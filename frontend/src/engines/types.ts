@@ -21,7 +21,7 @@ export interface AudioTrack {
     isDefault: boolean;
 }
 
-export type RequestKind = 'manifest' | 'playlist' | 'init' | 'segment' | 'key';
+export type RequestKind = 'manifest' | 'playlist' | 'init' | 'segment' | 'key' | 'license';
 
 export interface RequestTiming {
     kind: RequestKind;
@@ -48,6 +48,24 @@ export interface MediaPlaylistInfo {
     text: string | null;
 }
 
+export interface DrmConfig {
+    keySystem: 'com.widevine.alpha' | 'com.microsoft.playready';
+    licenseUrl: string;
+}
+
+export interface DrmState {
+    keySystem: string | null;
+    licenseServer: string | null;
+    videoRobustness: string | null;
+    audioRobustness: string | null;
+    encryptionScheme: string | null;
+    /** key id (hex) → MediaKeyStatus, e.g. usable, output-restricted, expired */
+    keyStatuses: Record<string, string>;
+    /** Seconds spent on license requests (engine's own count). */
+    licenseSeconds: number | null;
+    expiration: number | null;
+}
+
 export interface EngineEvents {
     manifest: {renditions: Rendition[]; master: string | null; live: boolean};
     rendition: {from: Rendition | null; to: Rendition};
@@ -61,6 +79,17 @@ export interface EngineEvents {
     playlist: MediaPlaylistInfo;
     /** The playhead entered a new Uplynk asset (#UPLYNK-SEGMENT: id,num,kind). */
     asset: {assetId: string; kind: string};
+    /** A DRM license request finished (or failed). */
+    license: {
+        ms: number;
+        status: number | null;
+        bytes: number;
+        failed: boolean;
+        error: string | null;
+    };
+    keystatus: {statuses: Record<string, string>};
+    /** DASH in-band event (emsg) the UI doesn't otherwise understand. */
+    emsg: {scheme: string; value: string; bytes: number};
     /** #EXT-X-DATERANGE, once per id; scte35 is the hex payload if any. */
     daterange: {
         id: string;
@@ -79,7 +108,8 @@ export interface PlayerEngine {
     readonly name: string;
     readonly version: string;
     load(url: string, video: HTMLVideoElement): void;
-    destroy(): void;
+    /** Resolves once the video element is free for the next engine. */
+    destroy(): Promise<void>;
     on<K extends EngineEventName>(event: K, listener: Listener<K>): void;
     /** Seconds between the playhead and the live edge, or null when not live. */
     liveEdgeDrift(): number | null;
@@ -90,6 +120,8 @@ export interface PlayerEngine {
     currentRendition(): Rendition | null;
     jumpToLive(): void;
     setAudioTrack(id: number): void;
+    /** DRM details, or null for clear/AES-128 playback. */
+    drmState(): DrmState | null;
 }
 
 /** Tiny typed event emitter shared by engine adapters. */

@@ -291,11 +291,15 @@ export class HlsJsEngine implements PlayerEngine {
         if (target !== null && Number.isFinite(target)) media.currentTime = target;
     }
 
+    drmState(): null {
+        return null; // FairPlay (Safari) arrives in a later release
+    }
+
     setAudioTrack(id: number): void {
         if (this.hls) this.hls.audioTrack = id;
     }
 
-    destroy(): void {
+    async destroy(): Promise<void> {
         this.hls?.destroy();
         this.hls = null;
         this.events.clear();

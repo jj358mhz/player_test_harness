@@ -76,7 +76,10 @@ def player() -> str:
         "initialSrc": request.args.get("src") or None,
         "endpoints": {
             "playback": url_for("api.playback"),
-            "versions": url_for("api.engine_versions", package="hls.js"),
+            "versions": {
+                package: url_for("api.engine_versions", package=package)
+                for package in ("hls.js", "shaka-player")
+            },
         },
     }
     return render_template("main/player.html", config=config, assets=vite_assets())

@@ -185,3 +185,44 @@ describe('uplynkSegment', async () => {
         expect(uplynkSegment({tagList: [['EXTINF', '4']]})).toBeNull();
     });
 });
+
+describe('shaka helpers', async () => {
+    const {drmHint, rayFromRepresentation, rayFromSegmentUrl} = await import(
+        '../src/engines/shaka'
+    );
+    const {defaultLicenseUrl} = await import('../src/app');
+
+    it('reads rays from DASH representation ids and segment URLs', () => {
+        expect(rayFromRepresentation('G')).toBe('g');
+        expect(rayFromRepresentation('video=2960177')).toBeNull();
+        expect(
+            rayFromSegmentUrl('https://cdn.example.com/slices/643/x/y/D00003391.m4s?pbs=1'),
+        ).toBe('d');
+        expect(rayFromSegmentUrl('https://cdn.example.com/slices/643/x/y/F00003391.ts')).toBe('f');
+        expect(rayFromSegmentUrl('https://cdn.example.com/slices/643/x/y/TK_init.mp4')).toBeNull();
+    });
+
+    it('explains common DRM errors', () => {
+        expect(drmHint(6007)).toMatch(/license request failed/i);
+        expect(drmHint(1001)).toBeNull();
+    });
+
+    it('derives the license URL from the stream zone', () => {
+        expect(
+            defaultLicenseUrl('https://content-ausw2-up-1.uplynk.com/preplay2/x.mpd?pbs=1', 'wv'),
+        ).toBe('https://content-ausw2-up-1.uplynk.com/wv');
+        expect(defaultLicenseUrl('https://example.com/a.mpd', 'pr')).toBe(
+            'https://content.uplynk.com/pr',
+        );
+    });
+});
+
+describe('chart scale', async () => {
+    const {niceStep} = await import('../src/ui/charts');
+    it('keeps about five grid lines for any range', () => {
+        expect(niceStep(3)).toBe(5);
+        expect(niceStep(12)).toBe(20);
+        expect(niceStep(1.7e9 / 5)).toBe(5e8);
+        expect(niceStep(Number.POSITIVE_INFINITY)).toBe(5);
+    });
+});

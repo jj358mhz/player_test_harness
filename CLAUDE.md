@@ -82,8 +82,11 @@ after dependency changes.
 - `frontend/src/` — the player:
   - `app.ts` — page controller: load bar, vitals, timeline, inspector tabs.
   - `engines/types.ts` — `PlayerEngine` interface + events; `engines/hlsjs.ts`
-    loads any hls.js version from jsDelivr (`dist/hls.mjs`); the npm
-    dependency gives types and `DEFAULT_HLS_VERSION`.
+    loads any hls.js version from jsDelivr (`dist/hls.mjs`); `engines/shaka.ts`
+    loads Shaka's UMD build with a `<script>` tag (`window.shaka`) and does
+    DASH + Widevine/PlayReady. npm dependencies give types and defaults.
+    `destroy()` is async: await it before attaching the next engine.
+    `window.playerEngine` is the live engine, for console debugging.
   - `lib/` — pure, unit-tested: `latency.ts` (ID3 latency at the playhead),
     `id3.ts`, `rays.ts` (ray from URI, `#UPLYNK-MEDIA0`, `rays=`),
     `scte35.ts` (splice_insert, time_signal, segmentation descriptors),
@@ -107,6 +110,15 @@ after dependency changes.
   the I-frame playlist), preceded by `#UPLYNK-MEDIA0:<W>x<H>x<fps>,<profile-level>,<ch>x<rate>`.
   The signed `rays=` param restricts playback to a set (e.g. `rays=fed`).
   Always label renditions with their ray in the UI.
+- DASH (Preplay `manifest=mpd`): video Representation `id` is the ray in
+  upper case (`A`…`H`), audio is `m`; segment files start with the ray
+  letter (`D00003391.m4f`, `F_init.mp4`); FairPlay HLS segments are
+  `FP_<RAY>…`. Ads are separate Periods with `AssetIdentifier
+  urn:com:uplynk:ad-asset-id`; `InbandEventStream com.uplynk.asset.metadata`.
+- Studio DRM channels: plain signed HLS is FairPlay (`METHOD=SAMPLE-AES`,
+  `skd://…/fp-spc/`, `KEYFORMAT="com.apple.streamingkeydelivery"`), Safari
+  only. In Chrome use Preplay `manifest=mpd&rmt=wv`: CENC DASH whose license
+  URL is `<prefix>/wv` (`/pr` for PlayReady); the MPD also carries it.
 - DRM: Widevine/PlayReady need DASH; FairPlay needs HLS. Studio DRM requires
   token-protected playback. License hosts: `content.uplynk.com/{wv,pr}` (use
   the Preplay `prefix` zone to avoid redirects). EME needs HTTPS.
@@ -142,8 +154,12 @@ in the `player_harness_data` volume.
 - [ ] Phase 2 — multi-player: more `PlayerEngine` adapters (Shaka, dash.js, native);
       per-engine latency source (ID3 wallclock for HLS; emsg/prft/UTCTiming
       for DASH). Presets move into the DB.
-- [ ] Phase 3 — DRM playback from Preplay `drm` config; DRM panel (key
-      system, license latency/status, robustness, key/HDCP errors)
+- [~] Phase 3 — DRM. **Done (v3.2.0):** Shaka engine, Widevine/PlayReady
+      over DASH from Preplay, DRM panel (key system, license timing/status,
+      robustness, expiry, per-key status with HDCP hints), FairPlay-in-Chrome
+      message. **Next:** FairPlay in Safari (SPC/CKC exchange with
+      `fairplayCertificateURL`), DRM badge on dashboard cards. PlayReady is
+      wired but untested (Chrome has no PlayReady; needs Edge).
 - [ ] Phase 4 — triage: recorded sessions with shareable links (retention
       setting), side-by-side compare, LL-HLS part/blocking-reload metrics,
       CMCD toggle, request waterfall, deep links, CSL cross-link via slicer_id

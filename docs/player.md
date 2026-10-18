@@ -50,9 +50,24 @@ bandwidth, switches, the last segment and dropped frames.
 
 ## DRM & keys
 
-Encryption method, keys seen and key load time. Uplynk key URIs include
-the ray (`r=`), so the same key on another ray isn't counted as a
-rotation. Widevine/PlayReady/FairPlay license timing comes with Phase 3.
+**Studio DRM** channels: choose **DRM → Widevine** (or PlayReady on Edge).
+The player switches to DASH and Shaka, signs a Preplay v2 session with
+`rmt=wv`, and uses the session's license URL. The tab shows:
+
+- key system, license server, robustness and license expiry;
+- license requests: count, average and last time, failures (also on the
+  timeline and in the waterfall);
+- **key status** per key id — `usable`, or problems such as
+  `output-restricted` (HDCP / output protection) with a hint;
+- DRM errors with a plain-language explanation of the Shaka error code.
+
+Plain signed HLS of a Studio DRM channel is **FairPlay**, which only Safari
+can decrypt; in Chrome the player says so and offers **Play with Widevine
+(DASH)**. FairPlay playback in Safari is still to come.
+
+For AES-128 HLS the tab shows the encryption method, keys seen and key load
+time. Uplynk key URIs include the ray (`r=`), so the same key on another
+ray isn't counted as a rotation.
 
 ## Metadata
 
@@ -85,9 +100,14 @@ Segment count, average load time, bytes and HTTP errors, plus a
 init and media segments and key fetches. Slow segments (over half the
 target duration) are orange; failures are red.
 
-## Engine versions
+## Engines and versions
 
-The menu lists the latest patch of the last three hls.js minor lines from
-npm (refreshed daily) plus **Custom version…** for any exact release.
-Versions load from jsDelivr. The default is the version pinned in
-`frontend/package.json`, which Dependabot keeps current.
+- **hls.js** plays HLS (clear and AES-128).
+- **Shaka Player** plays DASH and HLS, and is used for Widevine/PlayReady.
+  Choosing DASH or a DRM picks Shaka automatically.
+
+For each, the menu lists the latest patch of the last three minor lines
+from npm (refreshed daily) plus a custom exact version. Versions load from
+jsDelivr; the defaults are pinned in `frontend/package.json` and kept
+current by Dependabot. `playerEngine` in the browser console is the live
+engine (e.g. `playerEngine.drmState()`).

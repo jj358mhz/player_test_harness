@@ -17,6 +17,7 @@ import requests
 # package → GitHub repo for release-notes links
 ENGINES: dict[str, str] = {
     "hls.js": "video-dev/hls.js",
+    "shaka-player": "shaka-project/shaka-player",
 }
 
 NPM_REGISTRY = "https://registry.npmjs.org"
