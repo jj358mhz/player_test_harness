@@ -7,6 +7,7 @@ import hmac
 from urllib.parse import parse_qsl, urlsplit
 
 import pytest
+import requests
 
 from app.uplynk.playback import (
     PlaybackError,
@@ -14,6 +15,7 @@ from app.uplynk.playback import (
     fetch_preplay,
     manifest_base_url,
     preplay_base_url,
+    probe_manifest,
     sign_url,
 )
 from tests.conftest import FakeResponse, FakeSession
@@ -169,3 +171,31 @@ def test_fetch_preplay_parses_response():
 def test_fetch_preplay_errors(response, match):
     with pytest.raises(PlaybackError, match=match):
         fetch_preplay("https://signed/url", session=FakeSession(response))
+
+
+@pytest.mark.parametrize(
+    "body", ["#EXTM3U\n#EXT-X-VERSION:5\n", '<?xml version="1.0"?><MPD/>', "<MPD xmlns='x'/>"]
+)
+def test_probe_manifest_ok(body):
+    result = probe_manifest("https://u", session=FakeSession(FakeResponse(200, text=body)))
+    assert result.ok and result.status == 200 and result.error is None
+
+
+@pytest.mark.parametrize(
+    ("response", "status", "match"),
+    [
+        (
+            FakeResponse(400, text="<html><body>Non dash asset 0123abcd</body></html>"),
+            400,
+            "HTTP 400: Non dash asset 0123abcd",
+        ),
+        (FakeResponse(403, text=""), 403, "HTTP 403: response is not a manifest"),
+        (FakeResponse(200, text="<html>login</html>"), 200, "HTTP 200: login"),
+        (requests.ConnectionError("down"), None, "Request failed: down"),
+    ],
+)
+def test_probe_manifest_failures(response, status, match):
+    result = probe_manifest("https://u", session=FakeSession(response))
+    assert not result.ok
+    assert result.status == status
+    assert result.error == match

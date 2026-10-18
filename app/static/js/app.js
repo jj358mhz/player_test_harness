@@ -20,6 +20,22 @@ function flashButton(button, text) {
     setTimeout(() => { button.textContent = original; }, 1800);
 }
 
+// Show a flash message at the top of the page without reloading.
+function showNotice(message, kind = 'error') {
+    const main = document.querySelector('.site-main');
+    let list = main.querySelector(':scope > .flashes');
+    if (!list) {
+        list = document.createElement('ul');
+        list.className = 'flashes';
+        main.prepend(list);
+    }
+    const item = document.createElement('li');
+    item.className = `flash flash--${kind}`;
+    item.textContent = message;
+    list.prepend(item);
+    list.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+}
+
 // <button data-copy-url data-body='{"channel_id": 1, "manifest": "m3u8"}'>
 document.addEventListener('click', async (event) => {
     const button = event.target.closest('[data-copy-url]');
@@ -28,10 +44,15 @@ document.addEventListener('click', async (event) => {
     try {
         const data = await requestPlayback(JSON.parse(button.dataset.body));
         await navigator.clipboard.writeText(data.url);
-        flashButton(button, 'Copied ✓');
+        if (data.probe && !data.probe.ok) {
+            flashButton(button, 'Copied ⚠');
+            showNotice(`${button.dataset.label}: URL copied, but Uplynk answered ${data.probe.error}`);
+        } else {
+            flashButton(button, 'Copied ✓');
+        }
     } catch (err) {
         flashButton(button, 'Failed');
-        alert(`Could not sign URL: ${err.message}`);
+        showNotice(`Could not sign URL: ${err.message}`);
     } finally {
         button.disabled = false;
     }

@@ -85,12 +85,16 @@ Session-authenticated JSON. Send the page's CSRF token in `X-CSRFToken`.
   "mode": "preplay",            // url | preplay
   "drm": "wv",                  // wv | pr (mpd) · fps (m3u8) — Preplay only
   "ttl_seconds": 3600,
-  "params": {"delay": "10"}     // signed along with the token
+  "params": {"delay": "10"},    // signed along with the token
+  "probe": true                 // default; false skips the manifest check
 }
 ```
 
-Returns `{url, expires_at, mode, manifest, drm, event_id}`; Preplay adds
-`prefix`, `sid` and `drm_config` (license/certificate URLs).
+Returns `{url, expires_at, mode, manifest, drm, event_id, probe}`; Preplay
+adds `prefix`, `sid` and `drm_config` (license/certificate URLs). `probe` is
+the result of fetching the signed manifest once — `{ok, status, error,
+elapsed_ms}` — so content problems such as `HTTP 400: Non dash asset <id>`
+show up immediately instead of as a silent failed download.
 
 `GET /api/channels` lists active synced channels.
 

@@ -22,6 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Player** served behind login at `/player`; `?src=` autoloads a stream
 - Docker image, Compose stack for the Utility Pi, CI and SSH deploy workflows
 - App icon (pink play tile) and web manifest
+- **Manifest check after signing**: the server fetches the signed manifest
+  once and shows Uplynk's answer (e.g. `HTTP 400: Non dash asset <id>`) on the
+  Sign URL page, the dashboard copy buttons, and ▶ Play HLS. Recorded in the
+  activity log.
 
 ### Changed
 - Player moved to `app/player/hls-id3-player.html`; its reference docs moved to `docs/player.md`

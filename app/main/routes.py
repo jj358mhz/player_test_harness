@@ -56,6 +56,14 @@ def play_channel(channel_id: int):
     except PlaybackError as e:
         flash(f"Could not sign playback URL: {e}", "error")
         return redirect(url_for("main.index"))
+    probe = result.get("probe")
+    if probe and not probe["ok"]:
+        flash(
+            f"Uplynk answered {probe['error']} — not opening the player. "
+            "Use Advanced… to sign and open it anyway.",
+            "error",
+        )
+        return redirect(url_for("main.index"))
     return redirect(url_for("main.player", src=result["url"]))
 
 

@@ -112,8 +112,10 @@ in the `player_harness_data` volume.
       (200 on every channel), Preplay v2. DASH is signed correctly but
       Uplynk answers `400 Non dash asset <id>` when the airing asset has
       no DASH packaging — a content setting, not a signing bug
-- [ ] Probe the manifest after signing and show Uplynk's error text
-      (e.g. `Non dash asset`) instead of a silent failed download
+- [x] Probe the manifest after signing and show Uplynk's error text
+      (`probe_manifest` in `app/uplynk/playback.py`; tests stub it via the
+      autouse `probe_calls` fixture)
+- [ ] Review the player UI/structure before Phase 2 (layout feels stale)
 - [x] Merge PR #2 (bootstrap race between workers, gunicorn control socket)
 - [x] Port to CSL: PR #2 fixes and Dockerfile `LABEL` (csl-slicer-console
       #63, v1.15.3); CSL already had the deploy `concurrency` group
