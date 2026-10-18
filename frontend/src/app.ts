@@ -23,6 +23,7 @@ import type {
     RequestTiming,
 } from './engines/types';
 import {BANDS, bandFor} from './lib/bands';
+import {isVersion, parseView, type View, viewQuery} from './lib/deeplink';
 import {parsePriv, parseTxxx, toHex} from './lib/id3';
 import {Id3Clock} from './lib/latency';
 import {raysParam} from './lib/rays';
@@ -380,6 +381,17 @@ export class PlayerApp {
                 'div',
                 {class: 'pl-field pl-field--actions'},
                 h('button', {class: 'pl-btn-primary', type: 'submit'}, 'Load'),
+                h(
+                    'button',
+                    {
+                        class: 'pl-btn-ghost',
+                        type: 'button',
+                        title: 'Copy a link to this view: source, format, engine and version, DRM, rays and tab',
+                        onclick: (e: Event) =>
+                            void this.copyLink(e.currentTarget as HTMLButtonElement),
+                    },
+                    'Copy link',
+                ),
             ),
         );
     }
@@ -999,11 +1011,19 @@ export class PlayerApp {
         ]);
         this.versions = {'hls.js': hls, 'shaka-player': shaka, dashjs: dash};
         const select = this.el<HTMLSelectElement>('engine');
+        const {engine, version} = this.chosenEngine();
         const selected = select.value;
         select.replaceChildren(...this.engineOptions());
-        select.value = [...select.options].some((o) => o.value === selected)
-            ? selected
-            : `hls.js@${DEFAULT_HLS_VERSION}`;
+        const has = (value: string) => [...select.options].some((o) => o.value === value);
+        // A custom version that turns out to be on the menu (e.g. from a link) becomes that entry.
+        const listed = `${engine}@${version}`;
+        select.value =
+            selected.endsWith(`@${CUSTOM}`) && has(listed)
+                ? listed
+                : has(selected)
+                  ? selected
+                  : `hls.js@${DEFAULT_HLS_VERSION}`;
+        this.el<HTMLInputElement>('engineCustom').hidden = !select.value.endsWith(`@${CUSTOM}`);
     }
 
     private chosenEngine(): {engine: EngineName; version: string} {
@@ -1012,8 +1032,9 @@ export class PlayerApp {
             string,
         ];
         if (version !== CUSTOM) return {engine, version};
+        // The version goes into a jsDelivr URL: exact releases only.
         const typed = this.el<HTMLInputElement>('engineCustom').value.trim();
-        return {engine, version: typed || DEFAULT_VERSIONS[engine]};
+        return {engine, version: isVersion(typed) ? typed : DEFAULT_VERSIONS[engine]};
     }
 
     private selectEngine(engine: EngineName): void {
@@ -1050,6 +1071,8 @@ export class PlayerApp {
     private start(): void {
         const {initialChannel, initialSrc, channels} = this.config;
         const source = this.el<HTMLSelectElement>('source');
+        const view = parseView(location.search);
+        this.applyView(view);
         if (initialSrc) {
             source.value = PASTE;
             this.el<HTMLInputElement>('url').value = initialSrc;
@@ -1058,7 +1081,7 @@ export class PlayerApp {
         } else if (initialChannel && channels.some((c) => c.id === initialChannel)) {
             source.value = String(initialChannel);
             this.applyChannelDrm(this.selectedChannel());
-            void this.loadFromForm();
+            void this.loadFromForm(view.rays ? {rays: view.rays} : {});
         } else if (!channels.length) {
             source.value = PASTE;
             this.syncSourceInput();
@@ -1066,6 +1089,31 @@ export class PlayerApp {
                 'info',
                 'No synced channels yet. Paste a URL, or add an Uplynk account and sync it.',
             );
+        }
+    }
+
+    /** Set the load bar from a deep link: engine, then format, then DRM (each may adjust the others). */
+    private applyView(view: View): void {
+        if (view.engine) {
+            const select = this.el<HTMLSelectElement>('engine');
+            const version = view.version ?? DEFAULT_VERSIONS[view.engine];
+            const listed = `${view.engine}@${version}`;
+            if ([...select.options].some((o) => o.value === listed)) {
+                select.value = listed;
+            } else {
+                // Not on the menu yet (versions load later): use it as a custom version.
+                select.value = `${view.engine}@${CUSTOM}`;
+                this.el<HTMLInputElement>('engineCustom').value = version;
+            }
+            this.syncEngineInput();
+            this.el<HTMLInputElement>('engineCustom').blur();
+        }
+        if (view.format && ENGINE_FORMATS[this.chosenEngine().engine].includes(view.format))
+            this.setFormat(view.format);
+        if (view.drm) {
+            this.el<HTMLSelectElement>('drm').value = view.drm;
+            this.syncDrm();
+            this.autoDrm = false;
         }
     }
 
@@ -1078,9 +1126,9 @@ export class PlayerApp {
                 this.notice('error', 'Paste a stream URL to load.');
                 return;
             }
-            this.updateQuery({src: url});
             // A pasted .mpd plays as DASH whatever the toggle says.
             if (/\.mpd(\?|$)/i.test(url) && this.format() !== 'mpd') this.setFormat('mpd');
+            this.updateQuery({src: url});
             // Pasted URLs have no Preplay response; use Uplynk's default license host.
             const drm = this.drm();
             const license = drm ? defaultLicenseUrl(url, drm) : null;
@@ -1096,7 +1144,7 @@ export class PlayerApp {
         if (!channel) return;
         const drm = this.drm();
         const manifest = this.format();
-        this.updateQuery({channel: String(channel.id)});
+        this.updateQuery({channel: channel.id, rays: params.rays});
         let response: PlaybackResponse;
         try {
             response = await requestPlayback(this.config.endpoints.playback, {
@@ -1177,9 +1225,30 @@ export class PlayerApp {
         await this.loadFromForm(rays ? {rays} : {});
     }
 
-    private updateQuery(params: Record<string, string>): void {
-        const query = new URLSearchParams(params).toString();
+    /** Write what is about to play into the address bar, so the page can be shared or reloaded. */
+    private updateQuery(source: {src?: string; channel?: number; rays?: string}): void {
+        const {engine, version} = this.chosenEngine();
+        const query = viewQuery({
+            ...source,
+            format: this.format(),
+            engine,
+            version: engine === 'native' ? undefined : version,
+            // DRM the player chose for a DRM channel is chosen again on open.
+            drm: this.autoDrm ? undefined : (this.drm() ?? undefined),
+        });
         history.replaceState(null, '', `${location.pathname}?${query}${location.hash}`);
+    }
+
+    private async copyLink(button: HTMLButtonElement): Promise<void> {
+        try {
+            await navigator.clipboard.writeText(location.href);
+            button.textContent = 'Copied ✓';
+        } catch {
+            button.textContent = 'Copy failed';
+        }
+        setTimeout(() => {
+            button.textContent = 'Copy link';
+        }, 1500);
     }
 
     // ------------------------------------------------------------- playback

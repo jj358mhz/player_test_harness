@@ -109,7 +109,8 @@ after dependency changes.
   - `lib/` — pure, unit-tested: `latency.ts` (ID3 latency at the playhead),
     `id3.ts`, `rays.ts` (ray from URI, `#UPLYNK-MEDIA0`, `rays=`),
     `scte35.ts` (splice_insert, time_signal, segmentation descriptors),
-    `bands.ts`, `stats.ts`.
+    `bands.ts`, `stats.ts`, `deeplink.ts` (address bar ⇄ load bar; validates
+    engine versions because they end up in a jsDelivr URL).
   - Feature reference for users: `docs/player.md`.
 - `app/admin/` — Uplynk account CRUD + sync (admin-only).
 
@@ -192,9 +193,12 @@ in the `player_harness_data` volume.
       `flask check-encryption`. **Next:** FairPlay in Safari (SPC/CKC
       exchange with `fairplayCertificateURL`). PlayReady is
       wired but untested (Chrome has no PlayReady; needs Edge).
-- [ ] Phase 4 — triage: recorded sessions with shareable links (retention
-      setting), side-by-side compare, LL-HLS part/blocking-reload metrics,
-      CMCD toggle, request waterfall, deep links, CSL cross-link via slicer_id
+- [~] Phase 4 — triage (#24). **Done (v3.6.0):** deep links (source,
+      format, engine@version, DRM, rays, tab) + Copy link. **Left:**
+      recorded sessions with shareable links (retention setting),
+      side-by-side compare, LL-HLS part/blocking-reload metrics, CMCD
+      toggle, request waterfall detail, CSL cross-link via slicer_id,
+      old-Preplay-session latency investigation
 - [ ] Periodic background channel sync (for now: UI, CLI, or host cron)
 
 ### Todo
