@@ -14,6 +14,40 @@ export interface Rendition {
     profile: string | null; // from #UPLYNK-MEDIA0, e.g. high-31
 }
 
+export interface AudioTrack {
+    id: number;
+    name: string;
+    lang: string;
+    isDefault: boolean;
+}
+
+export type RequestKind = 'manifest' | 'playlist' | 'init' | 'segment' | 'key';
+
+export interface RequestTiming {
+    kind: RequestKind;
+    name: string;
+    /** performance.now() milliseconds */
+    start: number;
+    end: number;
+    status: number | null;
+    bytes: number;
+    failed: boolean;
+}
+
+export interface MediaPlaylistInfo {
+    ray: string | null;
+    live: boolean;
+    targetDuration: number;
+    windowSeconds: number;
+    segments: number;
+    firstSn: number;
+    lastSn: number;
+    hasProgramDateTime: boolean;
+    container: 'TS' | 'fMP4' | 'unknown';
+    /** Raw text when the engine exposes it (signatures still present). */
+    text: string | null;
+}
+
 export interface EngineEvents {
     manifest: {renditions: Rendition[]; master: string | null; live: boolean};
     rendition: {from: Rendition | null; to: Rendition};
@@ -22,6 +56,20 @@ export interface EngineEvents {
     segment: {ray: string | null; sn: number | string; ms: number; bytes: number};
     discontinuity: {cc: number};
     error: {fatal: boolean; details: string; status: number | null; url: string | null};
+    audio: {tracks: AudioTrack[]; current: number};
+    request: RequestTiming;
+    playlist: MediaPlaylistInfo;
+    /** The playhead entered a new Uplynk asset (#UPLYNK-SEGMENT: id,num,kind). */
+    asset: {assetId: string; kind: string};
+    /** #EXT-X-DATERANGE, once per id; scte35 is the hex payload if any. */
+    daterange: {
+        id: string;
+        cls: string;
+        start: Date;
+        duration: number | null;
+        scte35: string | null;
+        attribute: string | null;
+    };
 }
 
 export type EngineEventName = keyof EngineEvents;
@@ -41,6 +89,7 @@ export interface PlayerEngine {
     bandwidthEstimate(): number | null;
     currentRendition(): Rendition | null;
     jumpToLive(): void;
+    setAudioTrack(id: number): void;
 }
 
 /** Tiny typed event emitter shared by engine adapters. */

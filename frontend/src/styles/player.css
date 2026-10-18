@@ -133,12 +133,6 @@
     opacity: 0.45;
     cursor: not-allowed;
 }
-.pl-classic {
-    position: absolute;
-    top: 8px;
-    right: 12px;
-    font-size: 11.5px;
-}
 
 /* Status chips */
 .pl-status {
@@ -692,12 +686,118 @@
     .pl-loadbar {
         grid-template-columns: minmax(0, 1fr);
     }
-    .pl-classic {
-        position: static;
-    }
 }
 @media (prefers-reduced-motion: reduce) {
     .pl .chip--live::before {
         animation: none;
     }
+}
+
+/* Part 2: tracks, SCTE-35, waterfall, playlist switch */
+.pl-row--flush {
+    margin-top: 0;
+}
+.pl-btn-ghost[aria-pressed="true"] {
+    border-color: var(--accent);
+    background: var(--accent-bg);
+    color: var(--text-primary);
+}
+.pl-cue {
+    margin: 8px 0 0;
+    padding: 8px 10px;
+    background: var(--inset);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 13px;
+}
+.pl-scte .pl-code {
+    max-height: 220px;
+}
+.pl-seg--small {
+    height: 30px;
+}
+.pl-seg--small button {
+    font-size: 12px;
+}
+.chart-label--scte {
+    fill: var(--scte);
+}
+.pl-waterfall {
+    display: grid;
+    gap: 3px;
+    font: 11px var(--font-mono);
+    max-height: 320px;
+    overflow: auto;
+}
+.pl-wf {
+    display: grid;
+    grid-template-columns: 110px minmax(0, 1fr) 52px;
+    gap: 8px;
+    align-items: center;
+    color: var(--text-dim);
+}
+.pl-wf__name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.pl-wf__ms {
+    text-align: right;
+}
+.pl-wf__track {
+    position: relative;
+    height: 10px;
+    background: var(--surface-2);
+    border-radius: 2px;
+}
+.pl-wf__bar {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    border-radius: 2px;
+    background: var(--info);
+}
+.pl-wf--manifest,
+.pl-wf--playlist {
+    background: var(--text-dim);
+}
+.pl-wf--init {
+    background: var(--good);
+}
+.pl-wf--key {
+    background: var(--warn);
+}
+.pl-wf--slow {
+    background: var(--band-above);
+}
+.pl-wf--err {
+    background: var(--error);
+}
+.pl-meter {
+    display: grid;
+    gap: 4px;
+    margin-top: 8px;
+    font: 11.5px var(--font-mono);
+    color: var(--text-dim);
+}
+.pl-meter__row {
+    display: grid;
+    grid-template-columns: 14px minmax(0, 1fr) 84px;
+    gap: 8px;
+    align-items: center;
+}
+.pl-meter__row .num {
+    text-align: right;
+}
+.pl-meter__bar {
+    height: 8px;
+    border-radius: 4px;
+    background: var(--surface-2);
+    position: relative;
+    overflow: hidden;
+}
+.pl-meter__fill {
+    position: absolute;
+    inset: 0 auto 0 0;
+    background: linear-gradient(90deg, var(--good) 0 70%, var(--warn) 70% 90%, var(--error) 90%);
 }

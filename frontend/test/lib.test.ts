@@ -164,3 +164,24 @@ describe('app helpers', async () => {
         );
     });
 });
+
+describe('uplynkSegment', async () => {
+    const {uplynkSegment} = await import('../src/engines/hlsjs');
+
+    it.each([
+        [[['UPLYNK-SEGMENT', ' asset0001,0000001a,ad']]],
+        [[['#UPLYNK-SEGMENT: asset0001,0000001a,ad']]],
+        [
+            [
+                ['EXTINF', '4.096'],
+                ['UPLYNK-SEGMENT', 'asset0001,0000001a,ad'],
+            ],
+        ],
+    ])('reads asset and kind from %j', (tagList) => {
+        expect(uplynkSegment({tagList})).toEqual({assetId: 'asset0001', kind: 'ad'});
+    });
+
+    it('returns null without the tag', () => {
+        expect(uplynkSegment({tagList: [['EXTINF', '4']]})).toBeNull();
+    });
+});

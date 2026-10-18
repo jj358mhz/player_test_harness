@@ -27,9 +27,9 @@ latency, drift, ABR, DRM keys, ID3/SCTE-35, captions and more.
   the monitoring player with it. Copy HLS/DASH buttons for use in other players.
 - 📊 **Monitoring player** — video first, with latency (ID3, PDT and
   live-edge drift, measured at the playhead), Uplynk rays, an event
-  timeline and tabbed inspectors. Pick any hls.js version; the menu offers
-  the latest patch of the last three minor lines. The original player is at
-  `/player/classic` ([docs/player.md](docs/player.md)).
+  timeline with ad breaks (SCTE-35 decoded), tracks with an audio meter,
+  and a request waterfall. Pick any hls.js version; the menu offers the
+  latest patch of the last three minor lines. See [docs/player.md](docs/player.md).
 - 📜 **Audit trail** — every signing / Preplay request (base URL and params,
   never the signature) and every account or sync action.
 
@@ -39,7 +39,7 @@ latency, drift, ABR, DRM keys, ID3/SCTE-35, captions and more.
 |-------|--------------------------------------------------------------------------|---------|
 | 0     | Move to GitHub, scrub workspace-specific data                            | ✅ done |
 | 1     | Flask backend: accounts, channel sync, signing + Preplay API, Pi deploy  | ✅ done |
-| 2a    | Player rewrite: TypeScript + Vite, video-first layout, rays, versions    | in progress |
+| 2a    | Player rewrite: TypeScript + Vite, video-first layout, rays, versions    | ✅ done |
 | 2     | Multi-player: player adapter interface; hls.js, Shaka, dash.js, native   | planned |
 | 3     | DRM playback driven by Preplay; DRM diagnostics panel                    | planned |
 | 4     | Triage: recorded sessions, side-by-side compare, LL-HLS metrics, links   | planned |
@@ -244,7 +244,6 @@ player_test_harness/
 │   ├── api/                 # /api/playback, /api/channels + playback service
 │   ├── auth/                # Login / logout / argon2
 │   ├── main/                # Channels dashboard, player, sign tool, activity
-│   ├── player/              # The monitoring player (standalone HTML)
 │   ├── uplynk/
 │   │   ├── auth.py          # Scoped JWT + classic msg/sig auth
 │   │   ├── channels.py      # v4 channels client
@@ -258,7 +257,7 @@ player_test_harness/
 │   ├── src/engines/         # PlayerEngine interface + hls.js adapter
 │   ├── src/lib/             # Latency, ID3, rays, bands, stats (unit-tested)
 │   └── test/
-├── docs/player.md           # Classic player feature reference
+├── docs/player.md           # Player feature reference
 ├── migrations/              # Alembic
 ├── tests/                   # Pytest suite
 ├── .github/workflows/       # CI + deploy

@@ -3,17 +3,14 @@
 from __future__ import annotations
 
 from itertools import groupby
-from pathlib import Path
 
-from flask import abort, jsonify, redirect, render_template, request, send_file, url_for
+from flask import abort, jsonify, redirect, render_template, request, url_for
 from flask_login import login_required
 
 from app.main import bp
 from app.models import AdminEvent, Channel, PlaybackEvent, UplynkAccount, db
 from app.uplynk.playback import CONTENT_TYPES
 from app.vite import vite_assets
-
-PLAYER_HTML = Path(__file__).resolve().parent.parent / "player" / "hls-id3-player.html"
 
 
 @bp.route("/")
@@ -80,17 +77,9 @@ def player() -> str:
         "endpoints": {
             "playback": url_for("api.playback"),
             "versions": url_for("api.engine_versions", package="hls.js"),
-            "classic": url_for("main.player_classic"),
         },
     }
     return render_template("main/player.html", config=config, assets=vite_assets())
-
-
-@bp.route("/player/classic")
-@login_required
-def player_classic():
-    """The original single-file player, kept until the new one reaches parity."""
-    return send_file(PLAYER_HTML, mimetype="text/html", max_age=0)
 
 
 @bp.route("/sign")

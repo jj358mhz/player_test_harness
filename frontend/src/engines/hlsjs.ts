@@ -3,12 +3,12 @@
 // default version (bumped by Dependabot).
 
 import type HlsType from 'hls.js';
-import type {Level} from 'hls.js';
+import type {Fragment, Level, LoaderStats} from 'hls.js';
 import {version as pinned} from 'hls.js/package.json';
 import {parseId3} from '../lib/id3';
 import {ptsToSeconds} from '../lib/latency';
 import {parseUplynkMedia, rayFromUri, type UplynkMedia} from '../lib/rays';
-import {Emitter, type Listener, type PlayerEngine, type Rendition} from './types';
+import {Emitter, type Listener, type PlayerEngine, type Rendition, type RequestKind} from './types';
 
 export const DEFAULT_HLS_VERSION: string = pinned;
 
@@ -34,6 +34,8 @@ export class HlsJsEngine implements PlayerEngine {
     private media = new Map<string, UplynkMedia>();
     private lastCc: number | null = null;
     private keyStarted = new Map<string, number>();
+    private asset: string | null = null;
+    private dateRanges = new Set<string>();
 
     constructor(
         private Hls: HlsClass,
@@ -54,6 +56,7 @@ export class HlsJsEngine implements PlayerEngine {
             const details = data.networkDetails as XMLHttpRequest | undefined;
             const text = typeof details?.responseText === 'string' ? details.responseText : null;
             if (text) this.media = parseUplynkMedia(text);
+            this.request('manifest', 'master.m3u8', data.stats, 200);
             this.renditions = data.levels.map((_l, i) => this.toRendition(hls.levels[i], i));
             this.master = text;
         });
@@ -63,6 +66,45 @@ export class HlsJsEngine implements PlayerEngine {
             this.events.emit('manifest', {renditions: this.renditions, master: this.master, live});
         });
         hls.on(E.LEVEL_LOADED, (_e, data) => {
+            const {details} = data;
+            const ray = this.renditions[data.level]?.ray ?? null;
+            this.request('playlist', `${ray ?? data.level}.m3u8`, data.stats, 200);
+            const xhr = data.networkDetails as XMLHttpRequest | undefined;
+            const first = details.fragments[0];
+            const container = !first
+                ? 'unknown'
+                : details.fragments.some((f) => f.initSegment) ||
+                    /\.(m4s|mp4|cmf[av]?)(\?|$)/i.test(first.url)
+                  ? 'fMP4'
+                  : /\.ts(\?|$)/i.test(first.url)
+                    ? 'TS'
+                    : 'unknown';
+            this.events.emit('playlist', {
+                ray,
+                live: details.live,
+                targetDuration: details.targetduration,
+                windowSeconds: details.totalduration,
+                segments: details.fragments.length,
+                firstSn: details.startSN,
+                lastSn: details.endSN,
+                hasProgramDateTime: details.hasProgramDateTime,
+                container,
+                text: typeof xhr?.responseText === 'string' ? xhr.responseText : null,
+            });
+            for (const [id, range] of Object.entries(details.dateRanges)) {
+                if (!range || this.dateRanges.has(id)) continue;
+                this.dateRanges.add(id);
+                const attr = range.attr as unknown as Record<string, string | undefined>;
+                const which = ['SCTE35-OUT', 'SCTE35-IN', 'SCTE35-CMD'].find((k) => attr[k]);
+                this.events.emit('daterange', {
+                    id,
+                    cls: range.class,
+                    start: range.startDate,
+                    duration: range.duration ?? range.plannedDuration,
+                    scte35: which ? (attr[which] ?? null) : null,
+                    attribute: which ?? null,
+                });
+            }
             if (data.level === 0 || this.liveKnown) return;
             this.liveKnown = true;
             this.events.emit('manifest', {
@@ -77,6 +119,18 @@ export class HlsJsEngine implements PlayerEngine {
             this.events.emit('rendition', {from: this.current, to});
             this.current = to;
         });
+        const emitAudio = () =>
+            this.events.emit('audio', {
+                tracks: hls.audioTracks.map((t) => ({
+                    id: t.id,
+                    name: t.name,
+                    lang: t.lang ?? '',
+                    isDefault: t.default,
+                })),
+                current: hls.audioTrack,
+            });
+        hls.on(E.AUDIO_TRACKS_UPDATED, emitAudio);
+        hls.on(E.AUDIO_TRACK_SWITCHED, emitAudio);
         hls.on(E.FRAG_PARSING_METADATA, (_e, data) => {
             for (const sample of data.samples) {
                 this.events.emit('id3', {
@@ -94,6 +148,18 @@ export class HlsJsEngine implements PlayerEngine {
             if (!key?.uri) return;
             const started = this.keyStarted.get(key.uri);
             this.keyStarted.delete(key.uri);
+            // Cached keys resolve in ~0 ms; only real fetches belong in the waterfall.
+            if (started !== undefined && performance.now() - started > 3) {
+                this.events.emit('request', {
+                    kind: 'key',
+                    name: 'key',
+                    start: started,
+                    end: performance.now(),
+                    status: 200,
+                    bytes: 16,
+                    failed: false,
+                });
+            }
             this.events.emit('key', {
                 uri: key.uri,
                 method: key.method,
@@ -102,7 +168,15 @@ export class HlsJsEngine implements PlayerEngine {
         });
         hls.on(E.FRAG_LOADED, (_e, data) => {
             const {frag} = data;
-            if (frag.sn === 'initSegment') return;
+            const ray = this.renditions[frag.level]?.ray ?? null;
+            const init = frag.sn === 'initSegment';
+            this.request(
+                init ? 'init' : 'segment',
+                `${ray ?? frag.level} · ${init ? 'init' : `seg ${frag.sn}`}`,
+                frag.stats,
+                200,
+            );
+            if (init) return;
             const s = frag.stats.loading;
             this.events.emit('segment', {
                 ray: this.renditions[frag.level]?.ray ?? null,
@@ -115,9 +189,28 @@ export class HlsJsEngine implements PlayerEngine {
             const cc = data.frag.cc;
             if (this.lastCc !== null && cc !== this.lastCc) this.events.emit('discontinuity', {cc});
             this.lastCc = cc;
+            const asset = uplynkSegment(data.frag);
+            if (asset && `${asset.assetId},${asset.kind}` !== this.asset) {
+                this.asset = `${asset.assetId},${asset.kind}`;
+                this.events.emit('asset', asset);
+            }
         });
         hls.on(E.ERROR, (_e, data) => {
             const response = data.response as {code?: number} | undefined;
+            const status = typeof response?.code === 'number' ? response.code : null;
+            if (data.frag && status !== null && status >= 400) {
+                const now = performance.now();
+                const started = data.frag.stats.loading.start || now;
+                this.events.emit('request', {
+                    kind: 'segment',
+                    name: `${this.renditions[data.frag.level]?.ray ?? data.frag.level} · seg ${data.frag.sn}`,
+                    start: started,
+                    end: now,
+                    status,
+                    bytes: 0,
+                    failed: true,
+                });
+            }
             this.events.emit('error', {
                 fatal: data.fatal,
                 details: String(data.details),
@@ -129,6 +222,20 @@ export class HlsJsEngine implements PlayerEngine {
 
         hls.attachMedia(video);
         hls.loadSource(url);
+    }
+
+    private request(kind: RequestKind, name: string, stats: LoaderStats, status: number): void {
+        const {start, end} = stats.loading;
+        if (!start || !end) return;
+        this.events.emit('request', {
+            kind,
+            name,
+            start,
+            end,
+            status,
+            bytes: stats.total || stats.loaded,
+            failed: false,
+        });
     }
 
     private master: string | null = null;
@@ -184,9 +291,25 @@ export class HlsJsEngine implements PlayerEngine {
         if (target !== null && Number.isFinite(target)) media.currentTime = target;
     }
 
+    setAudioTrack(id: number): void {
+        if (this.hls) this.hls.audioTrack = id;
+    }
+
     destroy(): void {
         this.hls?.destroy();
         this.hls = null;
         this.events.clear();
     }
+}
+
+/** #UPLYNK-SEGMENT: <asset id>,<segment number>,<kind> from a fragment's tags. */
+export function uplynkSegment(
+    frag: Pick<Fragment, 'tagList'>,
+): {assetId: string; kind: string} | null {
+    for (const entry of frag.tagList ?? []) {
+        const joined = entry.join(':');
+        const match = /UPLYNK-SEGMENT:?\s*([^,\s]+),[^,]*,\s*([\w-]+)/i.exec(joined);
+        if (match) return {assetId: match[1] as string, kind: (match[2] as string).toLowerCase()};
+    }
+    return null;
 }
