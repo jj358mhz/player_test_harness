@@ -8,6 +8,8 @@ your Uplynk workspaces, signs playback URLs server-side (HLS and DASH, with
 Preplay v2 for DRM), and opens them in a monitoring player that tracks
 latency, drift, ABR, DRM keys, ID3/SCTE-35, captions and more.
 
+📖 **[Read the wiki](https://github.com/jj358mhz/player_test_harness/wiki)** — getting started, using the player, latency and drift, DRM, browser compatibility, Uplynk conventions and troubleshooting.
+
 ## 🌟 Highlights
 
 - 🏢 **Uplynk account management** — register workspaces with their API key
@@ -30,7 +32,8 @@ latency, drift, ABR, DRM keys, ID3/SCTE-35, captions and more.
   live-edge drift, measured at the playhead), Uplynk rays, an event
   timeline with ad breaks (SCTE-35 decoded), tracks with an audio meter,
   and a request waterfall. Pick any hls.js version; the menu offers the
-  latest patch of the last three minor lines. See [docs/player.md](docs/player.md).
+  latest patch of the last three minor lines. See [docs/player.md](docs/player.md)
+  and the [wiki](https://github.com/jj358mhz/player_test_harness/wiki/Using-the-Player).
 - 📜 **Audit trail** — every signing / Preplay request (base URL and params,
   never the signature) and every account or sync action.
 
