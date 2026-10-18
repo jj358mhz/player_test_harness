@@ -12,12 +12,14 @@ from flask_login import current_user
 
 from app.crypto import decrypt
 from app.models import Channel, PlaybackEvent, UplynkAccount, db
+from app.uplynk.clock import dash_clock
 from app.uplynk.playback import (
     DRM_TYPES,
     MANIFESTS,
     PlaybackError,
     PlaybackTarget,
     ProbeResult,
+    fetch_media_playlist,
     fetch_preplay,
     manifest_base_url,
     preplay_base_url,
@@ -98,6 +100,7 @@ def create_playback(req: PlaybackRequest) -> dict[str, Any]:
     content_base = current_app.config["UPLYNK_CONTENT_BASE"]
     ttl = req.ttl_seconds or current_app.config["PLAYBACK_TOKEN_TTL"]
     extra = list(req.extra)
+    api_key = decrypt(req.account.api_key_encrypted)
     if req.mode == "preplay":
         base_url = preplay_base_url(content_base, req.target)
         extra.append(("manifest", req.manifest))
@@ -121,7 +124,7 @@ def create_playback(req: PlaybackRequest) -> dict[str, Any]:
     db.session.add(event)
 
     try:
-        signed = sign_url(base_url, req.target, decrypt(req.account.api_key_encrypted), ttl, extra)
+        signed = sign_url(base_url, req.target, api_key, ttl, extra)
         event.expires_at = datetime.fromtimestamp(signed.expires_at, UTC)
         result: dict[str, Any] = {
             "mode": req.mode,
@@ -157,9 +160,31 @@ def create_playback(req: PlaybackRequest) -> dict[str, Any]:
         if req.channel and probe.encryption:
             record_encryption(req.channel, probe.encryption)
         result["probe"] = probe.as_dict()
+        if req.manifest == "mpd" and probe.ok and probe.body:
+            result["clock"] = measure_dash_clock(req, probe, api_key)
     db.session.commit()
     result["event_id"] = event.id
     return result
+
+
+def measure_dash_clock(req: PlaybackRequest, probe: ProbeResult, api_key: str) -> dict | None:
+    """How far this MPD's clock runs ahead of the encoder's (see app/uplynk/clock.py).
+
+    Signs the same content as HLS with `pdts=latency` (and the same `delay`,
+    so the windows overlap) and matches slices. Not audited: it's a
+    measurement, not playback. None for VOD or when nothing matches.
+    """
+    if 'type="dynamic"' not in probe.body:
+        return None
+    content_base = current_app.config["UPLYNK_CONTENT_BASE"]
+    params = [("pdts", "latency")] + [(k, v) for k, v in req.extra if k == "delay"]
+    base_url = manifest_base_url(content_base, req.target, "m3u8")
+    ttl = current_app.config["PLAYBACK_TOKEN_TTL"]
+    reference = fetch_media_playlist(sign_url(base_url, req.target, api_key, ttl, params).url)
+    if reference is None:
+        return None
+    clock = dash_clock(probe.body, reference, probe.fetched_at)
+    return clock.as_dict() if clock else None
 
 
 def record_encryption(channel: Channel, encryption: str) -> None:

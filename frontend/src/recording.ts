@@ -4,6 +4,7 @@
 
 import './styles/player.css';
 import {bandFor} from './lib/bands';
+import {CLOCK_LABELS} from './lib/clock';
 import type {Recording, StatsSummary} from './lib/recording';
 import {drawLatencyChart, drawTimeline} from './ui/charts';
 import {clock, h, kbps, resLabel, secs} from './ui/dom';
@@ -280,6 +281,18 @@ export function renderRecording(root: HTMLElement, r: Recording): void {
                     ['Item', 'Value'],
                     [
                         ['Source', r.source.url],
+                        ...(r.clock
+                            ? [
+                                  [
+                                      'Program dates',
+                                      `${CLOCK_LABELS[r.clock.kind].name}${r.clock.offsetS === null ? '' : ` · +${r.clock.offsetS.toFixed(1)} s`}`,
+                                  ],
+                                  [
+                                      'Uplynk delay',
+                                      r.clock.delay === null ? 'default' : `${r.clock.delay} s`,
+                                  ],
+                              ]
+                            : []),
                         ['Browser', r.userAgent],
                         ...(r.playlist
                             ? Object.entries(r.playlist).map(([k, v]) => [

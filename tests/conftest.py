@@ -52,6 +52,12 @@ def probe_calls(monkeypatch):
         return calls.result
 
     monkeypatch.setattr(service, "probe_manifest", fake)
+
+    def fake_media(url):
+        calls.media_urls.append(url)
+        return calls.media
+
+    monkeypatch.setattr(service, "fetch_media_playlist", fake_media)
     return calls
 
 
@@ -59,6 +65,8 @@ class ProbeCalls(list):
     def __init__(self, result):
         super().__init__()
         self.result = result
+        self.media = None  # what the DASH clock's reference HLS fetch returns
+        self.media_urls: list[str] = []
 
 
 @pytest.fixture

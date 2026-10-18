@@ -1,6 +1,8 @@
 // Calls to the harness backend. Signing happens server-side; the browser
 // never sees an Uplynk API key.
 
+import type {ServerClock} from './lib/clock';
+
 export interface Probe {
     ok: boolean;
     status: number | null;
@@ -23,6 +25,8 @@ export interface PlaybackResponse {
         playreadyLicenseURL?: string;
         fairplayCertificateURL?: string;
     } | null;
+    /** Live DASH: how far the MPD's clock runs ahead of the encoder's. */
+    clock?: ServerClock | null;
 }
 
 export interface PlaybackRequest {
