@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.1] - 2026-10-17
+
+### Fixed
+- The Sign URL page opened from a channel's **Advanced…** button has a
+  **← Back to channels** link that returns to that channel's card.
+
 ## [3.0.0] - 2026-10-17
 
 The standalone player becomes a self-hosted service: Uplynk accounts, channel

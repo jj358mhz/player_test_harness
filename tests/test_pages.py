@@ -190,3 +190,10 @@ def test_non_admin_cannot_manage_accounts(app, client):
     client.post("/auth/login", data={"email": "viewer@example.com", "password": "pw-123456"})
     assert client.get("/admin/uplynk-accounts").status_code == 403
     assert client.get("/").status_code == 200
+
+
+def test_sign_page_for_channel_links_back_to_its_card(auth_client, make_account, make_channel):
+    ch = make_channel(make_account(), "abc", description="Alpha")
+    html = auth_client.get(f"/sign?channel={ch.id}").get_data(as_text=True)
+    assert f'href="/#channel-{ch.id}">← Back to channels</a>' in html
+    assert "Back to channels" not in auth_client.get("/sign").get_data(as_text=True)
