@@ -58,7 +58,8 @@ after dependency changes.
 - `app/admin/` — Uplynk account CRUD + sync (admin-only).
 - `app/player/hls-id3-player.html` — the monitoring player, a single
   ~7k-line self-contained file served by `main.player` behind login.
-  `?src=<url>` autoloads. Must keep working standalone (opened from disk).
+  `?src=<url>` autoloads. Being replaced in Phase 2a; standalone use is no
+  longer required.
 
 ## Uplynk facts we rely on
 
@@ -92,8 +93,13 @@ in the `player_harness_data` volume.
 - [x] Phase 1 — backend: accounts, channel sync, signing + Preplay API,
       dashboard, Pi deploy, CI *(PR #1; live at player.telcomjj.com
       2026-10-17, login verified)*
-- [ ] Phase 2 — multi-player: split the player into ES modules (no build
-      step), `PlayerAdapter` interface (hls.js, Shaka, dash.js, native);
+- [ ] Phase 2a — player rewrite (decided 2026-10-17): TypeScript + Vite
+      (Node stage in the Dockerfile, typecheck/tests in CI), server-only
+      (drop the open-from-disk requirement), video-first layout: load bar,
+      pinned video + six vitals, 5-minute event timeline, tabbed inspector
+      (Latency, ABR, DRM & keys, Metadata, Tracks, Manifest, Network, Log).
+      Mockup reviewed before code.
+- [ ] Phase 2 — multi-player: `PlayerAdapter` interface (hls.js, Shaka, dash.js, native);
       per-engine latency source (ID3 wallclock for HLS; emsg/prft/UTCTiming
       for DASH). Presets move into the DB.
 - [ ] Phase 3 — DRM playback from Preplay `drm` config; DRM panel (key
@@ -115,7 +121,7 @@ in the `player_harness_data` volume.
 - [x] Probe the manifest after signing and show Uplynk's error text
       (`probe_manifest` in `app/uplynk/playback.py`; tests stub it via the
       autouse `probe_calls` fixture)
-- [ ] Review the player UI/structure before Phase 2 (layout feels stale)
+- [x] Review the player UI/structure before Phase 2 → Phase 2a above
 - [x] Merge PR #2 (bootstrap race between workers, gunicorn control socket)
 - [x] Port to CSL: PR #2 fixes and Dockerfile `LABEL` (csl-slicer-console
       #63, v1.15.3); CSL already had the deploy `concurrency` group
