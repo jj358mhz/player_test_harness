@@ -6,8 +6,8 @@ Uplynk stream is doing while it plays.
 
 ## Layout
 
-- **Load bar:** channel or pasted URL, format (HLS; DASH arrives with the
-  Shaka/dash.js engines), player engine version, DRM (Phase 3), Load.
+- **Load bar:** channel or pasted URL, format (HLS or DASH), player engine
+  and version, DRM, Load.
   `?channel=<id>` or `?src=<url>` in the address loads on open.
 - **Status chips:** live/VOD, engine version, encryption, codecs, rays,
   and time left on the playback token.
@@ -61,7 +61,8 @@ bandwidth, switches, the last segment and dropped frames.
 ## DRM & keys
 
 **Studio DRM** channels: choose **DRM → Widevine** (or PlayReady on Edge).
-The player switches to DASH and Shaka, signs a Preplay v2 session with
+The player switches to DASH and Shaka (or dash.js, if that's the chosen
+engine), signs a Preplay v2 session with
 `rmt=wv`, and uses the session's license URL. The tab shows:
 
 - key system, license server, robustness and license expiry;
@@ -117,10 +118,25 @@ target duration) are orange; failures are red.
 ## Engines and versions
 
 - **hls.js** plays HLS (clear and AES-128).
-- **Shaka Player** plays DASH and HLS, and is used for Widevine/PlayReady.
-  Choosing DASH or a DRM picks Shaka automatically.
+- **Shaka Player** plays DASH and HLS, and Widevine/PlayReady.
+- **dash.js** plays DASH, and Widevine/PlayReady. Without a DRM setting it
+  takes the license URL from the MPD's `<ms:laurl>`: Uplynk DASH is always
+  CENC, even on channels without Studio DRM. (Shaka does this by itself.)
+  dash.js 5.2 reports every request to the waterfall; older lines report
+  fewer.
+- **Native** (listed when the browser says it can play HLS) hands the URL
+  to the `<video>` element, as Safari does. The browser hides most of its
+  work: the ladder and rays come from the harness's own copy of the master
+  playlist, the current ray from the decoded frame size, latency from ID3
+  cues and `getStartDate()`, requests from Resource Timing where the
+  browser reports them. Outside Safari the built-in HLS is often
+  incomplete and may refuse the stream (`MEDIA_ERR_SRC_NOT_SUPPORTED`).
 
-For each, the menu lists the latest patch of the last three minor lines
+The format and engine keep each other valid: DASH picks Shaka unless
+dash.js is chosen, HLS picks hls.js unless Shaka or Native is chosen, and
+a DRM uses dash.js when it's selected, otherwise Shaka.
+
+For each npm engine, the menu lists the latest patch of the last three minor lines
 from npm (refreshed daily) plus a custom exact version. Versions load from
 jsDelivr; the defaults are pinned in `frontend/package.json` and kept
 current by Dependabot. `playerEngine` in the browser console is the live

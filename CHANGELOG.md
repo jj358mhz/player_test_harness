@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.5.0] - 2026-10-18
+
+### Added
+- **dash.js engine** (5.x, loaded from jsDelivr; the menu offers the latest
+  patch of the last three minor lines plus a custom version). Plays DASH,
+  Widevine and PlayReady with the same panels as Shaka: ray-labelled
+  ladder and switches, PDT latency, drift against its target delay,
+  request waterfall, license timing, key status, robustness and expiry.
+  Picking dash.js with a DRM uses it instead of Shaka.
+- **Native engine** (listed when the browser says it plays HLS): hands
+  the URL to `<video>`, as Safari does. Ladder and rays come from the
+  harness's own copy of the master; the current ray from the frame size;
+  latency from ID3 metadata cues and `getStartDate()`; requests from
+  Resource Timing where the browser reports them. The log and waterfall
+  say what the browser keeps hidden.
+- Compatibility panel names the new engines and explains that Uplynk DASH
+  is CENC even without Studio DRM.
+
+### Fixed
+- License log lines no longer claim `0 bytes` when the engine doesn't
+  report a size.
+
+### Notes
+- Uplynk lets a browser use a signed DASH URL once (`403 DRM sig reuse
+  rejected` on reuse). Synced channels are re-signed on every Load; a
+  pasted DASH URL has to be signed again before loading it in another
+  engine.
+
 ## [3.4.0] - 2026-10-18
 
 ### Added

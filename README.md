@@ -33,8 +33,9 @@ latency, drift, ABR, DRM keys, ID3/SCTE-35, captions and more.
 - 📊 **Monitoring player** — video first, with latency (ID3, PDT and
   live-edge drift, measured at the playhead), Uplynk rays, an event
   timeline with ad breaks (SCTE-35 decoded), tracks with an audio meter,
-  and a request waterfall. Pick any hls.js version; the menu offers the
-  latest patch of the last three minor lines. See [docs/player.md](docs/player.md)
+  and a request waterfall. Four engines to compare: **hls.js**, **Shaka
+  Player**, **dash.js** and the browser's **native** HLS (Safari). Each npm
+  engine offers the latest patch of its last three minor lines. See [docs/player.md](docs/player.md)
   and the [wiki](https://github.com/jj358mhz/player_test_harness/wiki/Using-the-Player).
 - 📜 **Audit trail** — every signing / Preplay request (base URL and params,
   never the signature) and every account or sync action.
@@ -46,8 +47,8 @@ latency, drift, ABR, DRM keys, ID3/SCTE-35, captions and more.
 | 0     | Move to GitHub, scrub workspace-specific data                            | ✅ done |
 | 1     | Flask backend: accounts, channel sync, signing + Preplay API, Pi deploy  | ✅ done |
 | 2a    | Player rewrite: TypeScript + Vite, video-first layout, rays, versions    | ✅ done |
-| 2     | Multi-player: player adapter interface; hls.js, Shaka, dash.js, native   | planned |
-| 3     | DRM playback driven by Preplay; DRM diagnostics panel                    | planned |
+| 2     | Multi-player: player adapter interface; hls.js, Shaka, dash.js, native   | ✅ done |
+| 3     | DRM playback driven by Preplay; DRM diagnostics panel                    | 🟡 Widevine/PlayReady done; FairPlay next |
 | 4     | Triage: recorded sessions, side-by-side compare, LL-HLS metrics, links   | planned |
 
 ## 🏗️ Architecture
@@ -59,7 +60,7 @@ latency, drift, ABR, DRM keys, ID3/SCTE-35, captions and more.
 | Auth             | Flask-Login + Flask-WTF (CSRF) + argon2                    |
 | Database         | SQLite (single-file, volume-mounted)                       |
 | Frontend         | Server-rendered HTML + a little vanilla JS (no build step) |
-| Player           | TypeScript + Vite (`frontend/`); hls.js from jsDelivr      |
+| Player           | TypeScript + Vite (`frontend/`); hls.js, Shaka, dash.js from jsDelivr |
 | Crypto           | `cryptography` (Fernet at rest, ES256 JWT, HMAC-SHA256)    |
 | WSGI server      | gunicorn                                                   |
 | Runtime          | Python 3.12 in a slim Debian container                     |
@@ -267,7 +268,7 @@ player_test_harness/
 │   └── templates/
 ├── frontend/                # The player: TypeScript + Vite → app/static/player
 │   ├── src/app.ts           # Page controller (load bar, vitals, tabs)
-│   ├── src/engines/         # PlayerEngine interface + hls.js adapter
+│   ├── src/engines/         # PlayerEngine interface + hls.js, Shaka, dash.js, native
 │   ├── src/lib/             # Latency, ID3, rays, bands, stats (unit-tested)
 │   └── test/
 ├── docs/player.md           # Player feature reference

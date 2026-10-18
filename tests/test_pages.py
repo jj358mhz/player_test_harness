@@ -69,6 +69,7 @@ def test_player_page_embeds_config_and_assets(auth_client, make_account, make_ch
     assert config["endpoints"]["versions"] == {
         "hls.js": "/api/engines/hls.js/versions",
         "shaka-player": "/api/engines/shaka-player/versions",
+        "dashjs": "/api/engines/dashjs/versions",
     }
     assert "api_key" not in raw.group(1)  # keys never reach the browser
 

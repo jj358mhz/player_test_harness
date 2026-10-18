@@ -95,7 +95,15 @@ after dependency changes.
   - `engines/types.ts` — `PlayerEngine` interface + events; `engines/hlsjs.ts`
     loads any hls.js version from jsDelivr (`dist/hls.mjs`); `engines/shaka.ts`
     loads Shaka's UMD build with a `<script>` tag (`window.shaka`) and does
-    DASH + Widevine/PlayReady. npm dependencies give types and defaults.
+    DASH + Widevine/PlayReady; `engines/dashjs.ts` imports dash.js's ESM
+    build (`dist/modern/esm/dash.all.min.js`, v5+), request timing via
+    `addResponseInterceptor`, license timing KEY_MESSAGE →
+    LICENSE_REQUEST_COMPLETE (protection events by name, e.g.
+    `public_keyMessage`); `engines/native.ts` is `video.src` (Safari),
+    with its own master fetch for the ladder and an optional `limits`
+    note. dash.js `reset()` clears `video.autoplay`/`muted`; the adapter
+    restores them. npm dependencies give types and defaults (dash.js's
+    version is read from `frontend/package.json`, it doesn't export its own).
     `destroy()` is async: await it before attaching the next engine.
     `window.playerEngine` is the live engine, for console debugging.
   - `lib/` — pure, unit-tested: `latency.ts` (ID3 latency at the playhead),
@@ -133,6 +141,12 @@ after dependency changes.
   `skd://…/fp-spc/`, `KEYFORMAT="com.apple.streamingkeydelivery"`), Safari
   only. In Chrome use Preplay `manifest=mpd&rmt=wv`: CENC DASH whose license
   URL is `<prefix>/wv` (`/pr` for PlayReady); the MPD also carries it.
+- **Uplynk DASH is always CENC**, even without Studio DRM: the MPD carries
+  Widevine/PlayReady `ContentProtection` with the license URL in
+  `<ms:laurl licenseUrl=…>` (Shaka uses it automatically; dash.js is given
+  it). A browser may use a signed DASH URL only once: a second fetch with
+  a browser User-Agent gets `403 DRM sig reuse rejected` (server-side
+  fetches like the probe don't count). Re-sign rather than replaying.
 - DRM: Widevine/PlayReady need DASH; FairPlay needs HLS. Studio DRM requires
   token-protected playback. License hosts: `content.uplynk.com/{wv,pr}` (use
   the Preplay `prefix` zone to avoid redirects). EME needs HTTPS.
@@ -165,9 +179,10 @@ in the `player_harness_data` volume.
       Engine versions: npm latest patch of the last 3 minors + Custom,
       loaded from jsDelivr; default pinned in npm, bumped by Dependabot.
       Classic player deleted.
-- [ ] Phase 2 — multi-player: more `PlayerEngine` adapters (Shaka, dash.js, native);
-      per-engine latency source (ID3 wallclock for HLS; emsg/prft/UTCTiming
-      for DASH). Presets move into the DB.
+- [x] Phase 2 — multi-player (v3.5.0): hls.js, Shaka, dash.js, native
+      adapters behind `PlayerEngine`. **Left:** DASH latency from
+      emsg/prft (PDT via the MPD is used now), presets in the DB, native
+      verified in real Safari.
 - [~] Phase 3 — DRM. **Done (v3.2.0):** Shaka engine, Widevine/PlayReady
       over DASH from Preplay, DRM panel (key system, license timing/status,
       robustness, expiry, per-key status with HDCP hints), FairPlay-in-Chrome

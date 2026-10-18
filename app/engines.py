@@ -18,6 +18,7 @@ import requests
 ENGINES: dict[str, str] = {
     "hls.js": "video-dev/hls.js",
     "shaka-player": "shaka-project/shaka-player",
+    "dashjs": "Dash-Industry-Forum/dash.js",
 }
 
 NPM_REGISTRY = "https://registry.npmjs.org"
