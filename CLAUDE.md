@@ -114,5 +114,6 @@ in the `player_harness_data` volume.
       no DASH packaging — a content setting, not a signing bug
 - [ ] Probe the manifest after signing and show Uplynk's error text
       (e.g. `Non dash asset`) instead of a silent failed download
-- [ ] Merge PR #2 (bootstrap race between workers, gunicorn control socket)
-- [ ] Port PR #2 fixes and the Dockerfile `LABEL` (deploy image prune) to CSL
+- [x] Merge PR #2 (bootstrap race between workers, gunicorn control socket)
+- [x] Port to CSL: PR #2 fixes and Dockerfile `LABEL` (csl-slicer-console
+      #63, v1.15.3); CSL already had the deploy `concurrency` group
