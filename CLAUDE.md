@@ -81,6 +81,9 @@ after dependency changes.
     until `total_items`. Allowed params: after, include_deleted, order,
     page, page_size, search, type (+ msg/sig).
   - `playback.py` — URL templates, token signing, Preplay v2 fetch.
+  - `clock.py` — DASH clock offset: matches MPD `$Number$` slices (per
+    Period `AssetIdentifier`) to `pdts=latency` HLS `#UPLYNK-SEGMENT`
+    slices. `create_playback` returns it as `clock` for live DASH.
   - `sync.py` — channels → DB upsert; deactivates missing, keeps favorites.
 - `app/api/service.py` — validates playback requests, signs/Preplays,
   writes `PlaybackEvent`, records `Channel.encryption` from the probe
@@ -109,6 +112,7 @@ after dependency changes.
   - `lib/` — pure, unit-tested: `latency.ts` (ID3 latency at the playhead),
     `id3.ts`, `rays.ts` (ray from URI, `#UPLYNK-MEDIA0`, `rays=`),
     `scte35.ts` (splice_insert, time_signal, segmentation descriptors),
+    `clock.ts` (which clock program dates use; `delay=` parsing),
     `bands.ts`, `stats.ts`, `deeplink.ts` (address bar ⇄ load bar; validates
     engine versions because they end up in a jsDelivr URL).
   - Feature reference for users: `docs/player.md`.
@@ -157,6 +161,18 @@ after dependency changes.
 - DRM: Widevine/PlayReady need DASH; FairPlay needs HLS. Studio DRM requires
   token-protected playback. License hosts: `content.uplynk.com/{wv,pr}` (use
   the Preplay `prefix` zone to avoid redirects). EME needs HTTPS.
+- **Latency clocks** (measured 2026-10-18, see `docs/player.md` "Which
+  clock"). `delay=<s>` signing param = seconds behind live (default -1 =
+  the channel's latency profile, 60 s unless set); HLS and DASH share the
+  same newest slice. HLS masters carry `#EXT-X-START:TIME-OFFSET=0`
+  (start at the oldest segment, a window of 8 × 4.096 s). Default HLS
+  PDT is per session (first slice = session start): ~5 s low, and an idle
+  session falls behind then catches up at ~2.5×. `pdts=latency` = encoder
+  time (works with Preplay too); `pdts=slicer` is anchored to the slicer
+  session start, useless. The MPD clock (`availabilityStartTime`) is
+  synthesised so the newest segment ends ≈ now; it shifts with `delay`,
+  is the same for every URL of a channel+delay, and ignores `pdts`. DASH
+  `$Number$` = HLS slice number (hex in `#UPLYNK-SEGMENT`) within an asset.
 - Docs index: https://docs.uplynk.com/llms.txt
 
 ## Deployment
@@ -205,8 +221,9 @@ in the `player_harness_data` volume.
       `/sessions/<slug>` replay via the `recording.ts` Vite entry,
       `SESSION_RETENTION_DAYS`, `flask prune-sessions`). **Left:**
       side-by-side compare, LL-HLS part/blocking-reload metrics, CMCD
-      toggle, request waterfall detail, CSL cross-link via slicer_id,
-      old-Preplay-session latency investigation
+      toggle, request waterfall detail, CSL cross-link via slicer_id.
+      **v3.8.0:** latency investigation done: `pdts=latency` for synced
+      HLS, DASH clock offset from the server, Delay control, Clock table
 - [ ] Periodic background channel sync (for now: UI, CLI, or host cron)
 
 ### Todo

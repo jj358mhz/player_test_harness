@@ -1,8 +1,10 @@
 // The player's address bar is a shareable view: what to play and how.
-//   ?channel=12&format=dash&engine=shaka@5.3.0&drm=wv&rays=fed#latency
+//   ?channel=12&format=dash&engine=shaka@5.3.0&drm=wv&rays=fed&delay=20#latency
 // `src=` replaces `channel=` for a pasted URL; the tab stays in the hash.
 // Links come from other people, so every value is checked before use:
 // the engine version ends up in a jsDelivr URL.
+
+import {parseDelay} from './clock';
 
 export type LinkEngine = 'hls.js' | 'shaka-player' | 'dashjs' | 'native';
 
@@ -16,6 +18,8 @@ export interface View {
     drm?: 'wv' | 'pr';
     /** Ray letters to sign into `rays=`, highest first (synced channels only). */
     rays?: string;
+    /** Uplynk `delay=` seconds to sign in (synced channels only). */
+    delay?: number;
 }
 
 /** Short names in links; the long npm names are accepted too. */
@@ -62,6 +66,8 @@ export function parseView(search: string): View {
     if (drm === 'wv' || drm === 'pr') view.drm = drm;
     const rays = q.get('rays')?.toLowerCase() ?? '';
     if (/^[a-z]{1,26}$/.test(rays)) view.rays = [...new Set(rays)].sort().reverse().join('');
+    const delay = parseDelay(q.get('delay'));
+    if (delay !== null) view.delay = delay;
     return view;
 }
 
@@ -80,6 +86,7 @@ export function viewQuery(view: View): string {
     }
     if (view.drm) q.set('drm', view.drm);
     if (view.rays && !view.src) q.set('rays', view.rays);
+    if (view.delay !== undefined && !view.src) q.set('delay', String(view.delay));
     // Keep @ and : readable; URLSearchParams escapes them.
     return q.toString().replace(/%40/g, '@').replace(/%3A/gi, ':').replace(/%2F/gi, '/');
 }

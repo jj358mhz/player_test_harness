@@ -22,7 +22,7 @@ Uplynk stream is doing while it plays.
 - **Deep links:** the address bar always describes the view, so it can be
   shared or reloaded: `?channel=<id>` (or `?src=<url>`), `format=dash`,
   `engine=<hlsjs|shaka|dashjs|native>[@<version>]`, `drm=wv|pr`,
-  `rays=fed`, plus the tab as `#latency` etc. Example:
+  `rays=fed`, `delay=20`, plus the tab as `#latency` etc. Example:
   `/player?channel=12&format=dash&engine=dashjs@5.2.1&drm=wv&rays=fed#keys`.
   Values are checked (exact versions only); a DRM channel still picks
   Widevine itself, so `drm=` is only written when you chose it.
@@ -54,12 +54,44 @@ All three are measured at the playhead, once a second:
 | Measure | What it is |
 |---|---|
 | **ID3 wallclock** | The encoder's timestamp in the segment's ID3 TXXX frame, carried forward to the frame on screen: `now − (wallclock + (currentTime − sample time))`. Needs `wallclock` enabled on the slicer. |
-| **Program date-time** | `#EXT-X-PROGRAM-DATE-TIME` at the playhead (`hls.playingDate`) to now. |
+| **Program date-time** | `#EXT-X-PROGRAM-DATE-TIME` at the playhead (`hls.playingDate`) to now. For DASH, the MPD's clock at the playhead, plus the measured offset (below). |
 | **Live-edge drift** | Playhead to the live edge of the playlist (`hls.latency`), with the engine's target shown alongside. |
 
 The headline number is ID3 when the stream has it, otherwise PDT. The
 Current / Average / Max / Min tiles run from load and use these bands:
 Awesome <10 s, Good 10–19 s, Average 19–25 s, Above avg 25–40 s, Yuk >40 s.
+
+### Which clock
+
+Program dates are only as good as the clock behind them, and Uplynk's
+defaults aren't the encoder's:
+
+- **HLS.** By default each playback session stamps its first slice with
+  the time the session started, so latency misses the delay before it
+  (about 5 s) and a session that idles falls behind, then catches up when
+  polled again. The player signs synced channels with **`pdts=latency`**,
+  which stamps slices with encoder time; the Latency tab says **Encoder
+  clock**. A pasted URL without it shows **Session clock**.
+- **DASH.** The MPD's clock is synthesised so its newest segment ends
+  about now, whatever the real delay, and `pdts` doesn't change it. So
+  dash.js and Shaka read roughly 30 s low. When it signs DASH, the server
+  also fetches the same channel as `pdts=latency` HLS (same `delay`),
+  matches a slice in both (the MPD's `$Number$` is the HLS slice number
+  within an asset) and returns how far the MPD clock runs ahead. The
+  player adds that: **MPD clock + offset**. Pasted MPDs show the raw
+  **MPD clock**.
+
+Measured on one channel with the default delay: about 65 s with hls.js
+(Uplynk serves 60 s behind and the master's `#EXT-X-START:TIME-OFFSET=0`
+starts at the oldest segment) and about 45–50 s with DASH (the newest
+segment is about 32 s old, plus the engine's `suggestedPresentationDelay`
+of 12.3 s). With `delay=20`: about 28 s and 21 s.
+
+**Delay** in the load bar signs Uplynk's `delay=` (seconds behind live;
+Default is the channel's latency profile, 60 s unless set). Synced
+channels only; it's kept in the link. The **Clock** table in the Latency
+tab shows the clock, the delay, where the master asks players to start
+(`EXT-X-START`) and when the session was loaded.
 
 **Auto-sync** jumps to live when drift passes a limit (at most every 10 s).
 **Tab return** does the same when you come back to the tab.

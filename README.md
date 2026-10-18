@@ -36,7 +36,8 @@ latency, drift, ABR, DRM keys, ID3/SCTE-35, captions and more.
 - ▶️ **One-click play** — each channel card signs a fresh HLS URL and opens
   the monitoring player with it. Copy HLS/DASH buttons for use in other players.
 - 📊 **Monitoring player** — video first, with latency (ID3, PDT and
-  live-edge drift, measured at the playhead), Uplynk rays, an event
+  live-edge drift, measured at the playhead, on the encoder's clock for
+  both HLS and DASH; Uplynk `delay=` from the load bar), Uplynk rays, an event
   timeline with ad breaks (SCTE-35 decoded), tracks with an audio meter,
   and a request waterfall. Four engines to compare: **hls.js**, **Shaka
   Player**, **dash.js** and the browser's **native** HLS (Safari). Each npm

@@ -24,6 +24,14 @@ import type {
     RequestTiming,
 } from './engines/types';
 import {BANDS, bandFor} from './lib/bands';
+import {
+    CLOCK_LABELS,
+    type ClockInfo,
+    clockFor,
+    DELAY_CHOICES,
+    hlsStart,
+    parseDelay,
+} from './lib/clock';
 import {isVersion, parseView, type View, viewQuery} from './lib/deeplink';
 import {parsePriv, parseTxxx, toHex} from './lib/id3';
 import {Id3Clock} from './lib/latency';
@@ -72,6 +80,8 @@ interface Source {
     url: string;
     expiresAt: Date | null;
     drm: DrmConfig | null;
+    /** What program dates mean for this URL (see lib/clock.ts). */
+    clock: ClockInfo;
 }
 
 type Format = 'm3u8' | 'mpd';
@@ -401,6 +411,24 @@ export class PlayerApp {
             ),
             h(
                 'div',
+                {class: 'pl-field'},
+                h('label', {for: 'pl-delay'}, 'Delay'),
+                this.ref(
+                    'delay',
+                    h(
+                        'select',
+                        {
+                            id: 'pl-delay',
+                            class: 'pl-control',
+                            title: "Uplynk's delay= signing param: seconds behind live. Default is the channel's latency profile (60 s unless set). Synced channels only",
+                        },
+                        h('option', {value: ''}, 'Default'),
+                        ...DELAY_CHOICES.map((d) => h('option', {value: String(d)}, `${d} s`)),
+                    ),
+                ),
+            ),
+            h(
+                'div',
                 {class: 'pl-field pl-field--actions'},
                 h('button', {class: 'pl-btn-primary', type: 'submit'}, 'Load'),
                 h(
@@ -619,9 +647,41 @@ export class PlayerApp {
                             row(
                                 'pdt',
                                 'Program date-time',
-                                '#EXT-X-PROGRAM-DATE-TIME at the playhead → now',
+                                '#EXT-X-PROGRAM-DATE-TIME (DASH: the MPD clock) at the playhead → now',
                             ),
                             row('drift', 'Live-edge drift', 'Playhead → live edge of the playlist'),
+                        ),
+                    ),
+                ),
+            ),
+            h(
+                'div',
+                {},
+                h('p', {class: 'pl-subhead'}, 'Clock'),
+                h(
+                    'div',
+                    {class: 'pl-table-wrap'},
+                    h(
+                        'table',
+                        {class: 'pl-defs'},
+                        h(
+                            'tbody',
+                            {},
+                            ...(
+                                [
+                                    ['clock', 'Program dates'],
+                                    ['delay', 'Uplynk delay'],
+                                    ['start', 'Start position'],
+                                    ['age', 'Session'],
+                                ] as const
+                            ).map(([key, name]) =>
+                                h(
+                                    'tr',
+                                    {},
+                                    h('td', {}, name),
+                                    this.ref(`clock-${key}`, h('td', {}, '--')),
+                                ),
+                            ),
                         ),
                     ),
                 ),
@@ -942,6 +1002,8 @@ export class PlayerApp {
         const url = this.el<HTMLInputElement>('url');
         url.hidden = !paste;
         if (paste) url.focus();
+        // delay= is signed in; a pasted URL's signature is fixed.
+        this.el<HTMLSelectElement>('delay').disabled = paste;
         this.applyChannelDrm(paste ? null : this.selectedChannel());
     }
 
@@ -1148,6 +1210,19 @@ export class PlayerApp {
             this.syncDrm();
             this.autoDrm = false;
         }
+        if (view.delay !== undefined) this.setDelay(view.delay);
+    }
+
+    /** Select a delay, adding it to the menu if a link asked for an unlisted one. */
+    private setDelay(delay: number): void {
+        const select = this.el<HTMLSelectElement>('delay');
+        if (![...select.options].some((o) => o.value === String(delay)))
+            select.append(h('option', {value: String(delay)}, `${delay} s`));
+        select.value = String(delay);
+    }
+
+    private delay(): number | null {
+        return parseDelay(this.el<HTMLSelectElement>('delay').value);
     }
 
     private async loadFromForm(params: Record<string, string> = {}): Promise<void> {
@@ -1170,6 +1245,7 @@ export class PlayerApp {
                 url,
                 expiresAt: expiryFromUrl(url),
                 drm: drm && license ? {keySystem: KEY_SYSTEMS[drm], licenseUrl: license} : null,
+                clock: clockFor(this.format(), url, null),
             });
             return;
         }
@@ -1177,13 +1253,21 @@ export class PlayerApp {
         if (!channel) return;
         const drm = this.drm();
         const manifest = this.format();
-        this.updateQuery({channel: channel.id, rays: params.rays});
+        const delay = this.delay();
+        this.updateQuery({channel: channel.id, rays: params.rays, delay: delay ?? undefined});
+        // Encoder-time program dates make HLS latency real; DASH ignores pdts
+        // (the server measures its clock offset instead).
+        const signed: Record<string, string> = {
+            ...params,
+            ...(manifest === 'm3u8' ? {pdts: 'latency'} : {}),
+            ...(delay !== null ? {delay: String(delay)} : {}),
+        };
         let response: PlaybackResponse;
         try {
             response = await requestPlayback(this.config.endpoints.playback, {
                 channel_id: channel.id,
                 manifest,
-                params,
+                params: signed,
                 // DRM needs Preplay: it returns the session URL and license servers.
                 ...(drm ? {mode: 'preplay' as const, drm} : {}),
             });
@@ -1229,6 +1313,7 @@ export class PlayerApp {
             url: response.url,
             expiresAt: new Date(response.expires_at),
             drm: drmConfig,
+            clock: clockFor(manifest, response.url, response.clock, delay),
         };
         if (response.probe && !response.probe.ok) {
             this.probeFailed(response.probe, source);
@@ -1259,7 +1344,12 @@ export class PlayerApp {
     }
 
     /** Write what is about to play into the address bar, so the page can be shared or reloaded. */
-    private updateQuery(source: {src?: string; channel?: number; rays?: string}): void {
+    private updateQuery(source: {
+        src?: string;
+        channel?: number;
+        rays?: string;
+        delay?: number;
+    }): void {
         const {engine, version} = this.chosenEngine();
         const query = viewQuery({
             ...source,
@@ -1314,6 +1404,7 @@ export class PlayerApp {
             live: s.live,
             userAgent: navigator.userAgent,
             latencyName: name,
+            clock: source.clock,
             stats: {
                 latency: summarize(this.headline().stats),
                 id3: summarize(s.latency.id3),
@@ -1896,7 +1987,9 @@ export class PlayerApp {
         const id3 = plausible(s.id3.latencyAt(this.video.currentTime, now));
         if (id3 !== null) s.latency.id3.add(id3);
         const date = engine.playingDate();
-        const pdt = plausible(date ? (now - date.getTime()) / 1000 : null);
+        // DASH: the MPD's clock runs ahead of the encoder's by the measured offset.
+        const offset = this.source?.clock.offsetS ?? 0;
+        const pdt = plausible(date ? (now - date.getTime()) / 1000 + offset : null);
         if (pdt !== null) s.latency.pdt.add(pdt);
         const drift = engine.liveEdgeDrift();
         if (drift !== null) s.latency.drift.add(drift);
@@ -1932,7 +2025,21 @@ export class PlayerApp {
         const {id3, pdt} = this.session.latency;
         return id3.count
             ? {stats: id3, name: 'ID3'}
-            : {stats: pdt, name: pdt.count ? 'PDT' : 'ID3'};
+            : {stats: pdt, name: pdt.count ? this.pdtName() : 'ID3'};
+    }
+
+    /** Short name of the program-date latency for this source's clock. */
+    private pdtName(): string {
+        switch (this.source?.clock.kind) {
+            case 'session':
+                return 'session PDT';
+            case 'mpd-offset':
+                return 'MPD + offset';
+            case 'mpd':
+                return 'MPD clock';
+            default:
+                return 'PDT';
+        }
     }
 
     // --------------------------------------------------------------- render
@@ -2059,6 +2166,48 @@ export class PlayerApp {
         }
         const target = this.engine?.targetLatency();
         this.el('target').textContent = target ? `· hls.js target ${secs(target)} s` : '';
+        this.renderClock();
+    }
+
+    private renderClock(): void {
+        const source = this.source;
+        const set = (key: string, text: string, title = '') => {
+            const el = this.el(`clock-${key}`);
+            el.textContent = text;
+            el.title = title;
+        };
+        if (!source) {
+            for (const key of ['clock', 'delay', 'start', 'age']) set(key, '--');
+            return;
+        }
+        const c = source.clock;
+        const label = CLOCK_LABELS[c.kind];
+        const offset =
+            c.kind === 'mpd-offset' && c.offsetS !== null
+                ? ` · +${c.offsetS.toFixed(1)} s (edge ${c.edgeAgeS?.toFixed(1) ?? '?'} s old at load, matched on ${c.slice})`
+                : '';
+        set('clock', `${label.name}${offset}`, label.what);
+        set(
+            'delay',
+            c.delay !== null
+                ? `delay=${c.delay} s`
+                : source.channel
+                  ? "default: the channel's latency profile (60 s unless set)"
+                  : 'not in the URL (the channel default)',
+        );
+        const start = hlsStart(this.session.master);
+        set(
+            'start',
+            c.kind === 'mpd' || c.kind === 'mpd-offset'
+                ? 'DASH: the engine picks (suggestedPresentationDelay)'
+                : (start ?? (this.session.master ? 'no EXT-X-START (engine default)' : '--')),
+        );
+        const age = Math.round((Date.now() - this.session.startedAt) / 1000);
+        set(
+            'age',
+            `loaded ${clock(new Date(this.session.startedAt))} · ${age < 120 ? `${age} s` : `${Math.round(age / 60)} min`} ago`,
+            'Default program dates are per session: a session that idles (nothing polling it) falls behind, then catches up when polled again',
+        );
     }
 
     private enabledRays(): string[] {

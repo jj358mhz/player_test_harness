@@ -3,6 +3,7 @@
 // is redacted here (and again on the server): no signatures, no session
 // tokens, no license URL queries.
 
+import type {ClockInfo} from './clock';
 import type {Point} from './stats';
 
 export const RECORDING_VERSION = 1;
@@ -45,6 +46,8 @@ export interface Recording {
     live: boolean;
     userAgent: string;
     latencyName: string;
+    /** What program dates meant (absent before v3.8.0). */
+    clock?: ClockInfo;
     stats: {latency: StatsSummary; id3: StatsSummary; pdt: StatsSummary; drift: StatsSummary};
     counters: Record<string, number | null>;
     series: {latency: Point[]; drift: Point[]};

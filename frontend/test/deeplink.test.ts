@@ -12,6 +12,12 @@ describe('deep links', () => {
             rays: 'fed',
         });
     });
+    it('reads and writes delay for channels only', () => {
+        expect(parseView('?channel=3&delay=20').delay).toBe(20);
+        expect(parseView('?channel=3&delay=9999').delay).toBeUndefined();
+        expect(viewQuery({channel: 3, delay: 20})).toBe('channel=3&delay=20');
+        expect(viewQuery({src: 'https://h/x.m3u8', delay: 20})).not.toContain('delay');
+    });
     it('accepts long engine names and a missing version', () => {
         expect(parseView('?engine=hls.js')).toEqual({engine: 'hls.js'});
         expect(parseView('?engine=dash.js@5.2.1')).toEqual({engine: 'dashjs', version: '5.2.1'});

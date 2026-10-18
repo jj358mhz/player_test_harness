@@ -187,6 +187,9 @@ class ProbeResult:
     elapsed_ms: int
     # HLS only: see classify_hls_encryption. None when not determined.
     encryption: str | None = None
+    # The manifest served (never sent to the browser: it carries session tokens).
+    body: str | None = field(default=None, repr=False)
+    fetched_at: float | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -218,12 +221,13 @@ def probe_manifest(
     except requests.RequestException as e:
         return ProbeResult(False, None, f"Request failed: {e}", _ms_since(start))
     elapsed = _ms_since(start)
+    fetched_at = time.time()
     body = response.text or ""
     if response.status_code == 200 and body.lstrip().startswith(_MANIFEST_MARKERS):
         encryption = None
         if body.lstrip().startswith("#EXTM3U"):
             encryption = _hls_encryption(body, url, timeout, http)
-        return ProbeResult(True, 200, None, elapsed, encryption)
+        return ProbeResult(True, 200, None, elapsed, encryption, body, fetched_at)
     detail = _strip_html(body) or "response is not a manifest"
     return ProbeResult(
         False, response.status_code, f"HTTP {response.status_code}: {detail}", elapsed
@@ -262,8 +266,27 @@ def first_variant_url(master: str, base_url: str) -> str | None:
 
 def _hls_encryption(body: str, url: str, timeout: int, http: Any) -> str | None:
     """Keys only appear in media playlists, so follow the first variant."""
+    media = _media_playlist(body, url, timeout, http)
+    return None if media is None else classify_hls_encryption(media)
+
+
+def fetch_media_playlist(
+    url: str, timeout: int = 8, session: requests.Session | None = None
+) -> str | None:
+    """Text of the first media playlist behind a signed HLS URL, or None."""
+    http = session or requests
+    try:
+        response = http.get(url, timeout=timeout)
+    except requests.RequestException:
+        return None
+    if response.status_code != 200 or not (response.text or "").lstrip().startswith("#EXTM3U"):
+        return None
+    return _media_playlist(response.text, url, timeout, http)
+
+
+def _media_playlist(body: str, url: str, timeout: int, http: Any) -> str | None:
     if "#EXT-X-STREAM-INF" not in body:
-        return classify_hls_encryption(body)
+        return body
     variant = first_variant_url(body, url)
     if variant is None:
         return None
@@ -273,7 +296,7 @@ def _hls_encryption(body: str, url: str, timeout: int, http: Any) -> str | None:
         return None
     if response.status_code != 200 or not (response.text or "").lstrip().startswith("#EXTM3U"):
         return None
-    return classify_hls_encryption(response.text)
+    return response.text
 
 
 def _ms_since(start: float) -> int:

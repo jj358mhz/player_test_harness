@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.8.0] - 2026-10-18
+
+### Added
+- **Real latency for DASH.** Uplynk's MPD clock puts the newest segment at
+  about now, so dash.js and Shaka read about 30 s low. When it signs a
+  live DASH URL, the server also fetches the channel as `pdts=latency`
+  HLS, matches a slice in both and returns the MPD clock's offset
+  (`clock` in `POST /api/playback`); the player adds it (**MPD clock +
+  offset**).
+- **Delay** in the load bar: signs Uplynk's `delay=` (15–120 s, or the
+  channel default) for synced channels, and `delay=` in deep links.
+- **Clock** table in the Latency tab: which clock the program dates use,
+  the delay, the master's `EXT-X-START` and when the session was loaded.
+  Recordings keep the clock and delay.
+
+### Changed
+- The player signs synced HLS with **`pdts=latency`**, so program dates
+  are encoder time. Uplynk's default dates start at the session's first
+  slice: they read about 5 s low and drift when a session idles (the
+  "old Preplay sessions fall behind" item in #24). Pasted URLs without it
+  are labelled **Session clock**. The Sign URL page and the dashboard's
+  Copy buttons are unchanged.
+
 ## [3.7.0] - 2026-10-18
 
 ### Added
