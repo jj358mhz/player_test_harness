@@ -17,6 +17,12 @@ on:
       - "v*"
   workflow_dispatch:
 
+# Merging two PRs back to back starts two deploys; run them one at a time so
+# they don't race on `docker compose up` (container name conflict).
+concurrency:
+  group: deploy-utility-pi
+  cancel-in-progress: false
+
 jobs:
   deploy:
     name: SSH deploy
