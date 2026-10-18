@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.3.0] - 2026-10-18
+
+### Added
+- **Compatibility panel** on the player page (collapsible, under the load
+  bar): a live check of this browser (HTTPS, Media Source Extensions,
+  native HLS, Widevine with L1/L3, PlayReady, FairPlay, ClearKey), a
+  browser × format × DRM matrix with this browser highlighted, and how
+  Uplynk maps onto it (Studio DRM over HLS is FairPlay; over DASH via
+  Preplay `rmt=wv|pr` it is Widevine/PlayReady; `Non dash asset`; which
+  engine the harness uses). The FairPlay warning links to it ("Why?").
+
 ## [3.2.2] - 2026-10-17
 
 ### Changed

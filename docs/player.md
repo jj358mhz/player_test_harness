@@ -23,6 +23,13 @@ Uplynk stream is doing while it plays.
 - **Inspector tabs** (deep-link with `#latency`, `#abr`, `#keys`, `#meta`,
   `#tracks`, `#manifest`, `#network`, `#log`).
 
+## Compatibility
+
+The **Compatibility** panel under the load bar checks what this browser can
+do (HTTPS, MSE, native HLS, Widevine L1/L3, PlayReady, FairPlay, ClearKey),
+shows which browser plays which format and DRM, and explains how Uplynk's
+Studio DRM maps onto them. It remembers whether you left it open.
+
 ## Latency
 
 All three are measured at the playhead, once a second:
