@@ -237,6 +237,17 @@ code {
     margin-bottom: 32px;
 }
 
+.back-link {
+    display: inline-block;
+    margin-bottom: 8px;
+    font-size: 13px;
+    color: var(--text-dim);
+}
+
+.back-link:hover {
+    color: var(--text-primary);
+}
+
 .page-header h1 {
     margin: 0;
     font-size: 36px;
