@@ -10,8 +10,10 @@ import {
 } from './api';
 import type {ChannelOption, PlayerConfig} from './config';
 import {DEFAULT_HLS_VERSION, HlsJsEngine, loadHlsJs} from './engines/hlsjs';
+import {DEFAULT_SHAKA_VERSION, loadShaka, ShakaEngine} from './engines/shaka';
 import type {
     AudioTrack,
+    DrmConfig,
     EngineEvents,
     MediaPlaylistInfo,
     PlayerEngine,
@@ -38,6 +40,7 @@ const LOG_LIMIT = 300;
 const CUSTOM = '__custom__';
 const PASTE = '__paste__';
 const WATERFALL_MS = 30 * 1000;
+const MAX_LATENCY_S = 6 * 3600;
 
 type LogKind = TimelineKind | 'id3' | 'info';
 
@@ -52,7 +55,19 @@ interface Source {
     channel: ChannelOption | null;
     url: string;
     expiresAt: Date | null;
+    drm: DrmConfig | null;
 }
+
+type Format = 'm3u8' | 'mpd';
+type EngineName = 'hls.js' | 'shaka-player';
+
+const ENGINE_LABELS: Record<EngineName, string> = {'hls.js': 'hls.js', 'shaka-player': 'Shaka'};
+const KEY_SYSTEMS = {wv: 'com.widevine.alpha', pr: 'com.microsoft.playready'} as const;
+const KEY_SYSTEM_NAMES: Record<string, string> = {
+    'com.widevine.alpha': 'Widevine',
+    'com.microsoft.playready': 'PlayReady',
+    'com.apple.fps': 'FairPlay',
+};
 
 /** Everything measured for one loaded stream; replaced on each load. */
 class Session {
@@ -82,15 +97,26 @@ class Session {
     audio: {tracks: AudioTrack[]; current: number} = {tracks: [], current: -1};
     asset: {assetId: string; kind: string} | null = null;
     pending: number[] = []; // timers to cancel on reload
+    licenses: {count: number; failed: number; ms: number[]; last: EngineEvents['license'] | null} =
+        {
+            count: 0,
+            failed: 0,
+            ms: [],
+            last: null,
+        };
+    keyStatuses: Record<string, string> = {};
+    fairplay = false;
+    fairplayWarned = false;
 }
 
 export class PlayerApp {
     private engine: PlayerEngine | null = null;
     private session = new Session();
     private source: Source | null = null;
-    private versions: EngineVersion[] = [];
+    private versions: Record<EngineName, EngineVersion[]> = {'hls.js': [], 'shaka-player': []};
     private disabledRays = new Set<string>();
     private manifestView: 'master' | 'media' = 'master';
+    private loadToken = 0;
     private readonly video: HTMLVideoElement;
     private readonly refs: Record<string, HTMLElement> = {};
     private readonly svgs: Record<'chart' | 'timeline', SVGSVGElement>;
@@ -216,14 +242,20 @@ export class PlayerApp {
             h(
                 'select',
                 {id: 'pl-engine', class: 'pl-control', onchange: () => this.syncEngineInput()},
-                h(
-                    'option',
-                    {value: DEFAULT_HLS_VERSION},
-                    `hls.js ${DEFAULT_HLS_VERSION} (default)`,
-                ),
-                h('option', {value: CUSTOM}, 'Custom version…'),
+                ...this.engineOptions(),
             ),
         );
+        const format = (value: Format, label: string) =>
+            h(
+                'button',
+                {
+                    type: 'button',
+                    'data-format': value,
+                    'aria-pressed': String(value === 'm3u8'),
+                    onclick: () => this.setFormat(value),
+                },
+                label,
+            );
         return h(
             'form',
             {
@@ -255,19 +287,13 @@ export class PlayerApp {
                 'div',
                 {class: 'pl-field'},
                 h('span', {class: 'pl-label', id: 'pl-format-label'}, 'Format'),
-                h(
-                    'div',
-                    {class: 'pl-seg', role: 'group', 'aria-labelledby': 'pl-format-label'},
-                    h('button', {type: 'button', 'aria-pressed': 'true'}, 'HLS'),
+                this.ref(
+                    'format',
                     h(
-                        'button',
-                        {
-                            type: 'button',
-                            'aria-pressed': 'false',
-                            disabled: true,
-                            title: 'DASH playback needs Shaka or dash.js (Phase 2)',
-                        },
-                        'DASH',
+                        'div',
+                        {class: 'pl-seg', role: 'group', 'aria-labelledby': 'pl-format-label'},
+                        format('m3u8', 'HLS'),
+                        format('mpd', 'DASH'),
                     ),
                 ),
             ),
@@ -280,9 +306,9 @@ export class PlayerApp {
                     'engineCustom',
                     h('input', {
                         class: 'pl-control mono',
-                        placeholder: 'e.g. 1.6.15',
+                        placeholder: 'exact version, e.g. 1.6.15',
                         hidden: true,
-                        'aria-label': 'hls.js version',
+                        'aria-label': 'Engine version',
                         pattern: '\\d+\\.\\d+\\.\\d+(-[\\w.]+)?',
                     }),
                 ),
@@ -291,15 +317,16 @@ export class PlayerApp {
                 'div',
                 {class: 'pl-field'},
                 h('label', {for: 'pl-drm'}, 'DRM'),
-                h(
-                    'select',
-                    {
-                        id: 'pl-drm',
-                        class: 'pl-control',
-                        disabled: true,
-                        title: 'DRM playback arrives in Phase 3',
-                    },
-                    h('option', {}, 'None'),
+                this.ref(
+                    'drm',
+                    h(
+                        'select',
+                        {id: 'pl-drm', class: 'pl-control', onchange: () => this.syncDrm()},
+                        h('option', {value: ''}, 'None'),
+                        h('option', {value: 'wv'}, 'Widevine (DASH)'),
+                        h('option', {value: 'pr'}, 'PlayReady (DASH)'),
+                        h('option', {value: 'fps', disabled: true}, 'FairPlay (Safari, coming)'),
+                    ),
                 ),
             ),
             h(
@@ -597,12 +624,9 @@ export class PlayerApp {
         return h(
             'div',
             {},
+            this.ref('drmKv', h('dl', {class: 'pl-kv', hidden: true})),
+            this.ref('keyStatuses', h('div', {class: 'pl-keystatus', hidden: true})),
             this.ref('keysKv', h('dl', {class: 'pl-kv'})),
-            h(
-                'p',
-                {class: 'pl-muted'},
-                'Widevine, PlayReady and FairPlay license timing arrive with DRM playback (Phase 3).',
-            ),
             this.ref('keysLog', h('div', {class: 'pl-log'})),
         );
     }
@@ -829,51 +853,102 @@ export class PlayerApp {
     }
 
     private syncEngineInput(): void {
-        const custom = this.el<HTMLSelectElement>('engine').value === CUSTOM;
+        const custom = this.el<HTMLSelectElement>('engine').value.endsWith(`@${CUSTOM}`);
         const input = this.el<HTMLInputElement>('engineCustom');
         input.hidden = !custom;
         if (custom) input.focus();
+        // hls.js can't play DASH; picking it switches the format back to HLS.
+        if (this.chosenEngine().engine === 'hls.js' && this.format() === 'mpd')
+            this.setFormat('m3u8');
+    }
+
+    private engineOptions(): HTMLElement[] {
+        const group = (engine: EngineName, label: string, pinned: string) => {
+            const list = this.versions[engine];
+            const versions = list.some((v) => v.version === pinned)
+                ? list
+                : [{version: pinned, released: null, notes_url: ''}, ...list];
+            return h(
+                'optgroup',
+                {label},
+                ...versions.map((v) => {
+                    const tags = [v.version === pinned ? 'default' : '', v.released ?? ''].filter(
+                        Boolean,
+                    );
+                    return h(
+                        'option',
+                        {value: `${engine}@${v.version}`},
+                        `${ENGINE_LABELS[engine]} ${v.version}${tags.length ? ` (${tags.join(', ')})` : ''}`,
+                    );
+                }),
+                h(
+                    'option',
+                    {value: `${engine}@${CUSTOM}`},
+                    `${ENGINE_LABELS[engine]} custom version…`,
+                ),
+            );
+        };
+        return [
+            group('hls.js', 'hls.js (HLS)', DEFAULT_HLS_VERSION),
+            group('shaka-player', 'Shaka Player (DASH, HLS, DRM)', DEFAULT_SHAKA_VERSION),
+        ];
     }
 
     private async loadVersions(): Promise<void> {
-        this.versions = await fetchVersions(this.config.endpoints.versions).catch(() => []);
+        const endpoints = this.config.endpoints.versions;
+        const [hls, shaka] = await Promise.all([
+            fetchVersions(endpoints['hls.js'] ?? '').catch(() => []),
+            fetchVersions(endpoints['shaka-player'] ?? '').catch(() => []),
+        ]);
+        this.versions = {'hls.js': hls, 'shaka-player': shaka};
         const select = this.el<HTMLSelectElement>('engine');
         const selected = select.value;
-        const seen = new Set<string>();
-        const options: HTMLOptionElement[] = [];
-        for (const v of this.versions) {
-            seen.add(v.version);
-            const tags = [
-                v.version === DEFAULT_HLS_VERSION ? 'default' : '',
-                v.released ?? '',
-            ].filter(Boolean);
-            options.push(
-                h(
-                    'option',
-                    {value: v.version},
-                    `hls.js ${v.version}${tags.length ? ` (${tags.join(', ')})` : ''}`,
-                ),
-            );
-        }
-        if (!seen.has(DEFAULT_HLS_VERSION)) {
-            options.unshift(
-                h(
-                    'option',
-                    {value: DEFAULT_HLS_VERSION},
-                    `hls.js ${DEFAULT_HLS_VERSION} (default)`,
-                ),
-            );
-        }
-        select.replaceChildren(...options, h('option', {value: CUSTOM}, 'Custom version…'));
+        select.replaceChildren(...this.engineOptions());
         select.value = [...select.options].some((o) => o.value === selected)
             ? selected
-            : DEFAULT_HLS_VERSION;
+            : `hls.js@${DEFAULT_HLS_VERSION}`;
     }
 
-    private chosenVersion(): string {
-        const select = this.el<HTMLSelectElement>('engine');
-        if (select.value !== CUSTOM) return select.value;
-        return this.el<HTMLInputElement>('engineCustom').value.trim() || DEFAULT_HLS_VERSION;
+    private chosenEngine(): {engine: EngineName; version: string} {
+        const [engine, version] = this.el<HTMLSelectElement>('engine').value.split('@') as [
+            EngineName,
+            string,
+        ];
+        if (version !== CUSTOM) return {engine, version};
+        const typed = this.el<HTMLInputElement>('engineCustom').value.trim();
+        return {
+            engine,
+            version: typed || (engine === 'hls.js' ? DEFAULT_HLS_VERSION : DEFAULT_SHAKA_VERSION),
+        };
+    }
+
+    private selectEngine(engine: EngineName): void {
+        if (this.chosenEngine().engine === engine) return;
+        this.el<HTMLSelectElement>('engine').value =
+            `${engine}@${engine === 'hls.js' ? DEFAULT_HLS_VERSION : DEFAULT_SHAKA_VERSION}`;
+        this.syncEngineInput();
+    }
+
+    private format(): Format {
+        const pressed = this.el('format').querySelector('[aria-pressed="true"]');
+        return (pressed?.getAttribute('data-format') as Format) ?? 'm3u8';
+    }
+
+    private setFormat(value: Format): void {
+        for (const b of this.el('format').querySelectorAll('button')) {
+            b.setAttribute('aria-pressed', String(b.getAttribute('data-format') === value));
+        }
+        if (value === 'mpd') this.selectEngine('shaka-player');
+        if (value === 'm3u8' && this.drm()) this.el<HTMLSelectElement>('drm').value = '';
+    }
+
+    private drm(): 'wv' | 'pr' | null {
+        const value = this.el<HTMLSelectElement>('drm').value;
+        return value === 'wv' || value === 'pr' ? value : null;
+    }
+
+    private syncDrm(): void {
+        if (this.drm()) this.setFormat('mpd'); // Widevine/PlayReady need DASH and Shaka
     }
 
     private start(): void {
@@ -907,18 +982,32 @@ export class PlayerApp {
                 return;
             }
             this.updateQuery({src: url});
-            await this.play({channel: null, url, expiresAt: expiryFromUrl(url)});
+            // A pasted .mpd plays as DASH whatever the toggle says.
+            if (/\.mpd(\?|$)/i.test(url) && this.format() !== 'mpd') this.setFormat('mpd');
+            // Pasted URLs have no Preplay response; use Uplynk's default license host.
+            const drm = this.drm();
+            const license = drm ? defaultLicenseUrl(url, drm) : null;
+            await this.play({
+                channel: null,
+                url,
+                expiresAt: expiryFromUrl(url),
+                drm: drm && license ? {keySystem: KEY_SYSTEMS[drm], licenseUrl: license} : null,
+            });
             return;
         }
         const channel = this.config.channels.find((c) => String(c.id) === value) ?? null;
         if (!channel) return;
+        const drm = this.drm();
+        const manifest = this.format();
         this.updateQuery({channel: String(channel.id)});
         let response: PlaybackResponse;
         try {
             response = await requestPlayback(this.config.endpoints.playback, {
                 channel_id: channel.id,
-                manifest: 'm3u8',
+                manifest,
                 params,
+                // DRM needs Preplay: it returns the session URL and license servers.
+                ...(drm ? {mode: 'preplay' as const, drm} : {}),
             });
         } catch (err) {
             this.notice(
@@ -927,7 +1016,27 @@ export class PlayerApp {
             );
             return;
         }
-        const source = {channel, url: response.url, expiresAt: new Date(response.expires_at)};
+        let drmConfig: DrmConfig | null = null;
+        if (drm) {
+            const licenseUrl =
+                drm === 'wv'
+                    ? response.drm_config?.widevineLicenseURL
+                    : response.drm_config?.playreadyLicenseURL;
+            if (!licenseUrl) {
+                this.notice(
+                    'error',
+                    `Preplay returned no ${drm === 'wv' ? 'Widevine' : 'PlayReady'} license URL for ${channel.name}. Is Studio DRM enabled on this channel?`,
+                );
+                return;
+            }
+            drmConfig = {keySystem: KEY_SYSTEMS[drm], licenseUrl};
+        }
+        const source: Source = {
+            channel,
+            url: response.url,
+            expiresAt: new Date(response.expires_at),
+            drm: drmConfig,
+        };
         if (response.probe && !response.probe.ok) {
             this.probeFailed(response.probe, source);
             return;
@@ -965,35 +1074,71 @@ export class PlayerApp {
 
     private async play(source: Source): Promise<void> {
         this.clearNotices();
-        this.engine?.destroy();
+        const previous = this.engine;
         this.engine = null;
+        this.loadToken += 1;
+        const token = this.loadToken;
+        // Shaka needs the old player fully detached before a new one attaches.
+        await previous?.destroy();
+        if (token !== this.loadToken) return; // a newer load started meanwhile
         for (const timer of this.session.pending) clearTimeout(timer);
         this.session = new Session();
         this.source = source;
         this.renderAll();
-        const version = this.chosenVersion();
-        let Hls: Awaited<ReturnType<typeof loadHlsJs>>;
+        const {engine: kind, version} = source.drm
+            ? {engine: 'shaka-player' as const, version: this.shakaVersion()}
+            : this.chosenEngine();
+        let engine: PlayerEngine;
         try {
-            Hls = await loadHlsJs(version);
+            if (kind === 'shaka-player') {
+                const shaka = await loadShaka(version);
+                if (!shaka.Player.isBrowserSupported()) {
+                    this.notice(
+                        'error',
+                        'This browser lacks the Media Source / EME support Shaka needs.',
+                    );
+                    return;
+                }
+                engine = new ShakaEngine(shaka, version, source.drm);
+            } else {
+                const Hls = await loadHlsJs(version);
+                if (!Hls.isSupported()) {
+                    this.notice(
+                        'error',
+                        'This browser does not support Media Source Extensions, which hls.js needs.',
+                    );
+                    return;
+                }
+                engine = new HlsJsEngine(Hls, version);
+            }
         } catch {
             this.notice(
                 'error',
-                `Could not load hls.js ${version} from jsDelivr. Check the version number.`,
+                `Could not load ${ENGINE_LABELS[kind]} ${version} from jsDelivr. Check the version number.`,
             );
             return;
         }
-        if (!Hls.isSupported()) {
-            this.notice(
-                'error',
-                'This browser does not support Media Source Extensions, which hls.js needs.',
-            );
+        if (token !== this.loadToken) {
+            await engine.destroy();
             return;
         }
-        const engine = new HlsJsEngine(Hls, version);
         this.engine = engine;
+        // Handy from the browser console when triaging: playerEngine.drmState() etc.
+        (window as unknown as {playerEngine: PlayerEngine}).playerEngine = engine;
         this.wire(engine);
-        this.logEntry('info', 'LOAD', `${source.channel?.name ?? 'URL'} · hls.js ${version}`);
+        const drmText = source.drm ? ` · ${KEY_SYSTEM_NAMES[source.drm.keySystem]}` : '';
+        this.logEntry(
+            'info',
+            'LOAD',
+            `${source.channel?.name ?? 'URL'} · ${engine.name} ${version}${drmText}`,
+        );
         engine.load(source.url, this.video);
+    }
+
+    /** The Shaka version to use when DRM forces Shaka. */
+    private shakaVersion(): string {
+        const chosen = this.chosenEngine();
+        return chosen.engine === 'shaka-player' ? chosen.version : DEFAULT_SHAKA_VERSION;
     }
 
     private wire(engine: PlayerEngine): void {
@@ -1041,6 +1186,49 @@ export class PlayerApp {
             n.bytes += seg.bytes;
             n.last = seg;
         });
+        engine.on('license', (lic) => {
+            const l = s().licenses;
+            l.last = lic;
+            if (lic.failed) {
+                l.failed += 1;
+                this.logEntry('err', 'LICENSE ✗', lic.error ?? 'license request failed');
+                this.mark('err', `License failed · ${lic.error ?? ''}`);
+            } else {
+                l.count += 1;
+                l.ms.push(lic.ms);
+                this.logEntry(
+                    'key',
+                    'LICENSE',
+                    `HTTP ${lic.status} · ${lic.ms} ms · ${lic.bytes} bytes`,
+                );
+                this.mark('key', `License ${lic.ms} ms`);
+            }
+            this.renderKeys();
+        });
+        engine.on('keystatus', ({statuses}) => {
+            const before = s().keyStatuses;
+            for (const [id, status] of Object.entries(statuses)) {
+                if (before[id] !== status) {
+                    const bad = status !== 'usable' && status !== 'status-pending';
+                    this.logEntry(
+                        bad ? 'err' : 'key',
+                        'KEY STATUS',
+                        `${shortKey(id)} → ${status}${KEY_STATUS_HINTS[status] ? ` · ${KEY_STATUS_HINTS[status]}` : ''}`,
+                    );
+                    if (bad) this.mark('err', `Key ${shortKey(id)} ${status}`);
+                }
+            }
+            s().keyStatuses = {...statuses};
+            this.renderKeys();
+        });
+        engine.on('emsg', ({scheme, value, bytes}) => {
+            this.logEntry(
+                'id3',
+                'EMSG',
+                `${scheme}${value ? ` · ${value}` : ''} · ${bytes} bytes`,
+                'meta',
+            );
+        });
         engine.on('audio', (audio) => {
             s().audio = audio;
             this.renderTracks();
@@ -1053,6 +1241,10 @@ export class PlayerApp {
         });
         engine.on('playlist', (info) => {
             s().playlist = info;
+            if (info.text?.includes('com.apple.streamingkeydelivery') && !s().fairplay) {
+                s().fairplay = true;
+                if (!isSafari()) this.warnFairPlay();
+            }
             if (this.manifestView === 'media') this.renderManifest();
         });
         engine.on('asset', (asset) => {
@@ -1097,12 +1289,42 @@ export class PlayerApp {
             const label = http ? `HTTP ${err.status}` : 'FATAL';
             this.logEntry('err', label, text);
             this.mark('err', `${label} · ${err.details}`);
+            if (s().fairplay && !isSafari()) {
+                this.warnFairPlay();
+                return;
+            }
             if (err.fatal)
                 this.notice(
                     'error',
                     `Playback error: ${err.details}${err.status ? ` (HTTP ${err.status})` : ''}`,
                 );
         });
+    }
+
+    /** Studio DRM over HLS is FairPlay, which only Safari can decrypt. */
+    private warnFairPlay(): void {
+        if (this.session.fairplayWarned) return;
+        this.session.fairplayWarned = true;
+        const channel = this.source?.channel;
+        this.notice(
+            'error',
+            'This stream uses FairPlay DRM (Studio DRM over HLS), which only Safari can play. In Chrome, play it as DASH with Widevine.',
+            channel
+                ? h(
+                      'button',
+                      {
+                          type: 'button',
+                          class: 'pl-btn-ghost',
+                          onclick: () => {
+                              this.el<HTMLSelectElement>('drm').value = 'wv';
+                              this.syncDrm();
+                              void this.loadFromForm();
+                          },
+                      },
+                      'Play with Widevine (DASH)',
+                  )
+                : undefined,
+        );
     }
 
     private onScte35(bytes: Uint8Array, source: string, delayMs: number): void {
@@ -1301,10 +1523,14 @@ export class PlayerApp {
     private measure(engine: PlayerEngine): void {
         const s = this.session;
         const now = Date.now();
-        const id3 = s.id3.latencyAt(this.video.currentTime, now);
-        if (id3 !== null && id3 > -5) s.latency.id3.add(id3);
+        // Wall-clock latency only means something live; a VOD's dates can be
+        // decades old. Ignore anything outside a sane window.
+        const plausible = (v: number | null) =>
+            s.live && v !== null && v > -5 && v < MAX_LATENCY_S ? v : null;
+        const id3 = plausible(s.id3.latencyAt(this.video.currentTime, now));
+        if (id3 !== null) s.latency.id3.add(id3);
         const date = engine.playingDate();
-        const pdt = date ? (now - date.getTime()) / 1000 : null;
+        const pdt = plausible(date ? (now - date.getTime()) / 1000 : null);
         if (pdt !== null) s.latency.pdt.add(pdt);
         const drift = engine.liveEdgeDrift();
         if (drift !== null) s.latency.drift.add(drift);
@@ -1578,15 +1804,78 @@ export class PlayerApp {
     }
 
     private renderKeys(): void {
+        const drm = this.engine?.drmState() ?? null;
+        const l = this.session.licenses;
+        const drmKv = this.el('drmKv');
+        drmKv.hidden = !drm && !this.source?.drm;
+        if (!drmKv.hidden) {
+            const avg = l.ms.length
+                ? Math.round(l.ms.reduce((a, b) => a + b, 0) / l.ms.length)
+                : null;
+            const keySystem = drm?.keySystem ?? this.source?.drm?.keySystem ?? null;
+            kv(drmKv, [
+                ['Key system', keySystem ? (KEY_SYSTEM_NAMES[keySystem] ?? keySystem) : '--'],
+                [
+                    'License server',
+                    shortUrlFull(drm?.licenseServer ?? this.source?.drm?.licenseUrl ?? ''),
+                ],
+                ['Licenses', `${l.count} ok${l.failed ? ` · ${l.failed} failed` : ''}`],
+                [
+                    'License time',
+                    avg === null
+                        ? '--'
+                        : `${avg} ms avg${l.last && !l.last.failed ? ` · last ${l.last.ms} ms` : ''}`,
+                ],
+                [
+                    'Robustness',
+                    drm
+                        ? [drm.videoRobustness, drm.audioRobustness].filter(Boolean).join(' / ') ||
+                          'default'
+                        : '--',
+                ],
+                ['Scheme', drm?.encryptionScheme ?? '--'],
+                [
+                    'License expires',
+                    drm?.expiration ? new Date(drm.expiration).toLocaleString() : 'no expiry',
+                ],
+                ['Keys', String(Object.keys(this.session.keyStatuses).length)],
+            ]);
+        }
+        const statuses = Object.entries(this.session.keyStatuses);
+        const ks = this.el('keyStatuses');
+        ks.hidden = statuses.length === 0;
+        ks.replaceChildren(
+            h('p', {class: 'pl-subhead'}, 'Key status'),
+            ...statuses.map(([id, status]) =>
+                h(
+                    'div',
+                    {
+                        class: `pl-keyrow pl-keyrow--${status === 'usable' ? 'ok' : status === 'status-pending' ? 'pending' : 'bad'}`,
+                    },
+                    h('code', {}, shortKey(id)),
+                    h('span', {}, status),
+                    h('span', {class: 'pl-muted'}, KEY_STATUS_HINTS[status] ?? ''),
+                ),
+            ),
+        );
+
         const k = this.session.keys;
         const avg = k.ms.length ? Math.round(k.ms.reduce((a, b) => a + b, 0) / k.ms.length) : null;
-        kv(this.el('keysKv'), [
-            ['Encryption', k.method ?? (this.engine ? 'none seen' : '--')],
+        const kvEl = this.el('keysKv');
+        kvEl.hidden = Boolean(drm) && k.count === 0;
+        kv(kvEl, [
+            [
+                'Encryption',
+                this.session.fairplay
+                    ? 'FairPlay (SAMPLE-AES)'
+                    : (k.method ?? (this.engine ? (drm ? 'CENC (DRM)' : 'none seen') : '--')),
+            ],
             ['Keys loaded', String(k.count)],
             ['Unique keys', String(k.uris.size)],
             ['Avg key load', avg === null ? '--' : `${avg} ms`],
         ]);
-        this.el('count-keys').textContent = k.uris.size ? String(k.uris.size) : '';
+        const count = drm ? l.count : k.uris.size;
+        this.el('count-keys').textContent = count ? String(count) : '';
     }
 
     private renderMeta(): void {
@@ -1803,7 +2092,22 @@ export class PlayerApp {
             chips.push(
                 h('span', {class: `chip${s.live ? ' chip--live' : ''}`}, s.live ? 'LIVE' : 'VOD'),
             );
-            chips.push(h('span', {class: 'chip'}, `hls.js ${this.engine.version}`));
+            chips.push(h('span', {class: 'chip'}, `${this.engine.name} ${this.engine.version}`));
+            if (this.source?.drm) {
+                const ok = Object.values(s.keyStatuses);
+                const state = ok.length
+                    ? ok.every((x) => x === 'usable')
+                        ? 'keys usable'
+                        : 'key problem'
+                    : 'waiting for license';
+                chips.push(
+                    h(
+                        'span',
+                        {class: `chip${state === 'key problem' ? ' chip--warn' : ''}`},
+                        `${KEY_SYSTEM_NAMES[this.source.drm.keySystem]} · ${state}`,
+                    ),
+                );
+            }
             if (s.keys.method)
                 chips.push(
                     h(
@@ -1944,6 +2248,46 @@ function shortUrl(url: string): string {
         return `${u.host}${u.pathname.split('/').slice(-2).join('/') ? `/…/${u.pathname.split('/').slice(-2).join('/')}` : ''}`;
     } catch {
         return url.slice(0, 80);
+    }
+}
+
+const KEY_STATUS_HINTS: Record<string, string> = {
+    'output-restricted':
+        'HDCP / output protection blocked this key (external display, screen capture or VM?)',
+    'output-downscaled': 'Output protection forced a lower resolution',
+    expired: 'License expired',
+    'internal-error': 'The CDM failed on this key',
+    released: 'Key released',
+};
+
+const shortKey = (id: string): string =>
+    id.length > 12 ? `${id.slice(0, 8)}…${id.slice(-4)}` : id;
+
+function shortUrlFull(url: string): string {
+    if (!url) return '--';
+    try {
+        const u = new URL(url);
+        return `${u.host}${u.pathname}`;
+    } catch {
+        return url.slice(0, 60);
+    }
+}
+
+function isSafari(): boolean {
+    const ua = navigator.userAgent;
+    return /Safari\//.test(ua) && !/Chrome|Chromium|Edg\//.test(ua);
+}
+
+/** Uplynk license endpoint for a pasted URL: same content zone, /wv or /pr. */
+export function defaultLicenseUrl(url: string, drm: 'wv' | 'pr'): string {
+    try {
+        const u = new URL(url);
+        const origin = /(^|\.)uplynk\.com$/.test(u.hostname)
+            ? u.origin
+            : 'https://content.uplynk.com';
+        return `${origin}/${drm}`;
+    } catch {
+        return `https://content.uplynk.com/${drm}`;
     }
 }
 

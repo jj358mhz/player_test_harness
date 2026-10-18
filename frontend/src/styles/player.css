@@ -610,7 +610,7 @@
 }
 .pl-log div {
     display: grid;
-    grid-template-columns: 70px 116px minmax(0, 1fr);
+    grid-template-columns: 86px 116px minmax(0, 1fr);
     gap: 8px;
     padding: 5px 8px;
     border-bottom: 1px solid var(--border);
@@ -811,4 +811,43 @@ select.pl-control {
     background-position: right 12px center;
     background-size: 11px 7px;
     text-overflow: ellipsis;
+}
+
+/* DRM key statuses */
+.pl-keystatus {
+    display: grid;
+    gap: 4px;
+}
+.pl-keyrow {
+    display: grid;
+    grid-template-columns: 130px 120px minmax(0, 1fr);
+    gap: 8px;
+    align-items: center;
+    font-size: 12px;
+    padding: 4px 8px;
+    border-radius: var(--radius);
+    background: var(--inset);
+    border-left: 3px solid var(--border-strong);
+}
+.pl-keyrow code {
+    font-family: var(--font-mono);
+    color: var(--text-dim);
+}
+.pl-keyrow--ok {
+    border-left-color: var(--good);
+}
+.pl-keyrow--pending {
+    border-left-color: var(--warn);
+}
+.pl-keyrow--bad {
+    border-left-color: var(--error);
+}
+.pl-wf--license {
+    background: var(--scte);
+}
+
+/* Components here set display (grid/flex); keep [hidden] winning. */
+.pl [hidden] {
+    /* biome-ignore lint/complexity/noImportantStyles: the standard [hidden] reset must beat component display rules */
+    display: none !important;
 }

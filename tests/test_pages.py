@@ -65,7 +65,10 @@ def test_player_page_embeds_config_and_assets(auth_client, make_account, make_ch
     config = json.loads(raw.group(1))
     assert config["initialChannel"] == ch.id
     assert config["channels"][0]["name"] == "Alpha"
-    assert config["endpoints"]["versions"] == "/api/engines/hls.js/versions"
+    assert config["endpoints"]["versions"] == {
+        "hls.js": "/api/engines/hls.js/versions",
+        "shaka-player": "/api/engines/shaka-player/versions",
+    }
     assert "api_key" not in raw.group(1)  # keys never reach the browser
 
 

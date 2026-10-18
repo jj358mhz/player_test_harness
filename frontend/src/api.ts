@@ -14,12 +14,21 @@ export interface PlaybackResponse {
     mode: 'url' | 'preplay';
     manifest: 'm3u8' | 'mpd';
     probe?: Probe;
+    prefix?: string | null;
+    drm_config?: {
+        required?: boolean;
+        widevineLicenseURL?: string;
+        playreadyLicenseURL?: string;
+        fairplayCertificateURL?: string;
+    } | null;
 }
 
 export interface PlaybackRequest {
     channel_id: number;
     manifest: 'm3u8' | 'mpd';
     params?: Record<string, string>;
+    mode?: 'url' | 'preplay';
+    drm?: 'wv' | 'pr' | 'fps';
 }
 
 export interface EngineVersion {

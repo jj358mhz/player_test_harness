@@ -21,8 +21,9 @@ latency, drift, ABR, DRM keys, ID3/SCTE-35, captions and more.
   [Uplynk's spec](https://docs.uplynk.com/docs/sign-playback-urls-with-a-token):
   channel GUID or external ID, `.m3u8` or `.mpd`, configurable lifetime, and
   extra signed params (`rays`, `delay`, …).
-- 🔐 **Preplay v2 + DRM** — request Widevine / PlayReady (DASH) or FairPlay
-  (HLS) sessions and get back the zone `prefix` and license/certificate URLs.
+- 🔐 **DRM playback** — Widevine (and PlayReady) over DASH via Preplay v2 and
+  Shaka Player, with a DRM panel: license timing and status, key status per
+  key (HDCP problems included), robustness and expiry. FairPlay (Safari) next.
 - ▶️ **One-click play** — each channel card signs a fresh HLS URL and opens
   the monitoring player with it. Copy HLS/DASH buttons for use in other players.
 - 📊 **Monitoring player** — video first, with latency (ID3, PDT and

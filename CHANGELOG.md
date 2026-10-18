@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.2.0] - 2026-10-17
+
+### Added
+- **DRM playback in Chrome: Widevine (and PlayReady) over DASH** with a new
+  **Shaka Player** engine. Pick DRM → Widevine; the player signs a Preplay
+  v2 session (`rmt=wv`) and hands Shaka the session's license URL.
+- **DRM & keys tab:** key system, license server, license requests (count,
+  time, failures), robustness, license expiry, and **key status per key**
+  with hints for `output-restricted` (HDCP) and other failures. DRM errors
+  carry plain-language explanations (e.g. 6007 license request failed).
+- **Shaka Player versions** in the engine menu, from npm like hls.js
+  (latest patch of the last three minors) plus a custom version.
+- **DASH** format: rays from Representation ids (A–H), request waterfall,
+  license requests on the timeline.
+- FairPlay channels in Chrome now say what's wrong — Studio DRM over HLS is
+  FairPlay, which only Safari can play — with a **Play with Widevine (DASH)**
+  button, instead of a bare key error.
+- A pasted `.mpd` URL switches to DASH automatically.
+
+### Fixed
+- Loading a new stream now waits for the previous player to let go of the
+  video element (Shaka could otherwise never attach).
+- The latency chart no longer freezes on VOD content, and wall-clock latency
+  is only measured on live streams.
+
 ## [3.1.1] - 2026-10-17
 
 ### Fixed

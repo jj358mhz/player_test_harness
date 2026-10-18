@@ -83,3 +83,15 @@ def test_versions_endpoint_error(auth_client):
     response = auth_client.get("/api/engines/left-pad/versions")
     assert response.status_code == 502
     assert "Unknown engine" in response.get_json()["error"]
+
+
+def test_shaka_versions_link_to_its_releases():
+    registry = {"versions": {"5.3.0": {}, "5.2.14": {}, "5.1.27": {}, "5.0.28": {}}, "time": {}}
+    entries = engines.engine_versions(
+        "shaka-player", session=FakeSession(FakeResponse(200, registry))
+    )
+    assert [e["version"] for e in entries] == ["5.3.0", "5.2.14", "5.1.27"]
+    assert (
+        entries[0]["notes_url"]
+        == "https://github.com/shaka-project/shaka-player/releases/tag/v5.3.0"
+    )

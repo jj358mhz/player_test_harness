@@ -12,7 +12,7 @@ export interface PlayerConfig {
     channels: ChannelOption[];
     initialChannel: number | null;
     initialSrc: string | null;
-    endpoints: {playback: string; versions: string};
+    endpoints: {playback: string; versions: Record<string, string>};
 }
 
 export function readConfig(): PlayerConfig {

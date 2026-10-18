@@ -18,7 +18,8 @@ export function drawLatencyChart(el: SVGSVGElement, points: Point[], windowMs: n
     const B = 20;
     el.setAttribute('viewBox', `0 0 ${W} ${H}`);
     const maxV = Math.max(15, ...points.map((p) => p.v)) * 1.1;
-    const top = Math.ceil(maxV / 5) * 5;
+    const step = niceStep(maxV / 5); // about five grid lines whatever the range
+    const top = Math.ceil(maxV / step) * step;
     const now = Date.now();
     const x = (t: number) => L + (1 - (now - t) / windowMs) * (W - L - R);
     const y = (v: number) => T + (1 - v / top) * (H - T - B);
@@ -41,7 +42,6 @@ export function drawLatencyChart(el: SVGSVGElement, points: Point[], windowMs: n
         );
         lower = upper;
     }
-    const step = top > 30 ? 10 : 5;
     for (let v = 0; v <= top; v += step) {
         svg('line', {x1: L, x2: W - R, y1: y(v), y2: y(v), stroke: css('--border-strong')}, el);
         svg(
@@ -205,4 +205,12 @@ export function drawTimeline(
         else mark = svg('circle', {cx: ex, cy: 76, r: 5, fill: 'var(--error)'}, el);
         svg('title', {}, mark).textContent = e.label;
     }
+}
+
+/** 1, 2 or 5 × a power of ten, at least 5 (seconds). */
+export function niceStep(raw: number): number {
+    if (!Number.isFinite(raw) || raw <= 5) return 5;
+    const power = 10 ** Math.floor(Math.log10(raw));
+    const unit = raw / power;
+    return (unit <= 1 ? 1 : unit <= 2 ? 2 : unit <= 5 ? 5 : 10) * power;
 }
