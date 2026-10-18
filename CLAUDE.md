@@ -72,6 +72,11 @@ after dependency changes.
 - Preplay v2: `/preplay/channel/<id>.json` (channels) and `/preplay/<id>.json`
   (assets); not events. Response: absolute `playURL`, `prefix`, `sid`, `drm`
   (`widevineLicenseURL`, `playreadyLicenseURL`, `fairplayCertificateURL`, `required`).
+- Rays: Uplynk names renditions by letter, `a` = lowest. In an HLS master
+  each variant URI's basename is the ray (`…/channel/<id>/e.m3u8`; `ifo` is
+  the I-frame playlist), preceded by `#UPLYNK-MEDIA0:<W>x<H>x<fps>,<profile-level>,<ch>x<rate>`.
+  The signed `rays=` param restricts playback to a set (e.g. `rays=fed`).
+  Always label renditions with their ray in the UI.
 - DRM: Widevine/PlayReady need DASH; FairPlay needs HLS. Studio DRM requires
   token-protected playback. License hosts: `content.uplynk.com/{wv,pr}` (use
   the Preplay `prefix` zone to avoid redirects). EME needs HTTPS.
@@ -98,7 +103,8 @@ in the `player_harness_data` volume.
       (drop the open-from-disk requirement), video-first layout: load bar,
       pinned video + six vitals, 5-minute event timeline, tabbed inspector
       (Latency, ABR, DRM & keys, Metadata, Tracks, Manifest, Network, Log).
-      Mockup reviewed before code.
+      Renditions labelled by ray letter everywhere; ladder toggles build a
+      `rays=` param to re-sign with. Mockup approved before code.
 - [ ] Phase 2 — multi-player: `PlayerAdapter` interface (hls.js, Shaka, dash.js, native);
       per-engine latency source (ID3 wallclock for HLS; emsg/prft/UTCTiming
       for DASH). Presets move into the DB.
