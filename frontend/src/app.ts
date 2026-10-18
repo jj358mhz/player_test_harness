@@ -9,7 +9,9 @@ import {
     requestPlayback,
 } from './api';
 import type {ChannelOption, PlayerConfig} from './config';
+import {DashJsEngine, DEFAULT_DASHJS_VERSION, loadDashJs} from './engines/dashjs';
 import {DEFAULT_HLS_VERSION, HlsJsEngine, loadHlsJs} from './engines/hlsjs';
+import {NATIVE_VERSION, NativeEngine, nativeHlsSupported} from './engines/native';
 import {DEFAULT_SHAKA_VERSION, loadShaka, ShakaEngine} from './engines/shaka';
 import type {
     AudioTrack,
@@ -60,9 +62,29 @@ interface Source {
 }
 
 type Format = 'm3u8' | 'mpd';
-type EngineName = 'hls.js' | 'shaka-player';
+type EngineName = 'hls.js' | 'shaka-player' | 'dashjs' | 'native';
+/** Engines whose versions come from npm (native has none). */
+type NpmEngine = Exclude<EngineName, 'native'>;
 
-const ENGINE_LABELS: Record<EngineName, string> = {'hls.js': 'hls.js', 'shaka-player': 'Shaka'};
+const ENGINE_LABELS: Record<EngineName, string> = {
+    'hls.js': 'hls.js',
+    'shaka-player': 'Shaka',
+    dashjs: 'dash.js',
+    native: 'Native',
+};
+const DEFAULT_VERSIONS: Record<EngineName, string> = {
+    'hls.js': DEFAULT_HLS_VERSION,
+    'shaka-player': DEFAULT_SHAKA_VERSION,
+    dashjs: DEFAULT_DASHJS_VERSION,
+    native: NATIVE_VERSION,
+};
+/** What each engine can play. */
+const ENGINE_FORMATS: Record<EngineName, Format[]> = {
+    'hls.js': ['m3u8'],
+    'shaka-player': ['m3u8', 'mpd'],
+    dashjs: ['mpd'],
+    native: ['m3u8'],
+};
 const KEY_SYSTEMS = {wv: 'com.widevine.alpha', pr: 'com.microsoft.playready'} as const;
 const KEY_SYSTEM_NAMES: Record<string, string> = {
     'com.widevine.alpha': 'Widevine',
@@ -117,7 +139,11 @@ export class PlayerApp {
     private source: Source | null = null;
     /** DRM → Widevine was chosen for a DRM channel, not by the user. */
     private autoDrm = false;
-    private versions: Record<EngineName, EngineVersion[]> = {'hls.js': [], 'shaka-player': []};
+    private versions: Record<NpmEngine, EngineVersion[]> = {
+        'hls.js': [],
+        'shaka-player': [],
+        dashjs: [],
+    };
     private disabledRays = new Set<string>();
     private manifestView: 'master' | 'media' = 'master';
     private loadToken = 0;
@@ -913,13 +939,13 @@ export class PlayerApp {
         const input = this.el<HTMLInputElement>('engineCustom');
         input.hidden = !custom;
         if (custom) input.focus();
-        // hls.js can't play DASH; picking it switches the format back to HLS.
-        if (this.chosenEngine().engine === 'hls.js' && this.format() === 'mpd')
-            this.setFormat('m3u8');
+        // Keep the format to one the engine plays: hls.js/native → HLS, dash.js → DASH.
+        const formats = ENGINE_FORMATS[this.chosenEngine().engine];
+        if (!formats.includes(this.format())) this.setFormat(formats[0] as Format);
     }
 
     private engineOptions(): HTMLElement[] {
-        const group = (engine: EngineName, label: string, pinned: string) => {
+        const group = (engine: NpmEngine, label: string, pinned: string) => {
             const list = this.versions[engine];
             const versions = list.some((v) => v.version === pinned)
                 ? list
@@ -947,16 +973,31 @@ export class PlayerApp {
         return [
             group('hls.js', 'hls.js (HLS)', DEFAULT_HLS_VERSION),
             group('shaka-player', 'Shaka Player (DASH, HLS, DRM)', DEFAULT_SHAKA_VERSION),
+            group('dashjs', 'dash.js (DASH, DRM)', DEFAULT_DASHJS_VERSION),
+            ...(nativeHlsSupported()
+                ? [
+                      h(
+                          'optgroup',
+                          {label: 'Browser'},
+                          h(
+                              'option',
+                              {value: `native@${NATIVE_VERSION}`},
+                              'Native <video> HLS (this browser)',
+                          ),
+                      ),
+                  ]
+                : []),
         ];
     }
 
     private async loadVersions(): Promise<void> {
         const endpoints = this.config.endpoints.versions;
-        const [hls, shaka] = await Promise.all([
+        const [hls, shaka, dash] = await Promise.all([
             fetchVersions(endpoints['hls.js'] ?? '').catch(() => []),
             fetchVersions(endpoints['shaka-player'] ?? '').catch(() => []),
+            fetchVersions(endpoints.dashjs ?? '').catch(() => []),
         ]);
-        this.versions = {'hls.js': hls, 'shaka-player': shaka};
+        this.versions = {'hls.js': hls, 'shaka-player': shaka, dashjs: dash};
         const select = this.el<HTMLSelectElement>('engine');
         const selected = select.value;
         select.replaceChildren(...this.engineOptions());
@@ -972,16 +1013,12 @@ export class PlayerApp {
         ];
         if (version !== CUSTOM) return {engine, version};
         const typed = this.el<HTMLInputElement>('engineCustom').value.trim();
-        return {
-            engine,
-            version: typed || (engine === 'hls.js' ? DEFAULT_HLS_VERSION : DEFAULT_SHAKA_VERSION),
-        };
+        return {engine, version: typed || DEFAULT_VERSIONS[engine]};
     }
 
     private selectEngine(engine: EngineName): void {
         if (this.chosenEngine().engine === engine) return;
-        this.el<HTMLSelectElement>('engine').value =
-            `${engine}@${engine === 'hls.js' ? DEFAULT_HLS_VERSION : DEFAULT_SHAKA_VERSION}`;
+        this.el<HTMLSelectElement>('engine').value = `${engine}@${DEFAULT_VERSIONS[engine]}`;
         this.syncEngineInput();
     }
 
@@ -994,7 +1031,10 @@ export class PlayerApp {
         for (const b of this.el('format').querySelectorAll('button')) {
             b.setAttribute('aria-pressed', String(b.getAttribute('data-format') === value));
         }
-        if (value === 'mpd') this.selectEngine('shaka-player');
+        // Keep the engine to one that plays the format (Shaka plays both).
+        const engine = this.chosenEngine().engine;
+        if (!ENGINE_FORMATS[engine].includes(value))
+            this.selectEngine(value === 'mpd' ? 'shaka-player' : 'hls.js');
         if (value === 'm3u8' && this.drm()) this.el<HTMLSelectElement>('drm').value = '';
     }
 
@@ -1157,9 +1197,7 @@ export class PlayerApp {
         this.session = new Session();
         this.source = source;
         this.renderAll();
-        const {engine: kind, version} = source.drm
-            ? {engine: 'shaka-player' as const, version: this.shakaVersion()}
-            : this.chosenEngine();
+        const {engine: kind, version} = source.drm ? this.drmEngine() : this.chosenEngine();
         let engine: PlayerEngine;
         try {
             if (kind === 'shaka-player') {
@@ -1172,6 +1210,22 @@ export class PlayerApp {
                     return;
                 }
                 engine = new ShakaEngine(shaka, version, source.drm);
+            } else if (kind === 'dashjs') {
+                const dashjs = await loadDashJs(version);
+                if (!dashjs.supportsMediaSource()) {
+                    this.notice(
+                        'error',
+                        'This browser does not support Media Source Extensions, which dash.js needs.',
+                    );
+                    return;
+                }
+                engine = new DashJsEngine(dashjs, version, source.drm);
+            } else if (kind === 'native') {
+                if (!nativeHlsSupported()) {
+                    this.notice('error', 'This browser cannot play HLS natively; use hls.js.');
+                    return;
+                }
+                engine = new NativeEngine();
             } else {
                 const Hls = await loadHlsJs(version);
                 if (!Hls.isSupported()) {
@@ -1204,13 +1258,16 @@ export class PlayerApp {
             'LOAD',
             `${source.channel?.name ?? 'URL'} · ${engine.name} ${version}${drmText}`,
         );
+        if (engine.limits) this.logEntry('info', 'ENGINE', engine.limits);
         engine.load(source.url, this.video);
     }
 
-    /** The Shaka version to use when DRM forces Shaka. */
-    private shakaVersion(): string {
+    /** Widevine/PlayReady play in dash.js when it's chosen, otherwise Shaka. */
+    private drmEngine(): {engine: 'shaka-player' | 'dashjs'; version: string} {
         const chosen = this.chosenEngine();
-        return chosen.engine === 'shaka-player' ? chosen.version : DEFAULT_SHAKA_VERSION;
+        if (chosen.engine === 'shaka-player' || chosen.engine === 'dashjs')
+            return {engine: chosen.engine, version: chosen.version};
+        return {engine: 'shaka-player', version: DEFAULT_SHAKA_VERSION};
     }
 
     private wire(engine: PlayerEngine): void {
@@ -1271,7 +1328,7 @@ export class PlayerApp {
                 this.logEntry(
                     'key',
                     'LICENSE',
-                    `HTTP ${lic.status} · ${lic.ms} ms · ${lic.bytes} bytes`,
+                    `HTTP ${lic.status} · ${lic.ms} ms${lic.bytes ? ` · ${lic.bytes} bytes` : ''}`,
                 );
                 this.mark('key', `License ${lic.ms} ms`);
             }
@@ -2193,7 +2250,7 @@ export class PlayerApp {
                           'p',
                           {class: 'pl-muted'},
                           this.engine
-                              ? 'Waiting for requests…'
+                              ? (this.engine.limits ?? 'Waiting for requests…')
                               : 'Load a stream to see its requests.',
                       ),
                   ]),

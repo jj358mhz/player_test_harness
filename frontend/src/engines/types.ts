@@ -1,5 +1,5 @@
-// What the UI needs from a player engine. hls.js implements it now; Shaka,
-// dash.js and native playback implement it in Phase 2.
+// What the UI needs from a player engine: hls.js, Shaka, dash.js and native
+// (<video src>) each implement it.
 
 import type {Id3Frame} from '../lib/id3';
 
@@ -116,6 +116,8 @@ export type Listener<K extends EngineEventName> = (data: EngineEvents[K]) => voi
 export interface PlayerEngine {
     readonly name: string;
     readonly version: string;
+    /** What this engine can't report, said once in the log and empty panels. */
+    readonly limits?: string;
     load(url: string, video: HTMLVideoElement): void;
     /** Resolves once the video element is free for the next engine. */
     destroy(): Promise<void>;

@@ -7,6 +7,7 @@ from itertools import groupby
 from flask import abort, jsonify, redirect, render_template, request, url_for
 from flask_login import login_required
 
+from app.engines import ENGINES
 from app.main import bp
 from app.models import AdminEvent, Channel, PlaybackEvent, UplynkAccount, db
 from app.uplynk.playback import CONTENT_TYPES
@@ -78,8 +79,7 @@ def player() -> str:
         "endpoints": {
             "playback": url_for("api.playback"),
             "versions": {
-                package: url_for("api.engine_versions", package=package)
-                for package in ("hls.js", "shaka-player")
+                package: url_for("api.engine_versions", package=package) for package in ENGINES
             },
         },
     }

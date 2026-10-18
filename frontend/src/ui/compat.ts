@@ -27,7 +27,7 @@ const ROWS: Row[] = [
         browser: 'Chrome (Mac, Windows, Linux)',
         cells: [
             ['yes', 'hls.js'],
-            ['yes', 'Shaka'],
+            ['yes', 'Shaka, dash.js'],
             ['yes', 'L3, software'],
             ['no', ''],
             ['no', ''],
@@ -38,7 +38,7 @@ const ROWS: Row[] = [
         browser: 'Edge (Windows)',
         cells: [
             ['yes', 'hls.js'],
-            ['yes', 'Shaka'],
+            ['yes', 'Shaka, dash.js'],
             ['yes', 'L3, software'],
             ['yes', 'SL2000/3000'],
             ['no', ''],
@@ -49,7 +49,7 @@ const ROWS: Row[] = [
         browser: 'Firefox',
         cells: [
             ['yes', 'hls.js'],
-            ['yes', 'Shaka'],
+            ['yes', 'Shaka, dash.js'],
             ['yes', 'L3, software'],
             ['partial', 'varies; see live check'],
             ['no', ''],
@@ -60,7 +60,7 @@ const ROWS: Row[] = [
         browser: 'Safari (macOS)',
         cells: [
             ['yes', 'native or hls.js'],
-            ['yes', 'Shaka (MSE)'],
+            ['yes', 'Shaka, dash.js (MSE)'],
             ['no', ''],
             ['no', ''],
             ['yes', 'native'],
@@ -82,7 +82,7 @@ const ROWS: Row[] = [
         browser: 'Chrome (Android)',
         cells: [
             ['yes', 'hls.js'],
-            ['yes', 'Shaka'],
+            ['yes', 'Shaka, dash.js'],
             ['yes', 'L1 or L3'],
             ['no', ''],
             ['no', ''],
@@ -177,7 +177,7 @@ const CHECKS: Check[] = [
         label: 'Media Source Extensions',
         run: async () => {
             const w = window as unknown as {MediaSource?: unknown; ManagedMediaSource?: unknown};
-            if (w.MediaSource) return ['yes', 'hls.js and Shaka run'];
+            if (w.MediaSource) return ['yes', 'hls.js, Shaka and dash.js run'];
             if (w.ManagedMediaSource) return ['partial', 'ManagedMediaSource only'];
             return ['no', 'only native playback'];
         },
@@ -188,7 +188,9 @@ const CHECKS: Check[] = [
             const can = document
                 .createElement('video')
                 .canPlayType('application/vnd.apple.mpegurl');
-            return can ? ['yes', 'plays .m3u8 itself'] : ['no', 'HLS needs hls.js here'];
+            return can
+                ? ['yes', `canPlayType says "${can}"; try the Native engine`]
+                : ['no', 'HLS needs hls.js here'];
         },
     },
     {
@@ -308,7 +310,9 @@ export function buildCompatPanel(): HTMLDetailsElement {
                         'li',
                         {},
                         h('b', {}, 'Without DRM'),
-                        ', HLS is clear or AES-128 and plays everywhere. DASH needs the content packaged for it; otherwise Uplynk answers ',
+                        ', HLS is clear or AES-128 and plays everywhere. Uplynk DASH is still CENC: the MPD names a Widevine license URL (',
+                        h('code', {}, 'ms:laurl'),
+                        ') that the players use on their own. DASH needs the content packaged for it; otherwise Uplynk answers ',
                         h('code', {}, 'Non dash asset'),
                         '.',
                     ),
@@ -316,7 +320,7 @@ export function buildCompatPanel(): HTMLDetailsElement {
                         'li',
                         {},
                         h('b', {}, 'Engines in this harness:'),
-                        ' hls.js for HLS (clear, AES-128); Shaka Player for DASH and for Widevine / PlayReady. FairPlay playback in Safari is not built yet.',
+                        ' hls.js for HLS (clear, AES-128); Shaka Player or dash.js for DASH and Widevine / PlayReady; Native hands HLS to the browser itself (Safari), with fewer metrics. FairPlay playback in Safari is not built yet.',
                     ),
                 ),
             ),
