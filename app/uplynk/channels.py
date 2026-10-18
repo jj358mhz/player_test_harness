@@ -89,8 +89,39 @@ class UplynkChannelsClient:
         except UplynkAuthError as e:
             raise UplynkAPIError(str(e)) from e
 
+    # The API returns at most 40 items per page whatever page_size says;
+    # `page` (1-based) walks the rest. `total_items` tells us when to stop.
+    MAX_PAGES = 250
+
     def list_channels(self) -> list[DiscoveredChannel]:
+        channels: dict[str, DiscoveredChannel] = {}
+        total: int | None = None
+        for page in range(1, self.MAX_PAGES + 1):
+            payload = self._get_page(page)
+            items = payload["items"]
+            try:
+                for item in items:
+                    channel = DiscoveredChannel.from_api(item)
+                    channels.setdefault(channel.channel_id, channel)
+            except KeyError as e:
+                raise UplynkAPIError(f"Uplynk API item missing required field: {e}") from e
+            if isinstance(payload.get("total_items"), int):
+                total = payload["total_items"]
+            if not items or (total is not None and len(channels) >= total):
+                break
+        else:
+            raise UplynkAPIError(f"Stopped after {self.MAX_PAGES} pages of channels")
+        if total is not None and len(channels) < total:
+            # A page went missing (e.g. channels moved between requests). Fail the
+            # sync rather than deactivate channels we simply didn't see.
+            raise UplynkAPIError(
+                f"Uplynk reported {total} channels but only {len(channels)} came back; try again"
+            )
+        return list(channels.values())
+
+    def _get_page(self, page: int) -> dict:
         headers, params = self._auth()
+        params = {**params, "page": page}
         url = f"{self.api_base}{self.LIST_ENDPOINT}"
         try:
             response = self._session.get(url, headers=headers, params=params, timeout=self.timeout)
@@ -114,12 +145,6 @@ class UplynkChannelsClient:
 
         if payload.get("error"):
             raise UplynkAPIError(f"Uplynk API error: {payload.get('msg') or payload['error']}")
-
-        items = payload.get("items")
-        if not isinstance(items, list):
+        if not isinstance(payload.get("items"), list):
             raise UplynkAPIError("Uplynk API response missing 'items' list")
-
-        try:
-            return [DiscoveredChannel.from_api(item) for item in items]
-        except KeyError as e:
-            raise UplynkAPIError(f"Uplynk API item missing required field: {e}") from e
+        return payload

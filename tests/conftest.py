@@ -149,14 +149,16 @@ class FakeResponse:
 
 
 class FakeSession:
-    """Records GETs and returns a canned response."""
+    """Records GETs and returns a canned response (or each of a list in turn)."""
 
     def __init__(self, response):
+        self.responses = list(response) if isinstance(response, list) else None
         self.response = response
         self.calls = []
 
     def get(self, url, **kwargs):
         self.calls.append((url, kwargs))
-        if isinstance(self.response, Exception):
-            raise self.response
-        return self.response
+        response = self.responses.pop(0) if self.responses is not None else self.response
+        if isinstance(response, Exception):
+            raise response
+        return response
