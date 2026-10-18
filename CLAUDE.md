@@ -103,6 +103,9 @@ in the `player_harness_data` volume.
       (drop the open-from-disk requirement), video-first layout: load bar,
       pinned video + six vitals, 5-minute event timeline, tabbed inspector
       (Latency, ABR, DRM & keys, Metadata, Tracks, Manifest, Network, Log).
+      Latency tab keeps the Current/Average/Max/Min tiles (running since
+      load, min/max timestamps) coloured by today's bands: Awesome <10 s,
+      Good 10–19, Average 19–25, Above avg 25–40, Yuk >40.
       Renditions labelled by ray letter everywhere; ladder toggles build a
       `rays=` param to re-sign with. Mockup approved before code.
 - [ ] Phase 2 — multi-player: `PlayerAdapter` interface (hls.js, Shaka, dash.js, native);
