@@ -2787,6 +2787,13 @@
             // Now initialize the rest of the player
             console.log('🎬 Uplynk HLS Monitor initialized');
             console.log('📦 HLS.js version:', Hls.version);
+
+            // Autoload ?src=<url> (used by the harness dashboard's Play buttons)
+            const autoSrc = new URLSearchParams(window.location.search).get('src');
+            if (autoSrc) {
+                streamUrl.value = autoSrc;
+                loadStream();
+            }
         } catch (error) {
             hideLoading();
             alert(`Failed to load HLS.js v${selectedVersion}. Please try reloading the page.`);

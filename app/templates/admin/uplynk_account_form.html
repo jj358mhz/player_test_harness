@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title_suffix %}{% if mode == 'new' %} — Add Uplynk Account{% else %} — Edit {{ account.label }}{% endif %}{% endblock %}
+
+{% macro render_field(field) %}
+<div class="field">
+    {{ field.label }}
+    {{ field(class="input", **kwargs) }}
+    {% if field.description %}<p class="field__help">{{ field.description }}</p>{% endif %}
+    {% for err in field.errors %}<p class="field__error">{{ err }}</p>{% endfor %}
+    {{ caller() if caller }}
+</div>
+{% endmacro %}
+
+{% block content %}
+<div class="card card--narrow">
+    <h1>{% if mode == 'new' %}Add Uplynk Account{% else %}Edit Uplynk Account{% endif %}</h1>
+
+    <form method="post" enctype="multipart/form-data" novalidate>
+        {{ form.hidden_tag() }}
+        {{ render_field(form.label) }}
+        {{ render_field(form.workspace_id) }}
+        {{ render_field(form.api_key, placeholder=('required' if mode == 'new' else '(unchanged)')) }}
+        {% call render_field(form.scoped_env_file) %}
+        {% if mode == 'edit' and account.has_scoped_key %}
+        <p class="field__help">
+            Currently loaded — KID: <span class="mono">{{ account.scoped_kid }}</span>.
+            Upload a new file to replace it.
+        </p>
+        {% endif %}
+        {% endcall %}
+
+        {% if mode == 'edit' and account.has_scoped_key %}
+        <div class="field">
+            {% include "admin/_scopes.html" %}
+        </div>
+        {% endif %}
+
+        <div class="form-actions">
+            {{ form.submit(class="button button--primary") }}
+            <a href="{{ url_for('admin.list_accounts') }}" class="button button--link">Cancel</a>
+        </div>
+    </form>
+
+    {% if mode == 'edit' and account.has_scoped_key %}
+    <form method="post" action="{{ url_for('admin.delete_scoped_key', account_id=account.id) }}"
+          onsubmit="return confirm('Remove the scoped key? Sync will fall back to classic auth.');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="link-button link-button--danger">Remove scoped key</button>
+    </form>
+    {% endif %}
+</div>
+{% endblock %}

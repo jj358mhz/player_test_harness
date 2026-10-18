@@ -1,0 +1,65 @@
+# =============================================================================
+# player-test-harness — Portainer-managed stack
+# =============================================================================
+# Deployed from GitHub via SSH → git pull → docker compose up --build on the
+# Utility Pi. Fronted by Caddy at player.telcomjj.com — see caddy/Caddyfile
+# in homelab-utility for the reverse-proxy snippet.
+#
+# Networking:
+#   - Container exposes port 5000 on the internal `web` network only.
+#   - No `ports:` publish — Caddy reaches it by service name on the shared
+#     network. Prevents accidental public exposure if Caddy is misconfigured.
+# -----------------------------------------------------------------------------
+
+services:
+  player-test-harness:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        APP_VERSION: ${APP_VERSION:-dev}
+    image: player-test-harness:latest
+    container_name: player-test-harness
+    pull_policy: never
+    environment:
+      - TZ=America/Los_Angeles
+      - SECRET_KEY=${SECRET_KEY}
+      - FERNET_KEY=${FERNET_KEY}
+      - DATABASE_URL=${DATABASE_URL:-sqlite:////app/data/player-test-harness.db}
+      - BOOTSTRAP_ADMIN_EMAIL=${BOOTSTRAP_ADMIN_EMAIL:-admin@example.com}
+      - BOOTSTRAP_ADMIN_PASSWORD=${BOOTSTRAP_ADMIN_PASSWORD}
+      - UPLYNK_API_BASE=${UPLYNK_API_BASE:-https://services.uplynk.com}
+      - UPLYNK_CONTENT_BASE=${UPLYNK_CONTENT_BASE:-https://content.uplynk.com}
+      - PLAYBACK_TOKEN_TTL=${PLAYBACK_TOKEN_TTL:-3600}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - GUNICORN_WORKERS=${GUNICORN_WORKERS:-2}
+      - APP_VERSION=${APP_VERSION:-dev}
+    restart: unless-stopped
+    expose:
+      - "5000"
+    networks:
+      - web
+    volumes:
+      - player_harness_data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    labels:
+      - "app=player-test-harness"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  web:
+    external: true
+    name: auth-net
+
+volumes:
+  player_harness_data:
+    name: player_harness_data

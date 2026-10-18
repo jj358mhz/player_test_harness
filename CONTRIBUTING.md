@@ -93,8 +93,8 @@ Links to test streams (if applicable).
 
 3. **Open the file**
 ```bash
-   # Edit hls-id3-player.html
-   open hls-id3-player.html
+   # Edit app/player/hls-id3-player.html
+   open app/player/hls-id3-player.html
 ```
 
 ### Development Guidelines

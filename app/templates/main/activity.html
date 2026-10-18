@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title_suffix %} — Activity{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Activity</h1>
+</div>
+
+<h2>Playback requests</h2>
+{% if playback_events %}
+<table class="data-table">
+    <thead>
+    <tr>
+        <th>When (UTC)</th>
+        <th>Account</th>
+        <th>Content</th>
+        <th>Mode</th>
+        <th>Manifest / DRM</th>
+        <th>Expires</th>
+        <th>Result</th>
+    </tr>
+    </thead>
+    <tbody>
+    {% for e in playback_events %}
+    <tr>
+        <td class="mono">{{ e.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+        <td>{{ e.uplynk_account.label if e.uplynk_account else '—' }}</td>
+        <td>
+            {% if e.channel %}{{ e.channel.display_name }}<br>{% endif %}
+            <span class="mono muted">{{ e.content_type }}:{{ e.content_id }}</span>
+        </td>
+        <td>{{ e.mode }}</td>
+        <td>{{ e.manifest }}{% if e.drm %} · {{ e.drm }}{% endif %}</td>
+        <td class="mono">{{ e.expires_at.strftime('%H:%M:%S') if e.expires_at else '—' }}</td>
+        <td>
+            {% if e.error %}<span class="field__error">{{ e.error }}</span>
+            {% else %}<span class="badge badge--active">ok</span>{% endif %}
+        </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<div class="card"><p class="muted">No playback requests yet.</p></div>
+{% endif %}
+
+<h2>Admin activity</h2>
+{% if admin_events %}
+<table class="data-table">
+    <thead>
+    <tr>
+        <th>When (UTC)</th>
+        <th>Category</th>
+        <th>Action</th>
+        <th>Summary</th>
+    </tr>
+    </thead>
+    <tbody>
+    {% for e in admin_events %}
+    <tr>
+        <td class="mono">{{ e.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+        <td>{{ e.category }}</td>
+        <td>{{ e.action }}</td>
+        <td>{{ e.summary }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<div class="card"><p class="muted">No admin activity yet.</p></div>
+{% endif %}
+{% endblock %}

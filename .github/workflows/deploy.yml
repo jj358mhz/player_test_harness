@@ -1,0 +1,43 @@
+# =============================================================================
+# Deploy to Utility Pi
+# =============================================================================
+# Triggered on every push to main, on pushing a version tag (so `git describe`
+# resolves to a clean vN.N.N once the release tag lands after the merge), or
+# manually via workflow_dispatch (e.g. `gh workflow run deploy.yml`).
+# SSHes into the Utility Pi, pulls the latest commit, rebuilds and restarts
+# the player-test-harness Docker container.
+
+name: Deploy to Utility Pi
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: SSH deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: 2222
+          script: |
+            set -e
+            cd ~/git/player_test_harness
+            git fetch --tags --force
+            git pull origin main
+            export APP_VERSION="$(git describe --tags --always --dirty)"
+            echo "Building version: $APP_VERSION"
+            APP_VERSION="$APP_VERSION" docker compose up -d --build
+            docker image prune -a -f --filter "label=app=player-test-harness" --filter "until=24h"
+            echo "Deploy complete: $(git rev-parse --short HEAD) as $APP_VERSION"

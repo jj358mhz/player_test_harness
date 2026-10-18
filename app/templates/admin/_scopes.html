@@ -1,0 +1,27 @@
+{#
+  Renders the scopes granted to a stored scoped Uplynk API key.
+  Expects `account` in context (an UplynkAccount).
+#}
+{% set scope_descriptions = {
+  "video.services.channels": "Read and modify live channels.",
+  "video.services.channels:read": "Read live channels — required for channel sync.",
+  "video.services.channels:write": "Modify live channels.",
+  "video.services.le": "Read and modify live events.",
+  "video.services.le:read": "Read live events.",
+} %}
+
+<div class="scopes" data-testid="scoped-key-scopes">
+    <p class="scopes__label">Scoped API Key permissions</p>
+    {% set scopes = account.scoped_scp.split(',')|map('trim')|select|list %}
+    <ul class="scopes__list">
+        {% for scope in scopes %}
+        <li>
+            <span class="badge badge--scope"
+                  {% if scope in scope_descriptions %}title="{{ scope_descriptions[scope] }}"{% endif %}>{{ scope }}</span>
+        </li>
+        {% endfor %}
+    </ul>
+    {% if "video.services.channels:read" not in scopes and "video.services.channels" not in scopes %}
+    <p class="field__error">This key lacks video.services.channels:read — channel sync will fail with 403.</p>
+    {% endif %}
+</div>

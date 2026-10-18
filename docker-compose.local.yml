@@ -1,0 +1,25 @@
+# =============================================================================
+# player-test-harness — local self-hosted overlay
+# =============================================================================
+# For running your own instance outside the author's homelab: no dependency
+# on the `auth-net` external network or a Caddy reverse proxy.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
+#   curl http://localhost:5051/health
+#
+# Note: DRM playback (EME) needs a secure context — localhost counts, a bare
+# LAN IP over http does not. Put it behind TLS to use DRM from other hosts.
+# -----------------------------------------------------------------------------
+
+services:
+  player-test-harness:
+    image: player-test-harness:local
+    ports:
+      - "${WEB_PORT:-5051}:5000"
+
+networks:
+  web:
+    external: false
+    driver: bridge
+    name: player-test-harness_local

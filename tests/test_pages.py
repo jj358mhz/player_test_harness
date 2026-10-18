@@ -1,0 +1,165 @@
+"""Tests for page routes and the account admin flow."""
+
+from __future__ import annotations
+
+import io
+from urllib.parse import parse_qs, urlsplit
+
+import pytest
+
+from app.crypto import decrypt
+from app.models import AdminEvent, UplynkAccount, db
+from app.uplynk.sync import SyncResult
+
+
+@pytest.mark.parametrize(
+    "path", ["/", "/player", "/sign", "/activity", "/admin/uplynk-accounts", "/api/channels"]
+)
+def test_pages_require_login(client, path):
+    response = client.get(path)
+    assert response.status_code == 302
+    assert "/auth/login" in response.headers["Location"]
+
+
+@pytest.mark.parametrize("path", ["/", "/player", "/sign", "/activity", "/admin/uplynk-accounts"])
+def test_pages_render(auth_client, path):
+    assert auth_client.get(path).status_code == 200
+
+
+def test_dashboard_lists_channels_grouped(auth_client, make_account, make_channel):
+    make_channel(make_account("acct-a"), "c1", description="Alpha Channel")
+    make_channel(make_account("acct-b"), "c2", description="Beta Channel")
+    html = auth_client.get("/").get_data(as_text=True)
+    assert "Alpha Channel" in html and "Beta Channel" in html
+    assert html.index("acct-a") < html.index("acct-b")
+
+
+def test_player_serves_html(auth_client):
+    response = auth_client.get("/player")
+    assert response.mimetype == "text/html"
+    assert b"autoSrc" in response.data
+
+
+def test_play_channel_redirects_to_player_with_signed_src(auth_client, make_account, make_channel):
+    ch = make_channel(make_account(), "abc")
+    response = auth_client.get(f"/channels/{ch.id}/play")
+    assert response.status_code == 302
+    location = urlsplit(response.headers["Location"])
+    assert location.path == "/player"
+    src = parse_qs(location.query)["src"][0]
+    assert "/channel/abc.m3u8?tc=1" in src and "&sig=" in src
+
+
+def test_play_unknown_channel_404(auth_client):
+    assert auth_client.get("/channels/999/play").status_code == 404
+
+
+def test_toggle_favorite(auth_client, make_account, make_channel):
+    ch = make_channel(make_account())
+    auth_client.post(f"/channels/{ch.id}/favorite")
+    db.session.refresh(ch)
+    assert ch.is_favorite
+    auth_client.post(f"/channels/{ch.id}/favorite")
+    db.session.refresh(ch)
+    assert not ch.is_favorite
+
+
+def test_create_account_encrypts_key(auth_client):
+    response = auth_client.post(
+        "/admin/uplynk-accounts/new",
+        data={"label": "ws1", "workspace_id": "own1", "api_key": "plain-secret"},
+        follow_redirects=True,
+    )
+    assert b"created" in response.data
+    acct = db.session.query(UplynkAccount).one()
+    assert acct.api_key_encrypted != "plain-secret"
+    assert decrypt(acct.api_key_encrypted) == "plain-secret"
+    assert db.session.query(AdminEvent).filter_by(action="create").count() == 1
+    # the list page shows a masked preview, never the key
+    listing = auth_client.get("/admin/uplynk-accounts").get_data(as_text=True)
+    assert "plain-secret" not in listing
+
+
+def test_create_account_requires_api_key(auth_client):
+    response = auth_client.post(
+        "/admin/uplynk-accounts/new",
+        data={"label": "ws1", "workspace_id": "own1"},
+        follow_redirects=True,
+    )
+    assert b"API Key is required" in response.data
+    assert db.session.query(UplynkAccount).count() == 0
+
+
+def test_create_account_with_scoped_env(auth_client, ec_keypair):
+    env = (
+        f"KID=kid1\nSUB=sub1\nPRIVATE_B64={ec_keypair['private_b64']}\n"
+        "SCP=video.services.channels:read\n"
+    )
+    auth_client.post(
+        "/admin/uplynk-accounts/new",
+        data={
+            "label": "ws1",
+            "workspace_id": "own1",
+            "api_key": "k",
+            "scoped_env_file": (io.BytesIO(env.encode()), "key.env"),
+        },
+        content_type="multipart/form-data",
+    )
+    acct = db.session.query(UplynkAccount).one()
+    assert acct.has_scoped_key
+    assert decrypt(acct.scoped_private_b64_encrypted) == ec_keypair["private_b64"]
+    html = auth_client.get(f"/admin/uplynk-accounts/{acct.id}/edit").get_data(as_text=True)
+    assert "video.services.channels:read" in html
+    assert "lacks video.services.channels:read" not in html
+
+
+def test_edit_account_blank_key_keeps_existing(auth_client, make_account):
+    acct = make_account(api_key="original")
+    auth_client.post(
+        f"/admin/uplynk-accounts/{acct.id}/edit",
+        data={"label": "renamed", "workspace_id": "own2", "api_key": ""},
+    )
+    db.session.refresh(acct)
+    assert acct.label == "renamed"
+    assert decrypt(acct.api_key_encrypted) == "original"
+
+
+def test_delete_scoped_key(auth_client, make_account):
+    acct = make_account(
+        scoped_kid="k", scoped_sub="s", scoped_private_b64_encrypted="x", scoped_scp="y"
+    )
+    auth_client.post(f"/admin/uplynk-accounts/{acct.id}/scoped-key/delete")
+    db.session.refresh(acct)
+    assert not acct.has_scoped_key
+
+
+def test_delete_account_cascades_channels(auth_client, make_account, make_channel):
+    from app.models import Channel
+
+    acct = make_account()
+    make_channel(acct)
+    auth_client.post(f"/admin/uplynk-accounts/{acct.id}/delete")
+    assert db.session.query(UplynkAccount).count() == 0
+    assert db.session.query(Channel).count() == 0
+
+
+def test_sync_route_flashes_and_logs(auth_client, make_account, monkeypatch):
+    acct = make_account()
+    monkeypatch.setattr(
+        "app.admin.routes.sync_account",
+        lambda a: SyncResult(a.id, a.label, auth_mode="classic", created=2),
+    )
+    response = auth_client.post(f"/admin/uplynk-accounts/{acct.id}/sync", follow_redirects=True)
+    assert b"2 new" in response.data
+    assert db.session.query(AdminEvent).filter_by(category="sync", action="run").count() == 1
+
+
+def test_non_admin_cannot_manage_accounts(app, client):
+    from app.auth.passwords import hash_password
+    from app.models import User
+
+    db.session.add(User(email="viewer@example.com", password_hash=hash_password("pw-123456")))
+    db.session.commit()
+    client.post("/auth/login", data={"email": "viewer@example.com", "password": "pw-123456"})
+    assert client.get("/admin/uplynk-accounts").status_code == 403
+    assert client.get("/").status_code == 200
