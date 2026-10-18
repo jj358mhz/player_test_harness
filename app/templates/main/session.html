@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title_suffix %} — Session {{ session.title }}{% endblock %}
+{% block main_modifier %} site-main--wide{% endblock %}
+
+{% block extra_head %}
+{% if assets %}
+{% for href in assets.css %}<link rel="stylesheet" href="{{ href }}">
+{% endfor %}
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="session-title">{{ session.title }} <span class="page-header__meta">recorded {{ session.started_at.strftime('%Y-%m-%d %H:%M') }} UTC</span></h1>
+    <div class="page-header__controls">
+        {% if player_link %}<a class="btn-ghost" href="{{ player_link }}">▶ Open live in the player</a>{% endif %}
+        <a class="btn-ghost" href="{{ url_for('api.session_json', slug=session.slug) }}">Download JSON</a>
+        <form method="post" action="{{ url_for('main.delete_session', slug=session.slug) }}" class="inline"
+              onsubmit="return confirm('Delete this recording? This cannot be undone.')">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn-ghost">Delete</button>
+        </form>
+    </div>
+</div>
+<p class="muted">{% if expires %}Kept until {{ expires.strftime('%Y-%m-%d') }}.{% else %}Kept until deleted.{% endif %}
+    Signatures and session tokens were removed before saving.{% if player_link %} <em>Open live</em> signs a fresh URL.{% endif %}</p>
+
+{% if assets %}
+<div id="recording-app"></div>
+<script id="recording-data" type="application/json">{{ recording|tojson }}</script>
+{% else %}
+<div class="card card--narrow">
+    <h2>Player not built</h2>
+    <p>The frontend hasn't been built on this server, so the recording can't be drawn.
+        <a href="{{ url_for('api.session_json', slug=session.slug) }}">Download the JSON</a> instead.</p>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if assets %}<script type="module" src="{{ assets.js }}"></script>{% endif %}
+{% endblock %}

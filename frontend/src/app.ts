@@ -7,6 +7,7 @@ import {
     type PlaybackResponse,
     type Probe,
     requestPlayback,
+    saveRecording,
 } from './api';
 import type {ChannelOption, PlayerConfig} from './config';
 import {DashJsEngine, DEFAULT_DASHJS_VERSION, loadDashJs} from './engines/dashjs';
@@ -27,8 +28,19 @@ import {isVersion, parseView, type View, viewQuery} from './lib/deeplink';
 import {parsePriv, parseTxxx, toHex} from './lib/id3';
 import {Id3Clock} from './lib/latency';
 import {raysParam} from './lib/rays';
+import {
+    capPush,
+    LIMITS,
+    RECORDING_VERSION,
+    type Recording,
+    RequestTally,
+    redact,
+    redactDeep,
+    stripQuery,
+    summarize,
+} from './lib/recording';
 import {decodeScte35, describeScte35, hexToBytes, type SpliceInfo} from './lib/scte35';
-import {RunningStats, Series} from './lib/stats';
+import {type Point, RunningStats, Series} from './lib/stats';
 import {
     type AdBreak,
     drawLatencyChart,
@@ -95,7 +107,17 @@ const KEY_SYSTEM_NAMES: Record<string, string> = {
 
 /** Everything measured for one loaded stream; replaced on each load. */
 class Session {
+    startedAt = Date.now();
     id3 = new Id3Clock();
+    /** The whole session, for recordings (the live views keep five minutes). */
+    history = {
+        latency: [] as Point[],
+        drift: [] as Point[],
+        events: [] as TimelineEvent[],
+        log: [] as LogEntry[],
+        requests: [] as RequestTiming[],
+        tally: new RequestTally(),
+    };
     latency = {id3: new RunningStats(), pdt: new RunningStats(), drift: new RunningStats()};
     series = new Series(WINDOW_MS);
     driftSeries = new Series(WINDOW_MS);
@@ -391,6 +413,17 @@ export class PlayerApp {
                             void this.copyLink(e.currentTarget as HTMLButtonElement),
                     },
                     'Copy link',
+                ),
+                h(
+                    'button',
+                    {
+                        class: 'pl-btn-ghost',
+                        type: 'button',
+                        title: 'Keep what this load measured on the server, with a link to replay it',
+                        onclick: (e: Event) =>
+                            void this.saveSession(e.currentTarget as HTMLButtonElement),
+                    },
+                    'Save session',
                 ),
             ),
         );
@@ -1251,6 +1284,129 @@ export class PlayerApp {
         }, 1500);
     }
 
+    /** Everything this load measured, redacted, for POST /api/sessions. */
+    private buildRecording(): Recording | null {
+        const s = this.session;
+        const source = this.source;
+        const engine = this.engine;
+        if (!source || !engine) return null;
+        const t0 = performance.timeOrigin;
+        const drm = engine.drmState();
+        const avg = (list: number[]) =>
+            list.length ? Math.round(list.reduce((a, b) => a + b, 0) / list.length) : null;
+        const {name} = this.headline();
+        // Only synced channels can be reopened live: a pasted URL's signature has expired.
+        const query = source.channel ? location.search.replace(/^\?/, '') : '';
+        const recording: Recording = {
+            v: RECORDING_VERSION,
+            title: source.channel?.name ?? `Pasted URL · ${pastedHost(source.url)}`,
+            source: {
+                channel: source.channel?.id ?? null,
+                url: redact(source.url),
+                format: this.format(),
+                engine: engine.name,
+                version: engine.version,
+                drm: source.drm ? (KEY_SYSTEM_NAMES[source.drm.keySystem] ?? null) : null,
+                link: query,
+            },
+            startedAt: s.startedAt,
+            endedAt: Date.now(),
+            live: s.live,
+            userAgent: navigator.userAgent,
+            latencyName: name,
+            stats: {
+                latency: summarize(this.headline().stats),
+                id3: summarize(s.latency.id3),
+                pdt: summarize(s.latency.pdt),
+                drift: summarize(s.latency.drift),
+            },
+            counters: {
+                switches: s.switches,
+                rebuffers: s.rebuffers,
+                stalledSeconds: Math.round(stalledSeconds(s) * 10) / 10,
+                errors: s.errors,
+                httpErrors: s.errorsHttp,
+                segments: s.segments.count,
+                segmentAvgMs: s.segments.count
+                    ? Math.round(s.segments.ms / s.segments.count)
+                    : null,
+                megabytes: Math.round(s.segments.bytes / 1e5) / 10,
+                keys: s.keys.uris.size,
+                keyAvgMs: avg(s.keys.ms),
+                licenses: s.licenses.count,
+                licensesFailed: s.licenses.failed,
+                licenseAvgMs: avg(s.licenses.ms),
+                id3: s.id3Count,
+                scte35: s.scteCount,
+                adBreaks: s.breaks.length,
+            },
+            series: {latency: s.history.latency, drift: s.history.drift},
+            events: s.history.events,
+            breaks: s.breaks.slice(-LIMITS.breaks),
+            log: s.history.log.map((e) => ({
+                t: e.t.getTime(),
+                kind: e.kind,
+                label: e.label,
+                text: e.text,
+            })),
+            renditions: s.renditions.map(({ray, width, height, bitrate, codecs, fps, profile}) => ({
+                ray,
+                width,
+                height,
+                bitrate,
+                codecs,
+                fps,
+                profile,
+            })),
+            requestStats: s.history.tally.summary(),
+            requests: s.history.requests.map((r) => ({
+                kind: r.kind,
+                name: shortUrlFull(r.name),
+                start: Math.round(t0 + r.start),
+                end: Math.round(t0 + r.end),
+                status: r.status,
+                bytes: r.bytes,
+                failed: r.failed,
+            })),
+            drm: drm
+                ? {
+                      keySystem: drm.keySystem,
+                      licenseServer: stripQuery(drm.licenseServer),
+                      robustness: drm.videoRobustness,
+                      keyStatuses: drm.keyStatuses,
+                  }
+                : null,
+            playlist: s.playlist
+                ? Object.fromEntries(Object.entries(s.playlist).filter(([k]) => k !== 'text'))
+                : null,
+        };
+        return redactDeep(recording);
+    }
+
+    private async saveSession(button: HTMLButtonElement): Promise<void> {
+        const recording = this.buildRecording();
+        if (!recording) {
+            this.notice('error', 'Load a stream first; there is nothing to save yet.');
+            return;
+        }
+        button.disabled = true;
+        try {
+            const saved = await saveRecording(this.config.endpoints.sessions, recording);
+            const url = new URL(saved.url, location.href).href;
+            await navigator.clipboard?.writeText(url).catch(() => undefined);
+            this.notice(
+                'info',
+                `Session saved (${saved.size_kb} KB, kept ${saved.retention_days ? `${saved.retention_days} days` : 'until deleted'}); link copied.`,
+                h('a', {href: saved.url, target: '_blank', rel: 'noopener'}, 'Open recording'),
+            );
+            this.logEntry('info', 'SAVED', url);
+        } catch (err) {
+            this.notice('error', `Could not save the session: ${(err as Error).message}`);
+        } finally {
+            button.disabled = false;
+        }
+    }
+
     // ------------------------------------------------------------- playback
 
     private async play(source: Source): Promise<void> {
@@ -1434,6 +1590,9 @@ export class PlayerApp {
         engine.on('request', (req) => {
             const list = s().requests;
             list.push(req);
+            const history = s().history;
+            history.tally.add(req.kind, req.end - req.start, req.bytes, req.failed);
+            capPush(history.requests, req, LIMITS.requests);
             const cutoff = performance.now() - WATERFALL_MS * 2;
             while (list.length && (list[0] as RequestTiming).end < cutoff) list.shift();
         });
@@ -1742,8 +1901,14 @@ export class PlayerApp {
         const drift = engine.liveEdgeDrift();
         if (drift !== null) s.latency.drift.add(drift);
         const headline = id3 ?? pdt;
-        if (headline !== null) s.series.push(headline, now);
-        if (drift !== null) s.driftSeries.push(drift, now);
+        if (headline !== null) {
+            s.series.push(headline, now);
+            capPush(s.history.latency, {t: now, v: headline}, LIMITS.points);
+        }
+        if (drift !== null) {
+            s.driftSeries.push(drift, now);
+            capPush(s.history.drift, {t: now, v: drift}, LIMITS.points);
+        }
 
         const threshold = Number(this.el<HTMLInputElement>('autosyncSecs').value) || 30;
         if (
@@ -2383,6 +2548,7 @@ export class PlayerApp {
         const s = this.session;
         s.log.unshift(entry);
         if (s.log.length > LOG_LIMIT) s.log.pop();
+        if (kind !== 'id3') capPush(s.history.log, entry, LIMITS.log);
         const row = () =>
             h(
                 'div',
@@ -2402,6 +2568,7 @@ export class PlayerApp {
         const now = Date.now();
         const tl = this.session.timeline;
         tl.push({t: now, kind, label});
+        capPush(this.session.history.events, {t: now, kind, label}, LIMITS.events);
         while (tl.length && (tl[0] as TimelineEvent).t < now - WINDOW_MS) tl.shift();
     }
 
@@ -2527,6 +2694,14 @@ const KEY_STATUS_HINTS: Record<string, string> = {
 
 const shortKey = (id: string): string =>
     id.length > 12 ? `${id.slice(0, 8)}…${id.slice(-4)}` : id;
+
+function pastedHost(url: string): string {
+    try {
+        return new URL(url).host;
+    } catch {
+        return 'unknown host';
+    }
+}
 
 function shortUrlFull(url: string): string {
     if (!url) return '--';

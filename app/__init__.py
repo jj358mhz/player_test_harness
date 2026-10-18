@@ -106,6 +106,14 @@ def _register_cli(app: Flask) -> None:
                 click.echo(f"  {channel.display_name}: {probe.error}")
         click.echo(", ".join(f"{n} {state}" for state, n in sorted(counts.items())))
 
+    @app.cli.command("prune-sessions")
+    @click.option("--days", type=int, help="Override SESSION_RETENTION_DAYS for this run.")
+    def prune_sessions_cmd(days: int | None) -> None:
+        """Delete recorded sessions older than the retention period."""
+        from app.sessions import prune_sessions
+
+        click.echo(f"Deleted {prune_sessions(days)} recorded sessions.")
+
     @app.cli.command("set-password")
     @click.argument("email")
     @click.password_option()

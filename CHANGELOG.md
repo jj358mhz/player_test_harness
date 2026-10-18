@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.7.0] - 2026-10-18
+
+### Added
+- **Recorded sessions.** **Save session** in the player keeps what the
+  current load measured and copies a link to `/sessions/<id>`: summary
+  tiles, latency and drift over the whole session with events and ad
+  breaks, latency stats per source, the ray ladder, request totals by kind
+  (count, failed, avg, p95), the last 400 requests, DRM and key status,
+  the log and the browser. **Open live** reopens a synced channel with a
+  fresh signature; **Download JSON**; **Delete**. A **Sessions** page lists
+  them.
+- `SESSION_RETENTION_DAYS` (default 30; 0 keeps them) and
+  `flask prune-sessions [--days N]`; every save also prunes.
+  `MAX_RECORDING_BYTES` caps an upload (default 8 MiB).
+- The player keeps the whole session's latency, drift, events and log for
+  recordings (the live views still show five minutes).
+
+### Security
+- Recordings are redacted in the browser and again on the server: `sig=`
+  and `pbs=` (also percent-encoded), the session part of Preplay play
+  URLs, and license URL queries. Pasted URLs are stored without a live
+  link.
+
 ## [3.6.0] - 2026-10-18
 
 ### Added

@@ -30,10 +30,25 @@ def _manifest() -> dict[str, Any] | None:
     return _cache["data"]
 
 
+RECORDING_ENTRY = "src/recording.ts"
+
+
+def _css(manifest: dict[str, Any], key: str, seen: set[str]) -> list[str]:
+    """CSS of a chunk and the chunks it imports (shared CSS lands in a common chunk)."""
+    if key in seen or key not in manifest:
+        return []
+    seen.add(key)
+    chunk = manifest[key]
+    out = list(chunk.get("css", []))
+    for imported in chunk.get("imports", []):
+        out += [c for c in _css(manifest, imported, seen) if c not in out]
+    return out
+
+
 def vite_assets(entry: str = ENTRY) -> dict[str, Any] | None:
-    manifest = _manifest()
-    chunk = (manifest or {}).get(entry)
+    manifest = _manifest() or {}
+    chunk = manifest.get(entry)
     if not chunk:
         return None
     asset = lambda name: url_for("static", filename=f"player/{name}")  # noqa: E731
-    return {"js": asset(chunk["file"]), "css": [asset(c) for c in chunk.get("css", [])]}
+    return {"js": asset(chunk["file"]), "css": [asset(c) for c in _css(manifest, entry, set())]}

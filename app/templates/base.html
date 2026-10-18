@@ -33,6 +33,7 @@
             <a href="{{ url_for('main.index') }}" class="site-header__link">Channels</a>
             <a href="{{ url_for('main.player') }}" class="site-header__link">Player</a>
             <a href="{{ url_for('main.sign_tool') }}" class="site-header__link">Sign URL</a>
+            <a href="{{ url_for('main.sessions') }}" class="site-header__link">Sessions</a>
             <a href="{{ url_for('main.activity') }}" class="site-header__link">Activity</a>
             {% if current_user.is_admin %}
             <a href="{{ url_for('admin.list_accounts') }}" class="site-header__link">Uplynk Accounts</a>

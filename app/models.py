@@ -13,6 +13,7 @@ from sqlalchemy import (
     JSON,
     Boolean,
     DateTime,
+    Float,
     ForeignKey,
     Integer,
     String,
@@ -197,6 +198,55 @@ class PlaybackEvent(Base):
     user: Mapped[User | None] = relationship()
     uplynk_account: Mapped[UplynkAccount | None] = relationship()
     channel: Mapped[Channel | None] = relationship()
+
+
+class PlaybackSession(Base):
+    """A recorded player session (Phase 4 triage): what one load measured.
+
+    `data` is the browser's recording JSON, redacted on both sides: no
+    signatures, session tokens or license URL queries. Kept for
+    `SESSION_RETENTION_DAYS`; `flask prune-sessions` (and every save)
+    deletes older ones.
+    """
+
+    __tablename__ = "playback_sessions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    slug: Mapped[str] = mapped_column(String(32), unique=True, index=True, nullable=False)
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    channel_id: Mapped[int | None] = mapped_column(
+        ForeignKey("channels.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    engine: Mapped[str] = mapped_column(String(40), nullable=False)
+    engine_version: Mapped[str] = mapped_column(String(40), nullable=False)
+    manifest: Mapped[str] = mapped_column(String(10), nullable=False)
+    drm: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    live: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    ended_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    latency_name: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    latency_avg: Mapped[float | None] = mapped_column(Float, nullable=True)
+    latency_max: Mapped[float | None] = mapped_column(Float, nullable=True)
+    rebuffers: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    errors: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
+    data: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False, index=True
+    )
+
+    user: Mapped[User | None] = relationship()
+    channel: Mapped[Channel | None] = relationship()
+
+    @property
+    def duration_s(self) -> int:
+        return max(0, round((self.ended_at - self.started_at).total_seconds()))
+
+    def __repr__(self) -> str:
+        return f"<PlaybackSession {self.slug}>"
 
 
 class AdminEvent(Base):

@@ -8,7 +8,17 @@ import {svg} from './dom';
 const css = (name: string) =>
     getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
-export function drawLatencyChart(el: SVGSVGElement, points: Point[], windowMs: number): void {
+/** Replays draw a fixed range ending at `end`, with clock-time labels. */
+export interface ChartRange {
+    end: number;
+}
+
+export function drawLatencyChart(
+    el: SVGSVGElement,
+    points: Point[],
+    windowMs: number,
+    range?: ChartRange,
+): void {
     el.textContent = '';
     const W = 560;
     const H = 160;
@@ -20,7 +30,7 @@ export function drawLatencyChart(el: SVGSVGElement, points: Point[], windowMs: n
     const maxV = Math.max(15, ...points.map((p) => p.v)) * 1.1;
     const step = niceStep(maxV / 5); // about five grid lines whatever the range
     const top = Math.ceil(maxV / step) * step;
-    const now = Date.now();
+    const now = range?.end ?? Date.now();
     const x = (t: number) => L + (1 - (now - t) / windowMs) * (W - L - R);
     const y = (v: number) => T + (1 - v / top) * (H - T - B);
 
@@ -51,11 +61,17 @@ export function drawLatencyChart(el: SVGSVGElement, points: Point[], windowMs: n
         ).textContent = `${v}s`;
     }
     const minutes = Math.round(windowMs / 60000);
-    const labels: [string, number, string][] = [
-        [`-${minutes}m`, now - windowMs, 'start'],
-        [`-${minutes / 2}m`, now - windowMs / 2, 'middle'],
-        ['now', now, 'end'],
-    ];
+    const labels: [string, number, string][] = range
+        ? [
+              [clockLabel(now - windowMs), now - windowMs, 'start'],
+              [clockLabel(now - windowMs / 2), now - windowMs / 2, 'middle'],
+              [clockLabel(now), now, 'end'],
+          ]
+        : [
+              [`-${minutes}m`, now - windowMs, 'start'],
+              [`-${minutes / 2}m`, now - windowMs / 2, 'middle'],
+              ['now', now, 'end'],
+          ];
     for (const [label, t, anchor] of labels) {
         svg(
             'text',
@@ -124,6 +140,7 @@ export function drawTimeline(
     events: TimelineEvent[],
     breaks: AdBreak[],
     windowMs: number,
+    range?: ChartRange,
 ): void {
     el.textContent = '';
     const W = Math.max(320, Math.round(el.clientWidth || 800));
@@ -136,7 +153,7 @@ export function drawTimeline(
     const plotBottom = 78;
     const laneTop = 102;
     const laneBottom = 124;
-    const now = Date.now();
+    const now = range?.end ?? Date.now();
     const x = (t: number) => L + (1 - (now - t) / windowMs) * (W - L - R);
 
     // Ad breaks span the whole strip
@@ -183,9 +200,10 @@ export function drawTimeline(
         ).textContent = `${v}s`;
     }
 
-    // Time ticks every minute
+    // Time ticks: every minute live; spaced to about eight ticks on a replay
     const minutes = Math.round(windowMs / 60000);
-    for (let m = minutes; m >= 0; m--) {
+    const every = range ? tickMinutes(windowMs / 60000) : 1;
+    for (let m = Math.floor(minutes / every) * every; m >= 0; m -= every) {
         const tx = x(now - m * 60000);
         svg(
             'line',
@@ -201,7 +219,7 @@ export function drawTimeline(
                 class: 'chart-label',
             },
             el,
-        ).textContent = m === 0 ? 'now' : `-${m}m`;
+        ).textContent = range ? clockLabel(now - m * 60000) : m === 0 ? 'now' : `-${m}m`;
     }
 
     // Lines + current values at the right edge
@@ -293,6 +311,17 @@ export function drawTimeline(
         else mark = svg('circle', {cx: ex, cy: mid, r: 5, fill: 'var(--error)'}, el);
         svg('title', {}, mark).textContent = e.label;
     }
+}
+
+/** Minutes between time ticks so a range of `minutes` gets about eight. */
+export function tickMinutes(minutes: number): number {
+    for (const step of [1, 2, 5, 10, 15, 30, 60, 120, 240]) if (minutes / step <= 8) return step;
+    return 480;
+}
+
+function clockLabel(t: number): string {
+    const d = new Date(t);
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
 /** 1, 2 or 5 × a power of ten, at least 5 (seconds). */

@@ -56,6 +56,25 @@ export async function requestPlayback(
     return data as PlaybackResponse;
 }
 
+export interface SavedSession {
+    id: string;
+    url: string;
+    size_kb: number;
+    retention_days: number;
+}
+
+/** Store a recording; the server redacts it again and answers with its replay link. */
+export async function saveRecording(endpoint: string, recording: unknown): Promise<SavedSession> {
+    const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf()},
+        body: JSON.stringify(recording),
+    });
+    const data = await response.json().catch(() => ({error: `HTTP ${response.status}`}));
+    if (!response.ok) throw new Error(data.error ?? `HTTP ${response.status}`);
+    return data as SavedSession;
+}
+
 export async function fetchVersions(endpoint: string): Promise<EngineVersion[]> {
     const response = await fetch(endpoint);
     const data = await response.json().catch(() => ({versions: []}));

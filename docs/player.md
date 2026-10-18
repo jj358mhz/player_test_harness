@@ -7,7 +7,18 @@ Uplynk stream is doing while it plays.
 ## Layout
 
 - **Load bar:** channel or pasted URL, format (HLS or DASH), player engine
-  and version, DRM, Load, **Copy link**.
+  and version, DRM, Load, **Copy link**, **Save session**.
+- **Recorded sessions:** **Save session** sends what this load measured to
+  the server and copies a link to `/sessions/<id>`: summary tiles, latency
+  and drift over the whole session with events and ad breaks, latency
+  stats per source, the ray ladder, request totals by kind (count, failed,
+  avg, p95), the last 400 requests, DRM and key status, the log (without
+  ID3 noise) and the browser. Signatures, `pbs=` tokens, Preplay session
+  paths and license URL queries are removed in the browser and again on the
+  server. **Open live** reopens a synced channel with a fresh signature
+  (pasted URLs can't be reopened). Kept `SESSION_RETENTION_DAYS` (default
+  30); `flask prune-sessions` and every save delete older ones. The
+  **Sessions** page lists them.
 - **Deep links:** the address bar always describes the view, so it can be
   shared or reloaded: `?channel=<id>` (or `?src=<url>`), `format=dash`,
   `engine=<hlsjs|shaka|dashjs|native>[@<version>]`, `drm=wv|pr`,
