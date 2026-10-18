@@ -74,6 +74,7 @@ class Session {
     id3 = new Id3Clock();
     latency = {id3: new RunningStats(), pdt: new RunningStats(), drift: new RunningStats()};
     series = new Series(WINDOW_MS);
+    driftSeries = new Series(WINDOW_MS);
     timeline: TimelineEvent[] = [];
     log: LogEntry[] = [];
     renditions: Rendition[] = [];
@@ -186,12 +187,27 @@ export class PlayerApp {
                             'div',
                             {class: 'pl-panel__head'},
                             h('span', {class: 'pl-panel__title'}, 'Last 5 minutes'),
-                            h('span', {class: 'pl-muted'}, 'latency line · events on one axis'),
+                            h('span', {class: 'pl-muted'}, 'seconds behind live · events below'),
                         ),
                         this.svgs.timeline,
                         h(
                             'div',
                             {class: 'pl-legend'},
+                            h(
+                                'span',
+                                {},
+                                h('i', {
+                                    class: 'pl-legend__line',
+                                    style: 'background:var(--accent)',
+                                }),
+                                'Latency',
+                            ),
+                            h(
+                                'span',
+                                {},
+                                h('i', {class: 'pl-legend__line pl-legend__line--dashed'}),
+                                'Live-edge drift',
+                            ),
                             ...(
                                 [
                                     ['info', 'Ray switch'],
@@ -1512,7 +1528,11 @@ export class PlayerApp {
         this.expireBreaks();
         drawTimeline(
             this.svgs.timeline,
-            this.session.series.points,
+            {
+                latency: this.session.series.points,
+                latencyLabel: `Latency (${this.headline().name})`,
+                drift: this.session.driftSeries.points,
+            },
             this.session.timeline,
             this.session.breaks,
             WINDOW_MS,
@@ -1536,6 +1556,7 @@ export class PlayerApp {
         if (drift !== null) s.latency.drift.add(drift);
         const headline = id3 ?? pdt;
         if (headline !== null) s.series.push(headline, now);
+        if (drift !== null) s.driftSeries.push(drift, now);
 
         const threshold = Number(this.el<HTMLInputElement>('autosyncSecs').value) || 30;
         if (
@@ -1608,8 +1629,8 @@ export class PlayerApp {
         this.setVital(
             'drift',
             drift === null ? '--' : `<span class="num">${secs(drift)}</span><small>s</small>`,
-            target ? `target ${secs(target)} s` : s.live ? ' ' : 'VOD',
-            drift === null ? null : target && drift > target * 2 ? 'state-warn' : 'state-good',
+            target ? `target ${secs(target)} s` : s.live ? 'behind the live edge' : 'VOD',
+            driftState(drift, target ?? null),
         );
 
         const buffer = bufferAhead(this.video);
@@ -2209,6 +2230,14 @@ export class PlayerApp {
 }
 
 // ------------------------------------------------------------------ helpers
+
+/** Green near the engine's target (or within 15 s), amber, then red past 45 s. */
+export function driftState(drift: number | null, target: number | null): string | null {
+    if (drift === null) return null;
+    const ok = target ? target * 1.5 : 15;
+    const bad = target ? Math.max(target * 3, 45) : 45;
+    return drift <= ok ? 'state-good' : drift <= bad ? 'state-warn' : 'state-bad';
+}
 
 function isCaptionTrack(track: TextTrack): boolean {
     return track.kind === 'captions' || track.kind === 'subtitles';

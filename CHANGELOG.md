@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.2.2] - 2026-10-17
+
+### Changed
+- **Timeline** plots latency and **live-edge drift** together on one
+  seconds scale (drift dashed), with labelled grid lines, minute ticks,
+  current values at the right edge, and events in their own lane. Rising
+  latency with rising drift means the player is falling behind the edge;
+  rising latency with steady drift means the stream itself is late.
+- **Drift tile** colours itself without an engine target (Shaka): green up
+  to 15 s, amber to 45 s, red beyond.
+
 ## [3.2.1] - 2026-10-17
 
 ### Fixed

@@ -265,3 +265,18 @@ describe('mpdInfo', async () => {
         expect(redactSignatures(mpd)).toContain('?pbs=…&amp;sig=…<');
     });
 });
+
+describe('driftState', async () => {
+    const {driftState} = await import('../src/app');
+    it('uses the engine target when there is one', () => {
+        expect(driftState(20, 24)).toBe('state-good');
+        expect(driftState(60, 24)).toBe('state-warn');
+        expect(driftState(80, 24)).toBe('state-bad');
+    });
+    it('falls back to 15 s / 45 s without a target', () => {
+        expect(driftState(10, null)).toBe('state-good');
+        expect(driftState(30, null)).toBe('state-warn');
+        expect(driftState(74.3, null)).toBe('state-bad');
+        expect(driftState(null, null)).toBeNull();
+    });
+});
