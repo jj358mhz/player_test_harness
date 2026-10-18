@@ -90,7 +90,8 @@ in the `player_harness_data` volume.
 
 - [x] Phase 0 — public GitHub repo, fresh history, scrubbed data
 - [x] Phase 1 — backend: accounts, channel sync, signing + Preplay API,
-      dashboard, Pi deploy, CI *(branch `feat/phase-1-backend`)*
+      dashboard, Pi deploy, CI *(PR #1; live at player.telcomjj.com
+      2026-10-17, login verified)*
 - [ ] Phase 2 — multi-player: split the player into ES modules (no build
       step), `PlayerAdapter` interface (hls.js, Shaka, dash.js, native);
       per-engine latency source (ID3 wallclock for HLS; emsg/prft/UTCTiming
@@ -101,3 +102,17 @@ in the `player_harness_data` volume.
       setting), side-by-side compare, LL-HLS part/blocking-reload metrics,
       CMCD toggle, request waterfall, deep links, CSL cross-link via slicer_id
 - [ ] Periodic background channel sync (for now: UI, CLI, or host cron)
+
+### Todo
+
+- [x] Own app icon: magenta-gradient play tile in `app/static/favicons/`,
+      the header brand mark (`.site-header__brand::before`, was CSL's "C")
+      and an inline SVG in the player
+- [x] Verify against a real workspace (2026-10-17): sync, signed HLS
+      (200 on every channel), Preplay v2. DASH is signed correctly but
+      Uplynk answers `400 Non dash asset <id>` when the airing asset has
+      no DASH packaging — a content setting, not a signing bug
+- [ ] Probe the manifest after signing and show Uplynk's error text
+      (e.g. `Non dash asset`) instead of a silent failed download
+- [ ] Merge PR #2 (bootstrap race between workers, gunicorn control socket)
+- [ ] Port PR #2 fixes and the Dockerfile `LABEL` (deploy image prune) to CSL
