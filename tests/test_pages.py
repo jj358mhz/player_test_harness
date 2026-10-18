@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import io
-from urllib.parse import parse_qs, urlsplit
 
 import pytest
 
@@ -34,32 +33,54 @@ def test_dashboard_lists_channels_grouped(auth_client, make_account, make_channe
     assert html.index("acct-a") < html.index("acct-b")
 
 
-def test_player_serves_html(auth_client):
-    response = auth_client.get("/player")
+def test_player_page_without_build_points_to_classic(auth_client, monkeypatch):
+    from app.main import routes
+
+    monkeypatch.setattr(routes, "vite_assets", lambda: None)
+    html = auth_client.get("/player").get_data(as_text=True)
+    assert "Player not built" in html and "/player/classic" in html
+
+
+def test_player_page_embeds_config_and_assets(auth_client, make_account, make_channel, monkeypatch):
+    import json
+    import re
+
+    from app.main import routes
+
+    monkeypatch.setattr(
+        routes,
+        "vite_assets",
+        lambda: {
+            "js": "/static/player/assets/main-abc.js",
+            "css": ["/static/player/assets/main.css"],
+        },
+    )
+    ch = make_channel(make_account(), "abc", description="Alpha")
+    html = auth_client.get(f"/player?channel={ch.id}").get_data(as_text=True)
+    assert '<script type="module" src="/static/player/assets/main-abc.js">' in html
+    assert '<link rel="stylesheet" href="/static/player/assets/main.css">' in html
+    raw = re.search(
+        r'<script id="player-config" type="application/json">(.*?)</script>', html, re.S
+    )
+    config = json.loads(raw.group(1))
+    assert config["initialChannel"] == ch.id
+    assert config["channels"][0]["name"] == "Alpha"
+    assert config["endpoints"]["versions"] == "/api/engines/hls.js/versions"
+    assert "api_key" not in raw.group(1)  # keys never reach the browser
+
+
+def test_classic_player_still_served(auth_client):
+    response = auth_client.get("/player/classic")
     assert response.mimetype == "text/html"
     assert b"autoSrc" in response.data
 
 
-def test_play_channel_redirects_to_player_with_signed_src(auth_client, make_account, make_channel):
+def test_play_channel_opens_player_on_channel(auth_client, make_account, make_channel, probe_calls):
     ch = make_channel(make_account(), "abc")
     response = auth_client.get(f"/channels/{ch.id}/play")
     assert response.status_code == 302
-    location = urlsplit(response.headers["Location"])
-    assert location.path == "/player"
-    src = parse_qs(location.query)["src"][0]
-    assert "/channel/abc.m3u8?tc=1" in src and "&sig=" in src
-
-
-def test_play_channel_stays_on_dashboard_when_probe_fails(
-    auth_client, make_account, make_channel, probe_calls
-):
-    from app.uplynk.playback import ProbeResult
-
-    ch = make_channel(make_account(), "abc")
-    probe_calls.result = ProbeResult(False, 403, "HTTP 403: Invalid signature", 9)
-    response = auth_client.get(f"/channels/{ch.id}/play", follow_redirects=True)
-    assert response.request.path == "/"
-    assert "Invalid signature" in response.get_data(as_text=True)
+    assert response.headers["Location"] == f"/player?channel={ch.id}"
+    assert probe_calls == []  # the player signs and checks it
 
 
 def test_play_unknown_channel_404(auth_client):

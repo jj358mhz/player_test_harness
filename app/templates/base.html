@@ -19,7 +19,7 @@
 </head>
 <body>
 <header class="site-header">
-    <div class="site-header__inner">
+    <div class="site-header__inner{{ self.main_modifier() }}">
         <div class="site-header__brand-group">
             <a class="site-header__brand" href="{{ url_for('main.index') }}">Player Test Harness</a>
             <a class="site-header__version"
@@ -47,7 +47,7 @@
     </div>
 </header>
 
-<main class="site-main">
+<main class="site-main{% block main_modifier %}{% endblock %}">
     {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}
     <ul class="flashes">

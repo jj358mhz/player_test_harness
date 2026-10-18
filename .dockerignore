@@ -23,3 +23,5 @@ data/
 .DS_Store
 docker-compose*.yml
 Dockerfile
+frontend/node_modules/
+app/static/player/

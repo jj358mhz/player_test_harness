@@ -5,13 +5,13 @@ from __future__ import annotations
 from itertools import groupby
 from pathlib import Path
 
-from flask import abort, flash, jsonify, redirect, render_template, request, send_file, url_for
+from flask import abort, jsonify, redirect, render_template, request, send_file, url_for
 from flask_login import login_required
 
-from app.api.service import create_playback, parse_request
 from app.main import bp
 from app.models import AdminEvent, Channel, PlaybackEvent, UplynkAccount, db
-from app.uplynk.playback import CONTENT_TYPES, PlaybackError
+from app.uplynk.playback import CONTENT_TYPES
+from app.vite import vite_assets
 
 PLAYER_HTML = Path(__file__).resolve().parent.parent / "player" / "hls-id3-player.html"
 
@@ -48,28 +48,48 @@ def toggle_favorite(channel_id: int):
 @bp.route("/channels/<int:channel_id>/play")
 @login_required
 def play_channel(channel_id: int):
-    """Sign an HLS URL for the channel and open it in the player."""
+    """Open the player on a channel; the player signs and checks the URL itself."""
     if db.session.get(Channel, channel_id) is None:
         abort(404)
-    try:
-        result = create_playback(parse_request({"channel_id": channel_id, "manifest": "m3u8"}))
-    except PlaybackError as e:
-        flash(f"Could not sign playback URL: {e}", "error")
-        return redirect(url_for("main.index"))
-    probe = result.get("probe")
-    if probe and not probe["ok"]:
-        flash(
-            f"Uplynk answered {probe['error']} — not opening the player. "
-            "Use Advanced… to sign and open it anyway.",
-            "error",
-        )
-        return redirect(url_for("main.index"))
-    return redirect(url_for("main.player", src=result["url"]))
+    return redirect(url_for("main.player", channel=channel_id))
 
 
 @bp.route("/player")
 @login_required
-def player():
+def player() -> str:
+    channels = (
+        db.session.query(Channel)
+        .filter_by(is_active=True)
+        .join(UplynkAccount)
+        .order_by(UplynkAccount.label, Channel.is_favorite.desc(), Channel.description)
+        .all()
+    )
+    config = {
+        "channels": [
+            {
+                "id": c.id,
+                "name": c.display_name,
+                "account": c.uplynk_account.label,
+                "channelId": c.channel_id,
+                "favorite": c.is_favorite,
+            }
+            for c in channels
+        ],
+        "initialChannel": request.args.get("channel", type=int),
+        "initialSrc": request.args.get("src") or None,
+        "endpoints": {
+            "playback": url_for("api.playback"),
+            "versions": url_for("api.engine_versions", package="hls.js"),
+            "classic": url_for("main.player_classic"),
+        },
+    }
+    return render_template("main/player.html", config=config, assets=vite_assets())
+
+
+@bp.route("/player/classic")
+@login_required
+def player_classic():
+    """The original single-file player, kept until the new one reaches parity."""
     return send_file(PLAYER_HTML, mimetype="text/html", max_age=0)
 
 

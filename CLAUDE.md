@@ -32,7 +32,17 @@ uv run pytest -q                     # tests (CI runs -v)
 uv run ruff check . && uv run ruff format --check .
 uv run alembic revision --autogenerate -m "..."   # after model changes
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build   # http://localhost:5051
+
+# Player frontend (frontend/, TypeScript + Vite, Node 24)
+npm --prefix frontend ci
+npm --prefix frontend run build      # → app/static/player (gitignored); `run dev` = watch
+npm --prefix frontend run lint && npm --prefix frontend run typecheck && npm --prefix frontend test
 ```
+
+Without a build, `/player` says "Player not built" and links to
+`/player/classic`; the Python tests don't need Node. Biome is the TS
+linter/formatter (4-space, single quotes, 100 cols) — run `npx biome check
+--write .` in `frontend/` before committing.
 
 Tests need no env setup — `tests/conftest.py` sets env vars and builds a
 temp SQLite DB. Useful fixtures: `auth_client` (logged-in admin),
@@ -54,12 +64,24 @@ after dependency changes.
   - `sync.py` — channels → DB upsert; deactivates missing, keeps favorites.
 - `app/api/service.py` — validates playback requests, signs/Preplays,
   writes `PlaybackEvent`. Both the JSON API and `/channels/<id>/play` use it.
-- `app/main/` — pages: channels dashboard, `/player`, `/sign`, `/activity`.
+- `app/main/` — pages: channels dashboard, `/player`, `/player/classic`,
+  `/sign`, `/activity`. `/player` renders `main/player.html` with a JSON
+  config (channels, endpoints; never keys) and the Vite assets found by
+  `app/vite.py`. `/channels/<id>/play` → `/player?channel=<id>`.
+- `app/engines.py` — engine version menu from npm (latest patch of the last
+  3 minors, cached 24 h), served at `/api/engines/<pkg>/versions`.
+- `frontend/src/` — the player:
+  - `app.ts` — page controller: load bar, vitals, timeline, inspector tabs.
+  - `engines/types.ts` — `PlayerEngine` interface + events; `engines/hlsjs.ts`
+    loads any hls.js version from jsDelivr (`dist/hls.mjs`); the npm
+    dependency gives types and `DEFAULT_HLS_VERSION`.
+  - `lib/` — pure, unit-tested: `latency.ts` (ID3 latency at the playhead),
+    `id3.ts`, `rays.ts` (ray from URI, `#UPLYNK-MEDIA0`, `rays=`),
+    `bands.ts`, `stats.ts`.
 - `app/admin/` — Uplynk account CRUD + sync (admin-only).
-- `app/player/hls-id3-player.html` — the monitoring player, a single
-  ~7k-line self-contained file served by `main.player` behind login.
-  `?src=<url>` autoloads. Being replaced in Phase 2a; standalone use is no
-  longer required.
+- `app/player/hls-id3-player.html` — the original player, served at
+  `/player/classic` until the new one reaches parity (Tracks tab, SCTE-35
+  decode, caption/audio monitors, HTTP waterfall), then deleted.
 
 ## Uplynk facts we rely on
 
@@ -98,7 +120,12 @@ in the `player_harness_data` volume.
 - [x] Phase 1 — backend: accounts, channel sync, signing + Preplay API,
       dashboard, Pi deploy, CI *(PR #1; live at player.telcomjj.com
       2026-10-17, login verified)*
-- [ ] Phase 2a — player rewrite (decided 2026-10-17): TypeScript + Vite
+- [ ] Phase 2a — player rewrite (decided 2026-10-17). **2a-1 done**
+      (PR "Phase 2a part 1"): toolchain, Docker/CI, version menu, load bar,
+      vitals, timeline, Latency/ABR/DRM & keys/Metadata/Manifest/Network/Log
+      tabs. **2a-2 next**: Tracks (audio + captions), SCTE-35 decode and ad
+      breaks on the timeline, request waterfall, then delete the classic
+      player. Plan: TypeScript + Vite
       (Node stage in the Dockerfile, typecheck/tests in CI), server-only
       (drop the open-from-disk requirement), video-first layout: load bar,
       pinned video + six vitals, 5-minute event timeline, tabbed inspector

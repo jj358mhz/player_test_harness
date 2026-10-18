@@ -6,6 +6,8 @@ from flask import Blueprint, jsonify, request
 from flask_login import login_required
 
 from app.api.service import create_playback, parse_request
+from app.engines import EngineVersionsError
+from app.engines import engine_versions as list_engine_versions
 from app.models import Channel, UplynkAccount, db
 from app.uplynk.playback import PlaybackError
 
@@ -49,3 +51,14 @@ def channels():
             for c in rows
         ]
     )
+
+
+@bp.route("/engines/<path:package>/versions")
+@login_required
+def engine_versions(package: str):
+    """Version menu for a player engine: latest patch of the last 3 minors."""
+    try:
+        versions = list_engine_versions(package)
+    except EngineVersionsError as e:
+        return jsonify(error=str(e), versions=[]), 502
+    return jsonify(package=package, versions=versions)

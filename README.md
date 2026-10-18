@@ -25,8 +25,11 @@ latency, drift, ABR, DRM keys, ID3/SCTE-35, captions and more.
   (HLS) sessions and get back the zone `prefix` and license/certificate URLs.
 - ▶️ **One-click play** — each channel card signs a fresh HLS URL and opens
   the monitoring player with it. Copy HLS/DASH buttons for use in other players.
-- 📊 **Monitoring player** — the HLS.js Advanced Latency Monitor; see
-  [docs/player.md](docs/player.md).
+- 📊 **Monitoring player** — video first, with latency (ID3, PDT and
+  live-edge drift, measured at the playhead), Uplynk rays, an event
+  timeline and tabbed inspectors. Pick any hls.js version; the menu offers
+  the latest patch of the last three minor lines. The original player is at
+  `/player/classic` ([docs/player.md](docs/player.md)).
 - 📜 **Audit trail** — every signing / Preplay request (base URL and params,
   never the signature) and every account or sync action.
 
@@ -36,6 +39,7 @@ latency, drift, ABR, DRM keys, ID3/SCTE-35, captions and more.
 |-------|--------------------------------------------------------------------------|---------|
 | 0     | Move to GitHub, scrub workspace-specific data                            | ✅ done |
 | 1     | Flask backend: accounts, channel sync, signing + Preplay API, Pi deploy  | ✅ done |
+| 2a    | Player rewrite: TypeScript + Vite, video-first layout, rays, versions    | in progress |
 | 2     | Multi-player: player adapter interface; hls.js, Shaka, dash.js, native   | planned |
 | 3     | DRM playback driven by Preplay; DRM diagnostics panel                    | planned |
 | 4     | Triage: recorded sessions, side-by-side compare, LL-HLS metrics, links   | planned |
@@ -49,7 +53,7 @@ latency, drift, ABR, DRM keys, ID3/SCTE-35, captions and more.
 | Auth             | Flask-Login + Flask-WTF (CSRF) + argon2                    |
 | Database         | SQLite (single-file, volume-mounted)                       |
 | Frontend         | Server-rendered HTML + a little vanilla JS (no build step) |
-| Player           | Self-contained HTML + HLS.js (loaded from jsDelivr)        |
+| Player           | TypeScript + Vite (`frontend/`); hls.js from jsDelivr      |
 | Crypto           | `cryptography` (Fernet at rest, ES256 JWT, HMAC-SHA256)    |
 | WSGI server      | gunicorn                                                   |
 | Runtime          | Python 3.12 in a slim Debian container                     |
@@ -116,12 +120,23 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
 curl http://localhost:5051/health
 ```
 
+Build the player (Node 24). The Docker image does this itself; locally the
+dev overlay serves whatever is in `app/static/player`:
+
+```bash
+npm --prefix frontend ci
+npm --prefix frontend run dev        # rebuilds on change
+```
+
 Tests and lint (same as CI):
 
 ```bash
 uv run pytest -v
 uv run ruff check .
 uv run ruff format --check .
+npm --prefix frontend run lint
+npm --prefix frontend run typecheck
+npm --prefix frontend test
 ```
 
 After changing `app/models.py`, generate a migration:
@@ -203,8 +218,11 @@ player.telcomjj.com {
 
 ## ⚙️ CI/CD
 
-- **`.github/workflows/ci.yml`** — `ruff check` + `ruff format --check` +
-  `pytest` on every PR and non-main push.
+- **`.github/workflows/ci.yml`** — on every PR and non-main push: Python
+  (`ruff` + `pytest`), frontend (Biome, `tsc`, Vitest, Vite build) and a
+  Docker image build.
+- **`.github/dependabot.yml`** — weekly npm updates (player engines grouped
+  separately from tooling) and monthly GitHub Actions updates.
 - **`.github/workflows/deploy.yml`** — on push to `main`, a `v*` tag, or
   manual dispatch: SSH to the Utility Pi, `git pull`, `docker compose up -d
   --build`, prune old images. `git describe` is baked in as `APP_VERSION`
@@ -235,7 +253,12 @@ player_test_harness/
 │   │   └── sync.py          # Channels → DB upsert
 │   ├── static/              # CSS + JS
 │   └── templates/
-├── docs/player.md           # Player feature reference
+├── frontend/                # The player: TypeScript + Vite → app/static/player
+│   ├── src/app.ts           # Page controller (load bar, vitals, tabs)
+│   ├── src/engines/         # PlayerEngine interface + hls.js adapter
+│   ├── src/lib/             # Latency, ID3, rays, bands, stats (unit-tested)
+│   └── test/
+├── docs/player.md           # Classic player feature reference
 ├── migrations/              # Alembic
 ├── tests/                   # Pytest suite
 ├── .github/workflows/       # CI + deploy
