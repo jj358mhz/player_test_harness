@@ -105,8 +105,9 @@ in the `player_harness_data` volume.
 
 ### Todo
 
-- [x] Own app icon (pink play tile in `app/static/favicons/`, SVG data URI
-      in the player) — was the 📺 emoji, showed CSL's icon in the browser
+- [x] Own app icon: magenta-gradient play tile in `app/static/favicons/`,
+      the header brand mark (`.site-header__brand::before`, was CSL's "C")
+      and an inline SVG in the player
 - [ ] Verify against a real workspace: account Sync, ▶ Play HLS, DASH and
       Preplay URLs
 - [ ] Merge PR #2 (bootstrap race between workers, gunicorn control socket)
