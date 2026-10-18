@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.1] - 2026-10-17
+
+### Fixed
+- **Channel sync reads every page.** Uplynk's channels API returns at most
+  40 channels per page, so workspaces with more than 40 only synced the
+  first 40. Sync now walks `page=1, 2, …` until it has `total_items`, and
+  fails (without deactivating anything) if the count comes up short.
+
 ## [3.1.0] - 2026-10-17
 
 ### Added

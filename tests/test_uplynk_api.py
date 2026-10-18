@@ -72,7 +72,7 @@ def test_list_channels_classic_auth():
     assert client.auth_mode == "classic"
     url, kwargs = session.calls[0]
     assert url == "https://services.uplynk.com/api/v4/channels"
-    assert set(kwargs["params"]) == {"msg", "sig"}
+    assert set(kwargs["params"]) == {"msg", "sig", "page"}
     assert "X-Auth-Uplynk-Jwt" not in kwargs["headers"]
 
     [ch] = channels
@@ -91,7 +91,7 @@ def test_list_channels_prefers_scoped_key(ec_keypair):
     assert client.list_channels() == []
     assert client.auth_mode == "scoped"
     _, kwargs = session.calls[0]
-    assert kwargs["params"] == {}
+    assert kwargs["params"] == {"page": 1}
     assert kwargs["headers"]["X-Auth-Uplynk-Jwt"]
 
 
@@ -117,3 +117,44 @@ def test_list_channels_errors(response, match):
 def test_client_requires_some_credentials():
     with pytest.raises(UplynkAPIError):
         UplynkChannelsClient("https://x", "owner1")
+
+
+def _item(n):
+    return {**CHANNEL_ITEM, "id": f"chan{n:04d}", "@id": f"/channels/chan{n:04d}"}
+
+
+def _page(start, count, total):
+    return FakeResponse(
+        200, {"items": [_item(i) for i in range(start, start + count)], "total_items": total}
+    )
+
+
+def test_list_channels_walks_every_page():
+    # Uplynk caps pages at 40 items; 142 channels → 4 pages
+    pages = [_page(0, 40, 142), _page(40, 40, 142), _page(80, 40, 142), _page(120, 22, 142)]
+    client, session = _client(pages)
+    channels = client.list_channels()
+    assert len(channels) == 142
+    assert [kw["params"]["page"] for _, kw in session.calls] == [1, 2, 3, 4]
+    assert len({c.channel_id for c in channels}) == 142
+
+
+def test_list_channels_stops_on_empty_page_without_total():
+    no_total = FakeResponse(200, {"items": [_item(1)]})
+    client, session = _client([no_total, FakeResponse(200, {"items": []})])
+    assert len(client.list_channels()) == 1
+    assert len(session.calls) == 2
+
+
+def test_list_channels_fails_rather_than_return_a_partial_list():
+    # total says 50 but the second page comes back empty: don't let sync
+    # deactivate the 10 we never saw.
+    client, _ = _client([_page(0, 40, 50), FakeResponse(200, {"items": [], "total_items": 50})])
+    with pytest.raises(UplynkAPIError, match="reported 50 channels but only 40"):
+        client.list_channels()
+
+
+def test_list_channels_error_on_a_later_page_fails_the_sync():
+    client, _ = _client([_page(0, 40, 80), FakeResponse(500, text="boom")])
+    with pytest.raises(UplynkAPIError, match="HTTP 500"):
+        client.list_channels()

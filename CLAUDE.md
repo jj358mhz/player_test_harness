@@ -66,7 +66,10 @@ after dependency changes.
   - `auth.py` — scoped-key ES256 JWT (`X-Auth-Uplynk-Jwt`) and classic
     `msg`/`sig` params (zlib+base64 JSON `{_owner,_timestamp}`, HMAC-SHA256).
   - `channels.py` — `GET /api/v4/channels`; prefers scoped key, falls back
-    to classic auth with the account API key. Response list is `items`.
+    to classic auth with the account API key. Response list is `items`,
+    **max 40 per page** (`page_size` is ignored above 40); walk `page=1..`
+    until `total_items`. Allowed params: after, include_deleted, order,
+    page, page_size, search, type (+ msg/sig).
   - `playback.py` — URL templates, token signing, Preplay v2 fetch.
   - `sync.py` — channels → DB upsert; deactivates missing, keeps favorites.
 - `app/api/service.py` — validates playback requests, signs/Preplays,
