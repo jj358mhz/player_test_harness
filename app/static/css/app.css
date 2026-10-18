@@ -1368,7 +1368,7 @@ form.inline {
 
 .channel-card__header {
     display: grid;
-    grid-template-columns: auto 1fr auto;
+    grid-template-columns: auto auto minmax(0, 1fr) auto;
     gap: 10px;
     align-items: flex-start;
 }
@@ -1488,4 +1488,81 @@ select.input {
     background-repeat: no-repeat;
     background-position: right 12px center;
     background-size: 11px 7px;
+}
+
+
+/* Channel selection and batch check results */
+.channel-card__select {
+    display: flex;
+    padding-top: 2px;
+}
+
+.channel-card__select input {
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    accent-color: var(--accent);
+    cursor: pointer;
+}
+
+.channel-card__check {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    font-size: 12px;
+}
+
+.check-pill {
+    padding: 1px 8px;
+    border-radius: 999px;
+    border: 1px solid var(--border-strong);
+    font-weight: 700;
+}
+
+.check-pill--ok {
+    color: var(--success);
+    border-color: rgba(34, 197, 94, .45);
+}
+
+.check-pill--bad {
+    color: var(--error);
+    border-color: rgba(224, 82, 82, .5);
+}
+
+.check-why {
+    color: var(--text-dim);
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.account-section__header {
+    cursor: pointer;
+}
+
+/* Keep batch-bar labels on one line; wrap whole buttons on narrow screens.
+   Centred with left/right + auto margins: left:50% + translate caps a
+   shrink-to-fit box at half the viewport, which wrapped "Clear selection". */
+.batch-bar {
+    left: 16px;
+    right: 16px;
+    width: fit-content;
+    margin: 0 auto;
+    transform: none;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.batch-bar__count,
+.batch-bar .button--action,
+.batch-bar .link-button {
+    white-space: nowrap;
+}
+
+.batch-bar__actions {
+    flex-wrap: wrap;
+}
+
+.batch-bar .button--action {
+    text-transform: none;
 }

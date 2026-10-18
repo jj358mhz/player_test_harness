@@ -9,6 +9,10 @@
         <input type="search" id="channel-filter" class="input channel-filter"
                placeholder="Filter by name, ID, external ID, slicer…" autocomplete="off">
         {% endif %}
+        {% if total %}
+        <button type="button" class="btn-ghost" id="collapse-all-btn">Collapse all</button>
+        <button type="button" class="btn-ghost" id="expand-all-btn">Expand all</button>
+        {% endif %}
         {% if current_user.is_admin and account_count %}
         <form method="post" action="{{ url_for('admin.sync_all') }}" class="inline">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -34,18 +38,41 @@
 </div>
 {% endif %}
 
+{% if groups|length > 1 %}
+<nav class="workspace-nav" id="workspace-nav" aria-label="Jump to account">
+    {% for label, channels in groups %}
+    <a href="#section-{{ loop.index }}" class="workspace-nav__chip" data-target="section-{{ loop.index }}">
+        {{ label }} <span class="workspace-nav__chip-count">({{ channels|length }})</span>
+    </a>
+    {% endfor %}
+</nav>
+{% endif %}
+
 {% for label, channels in groups %}
-<section class="account-section" data-account-section>
+{% set section = 'section-' ~ loop.index %}
+<section class="account-section" id="{{ section }}" data-account-section data-section="{{ label }}">
     <div class="account-section__header">
-        <h2 class="account-section__title">{{ label }} · <span data-section-count>{{ channels|length }}</span></h2>
+        <h2 class="account-section__title">
+            <span class="account-section__chevron" aria-hidden="true">▶</span>
+            {{ label }}
+            <span class="account-section__count">(<span data-section-count>{{ channels|length }}</span>)</span>
+        </h2>
+        <label class="section-selectall">
+            <input type="checkbox" class="section-selectall__cb" aria-label="Select all channels in {{ label }}">
+            <span>Select all</span>
+        </label>
     </div>
-    <div class="channel-grid">
+    <div class="account-section__body channel-grid">
         {% for ch in channels %}
         <article class="channel-card{% if ch.is_favorite %} channel-card--favorite{% endif %}"
                  id="channel-{{ ch.id }}"
                  data-channel
                  data-search="{{ [ch.description, ch.channel_id, ch.external_id, ch.slicer_id]|select|join(' ')|lower }}">
             <div class="channel-card__header">
+                <label class="channel-card__select">
+                    <input type="checkbox" class="channel-checkbox" value="{{ ch.id }}"
+                           data-name="{{ ch.display_name }}" aria-label="Select {{ ch.display_name }}">
+                </label>
                 <div class="channel-card__thumb">
                     {% if ch.thumb_url %}<img src="{{ ch.thumb_url }}" alt="" loading="lazy" referrerpolicy="no-referrer">{% endif %}
                 </div>
@@ -62,6 +89,7 @@
                 {% if ch.external_id %}<dt>Ext</dt><dd class="mono" title="{{ ch.external_id }}">{{ ch.external_id }}</dd>{% endif %}
                 {% if ch.slicer_id %}<dt>Slicer</dt><dd class="mono" title="{{ ch.slicer_id }}">{{ ch.slicer_id }}</dd>{% endif %}
             </dl>
+            <div class="channel-card__check" data-check hidden></div>
             <div class="channel-card__actions">
                 <a class="button button--primary" href="{{ url_for('main.play_channel', channel_id=ch.id) }}">▶ Play HLS</a>
                 <button type="button" class="btn-ghost" data-copy-url
@@ -75,27 +103,24 @@
     </div>
 </section>
 {% endfor %}
+
+{% if total %}
+<div id="batch-bar" class="batch-bar" hidden>
+    <div class="batch-bar__count"><span id="batch-count">0</span> selected</div>
+    <div class="batch-bar__actions">
+        <button type="button" class="button button--action" data-batch="check"
+                title="Sign HLS and DASH for each channel and show what Uplynk answers">Check HLS &amp; DASH</button>
+        <button type="button" class="button button--action" data-batch="copy-m3u8">Copy HLS URLs</button>
+        <button type="button" class="button button--action" data-batch="copy-mpd">Copy DASH URLs</button>
+        <button type="button" class="button button--action" data-batch="favorite">★ Pin</button>
+        <button type="button" class="button button--action" data-batch="unfavorite">☆ Unpin</button>
+    </div>
+    <button type="button" id="batch-clear" class="link-button">Clear selection</button>
+</div>
+{% endif %}
 {% endblock %}
 
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/app.js') }}"></script>
-<script>
-    (function () {
-        const input = document.getElementById('channel-filter');
-        if (!input) return;
-        input.addEventListener('input', () => {
-            const q = input.value.trim().toLowerCase();
-            document.querySelectorAll('[data-account-section]').forEach(section => {
-                let shown = 0;
-                section.querySelectorAll('[data-channel]').forEach(card => {
-                    const match = !q || card.dataset.search.includes(q);
-                    card.hidden = !match;
-                    if (match) shown++;
-                });
-                section.hidden = shown === 0;
-                section.querySelector('[data-section-count]').textContent = shown;
-            });
-        });
-    })();
-</script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
 {% endblock %}

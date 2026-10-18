@@ -62,3 +62,21 @@ def engine_versions(package: str):
     except EngineVersionsError as e:
         return jsonify(error=str(e), versions=[]), 502
     return jsonify(package=package, versions=versions)
+
+
+@bp.route("/channels/favorite", methods=["POST"])
+@login_required
+def favorite_channels():
+    """Pin or unpin several channels: {"ids": [1, 2], "favorite": true}."""
+    data = request.get_json(silent=True) or {}
+    ids = data.get("ids")
+    if not isinstance(ids, list) or not all(isinstance(i, int) for i in ids):
+        return jsonify(error="ids must be a list of channel ids"), 400
+    value = bool(data.get("favorite", True))
+    updated = (
+        db.session.query(Channel)
+        .filter(Channel.id.in_(ids))
+        .update({Channel.is_favorite: value}, synchronize_session=False)
+    )
+    db.session.commit()
+    return jsonify(updated=updated, favorite=value)
