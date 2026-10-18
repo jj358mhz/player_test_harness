@@ -108,6 +108,10 @@ in the `player_harness_data` volume.
       Good 10–19, Average 19–25, Above avg 25–40, Yuk >40.
       Renditions labelled by ray letter everywhere; ladder toggles build a
       `rays=` param to re-sign with. Mockup approved before code.
+      Engine versions: the server reads npm (cached ~24 h) and offers the
+      latest patch of the last 3 minor lines (e.g. 1.7.3 · 1.6.19 · 1.5.20)
+      plus a Custom… exact version; loaded from jsDelivr. The default is the
+      npm-pinned dependency, bumped by Dependabot PRs. No pre-releases.
 - [ ] Phase 2 — multi-player: `PlayerAdapter` interface (hls.js, Shaka, dash.js, native);
       per-engine latency source (ID3 wallclock for HLS; emsg/prft/UTCTiming
       for DASH). Presets move into the DB.
