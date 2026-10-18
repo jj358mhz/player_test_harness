@@ -136,6 +136,12 @@ class FakeResponse:
         self._payload = payload
         self.text = text or (str(payload) if payload is not None else "")
 
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            import requests
+
+            raise requests.HTTPError(f"HTTP {self.status_code}")
+
     def json(self):
         if self._payload is None:
             raise ValueError("no json")

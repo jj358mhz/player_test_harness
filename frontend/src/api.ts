@@ -1,0 +1,52 @@
+// Calls to the harness backend. Signing happens server-side; the browser
+// never sees an Uplynk API key.
+
+export interface Probe {
+    ok: boolean;
+    status: number | null;
+    error: string | null;
+    elapsed_ms: number;
+}
+
+export interface PlaybackResponse {
+    url: string;
+    expires_at: string;
+    mode: 'url' | 'preplay';
+    manifest: 'm3u8' | 'mpd';
+    probe?: Probe;
+}
+
+export interface PlaybackRequest {
+    channel_id: number;
+    manifest: 'm3u8' | 'mpd';
+    params?: Record<string, string>;
+}
+
+export interface EngineVersion {
+    version: string;
+    released: string | null;
+    notes_url: string;
+}
+
+const csrf = () =>
+    document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '';
+
+export async function requestPlayback(
+    endpoint: string,
+    body: PlaybackRequest,
+): Promise<PlaybackResponse> {
+    const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf()},
+        body: JSON.stringify(body),
+    });
+    const data = await response.json().catch(() => ({error: `HTTP ${response.status}`}));
+    if (!response.ok) throw new Error(data.error ?? `HTTP ${response.status}`);
+    return data as PlaybackResponse;
+}
+
+export async function fetchVersions(endpoint: string): Promise<EngineVersion[]> {
+    const response = await fetch(endpoint);
+    const data = await response.json().catch(() => ({versions: []}));
+    return (data.versions ?? []) as EngineVersion[];
+}

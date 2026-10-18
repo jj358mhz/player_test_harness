@@ -8,6 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased] - 3.0.0
 
 ### Added
+- **New player (Phase 2a, part 1)** in TypeScript + Vite at `/player`:
+  load bar (synced channel or pasted URL, hls.js version, DRM placeholder),
+  video with six vitals, a five-minute event timeline, and tabs for Latency,
+  ABR, DRM & keys, Metadata, Manifest, Network and Log. The original player
+  stays at `/player/classic` until the new one covers everything.
+- Latency is measured **at the playhead**: ID3 wallclock and PDT now account
+  for the buffer, so they read lower and steadier than the classic player's
+  download-time numbers. Bands (Awesome <10 s … Yuk >40 s) unchanged.
+- Renditions are labelled by **Uplynk ray** with fps/profile from
+  `#UPLYNK-MEDIA0`; toggling rays re-signs the channel with `rays=`.
+- **hls.js version menu** from npm: latest patch of the last three minor
+  lines plus any custom version, loaded from jsDelivr. Dependabot bumps the
+  default.
 - **Backend service** (Flask, SQLAlchemy, Alembic) modelled on csl-slicer-console:
   login, CSRF, argon2 passwords, Fernet-encrypted credentials at rest
 - **Uplynk accounts** - API key (signs playback tokens) plus optional Scoped API Key `.env`

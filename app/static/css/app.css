@@ -220,6 +220,16 @@ code {
     padding: 36px 40px 60px;
 }
 
+/* Full-width pages (the player); the header widens to match */
+.site-main.site-main--wide {
+    max-width: 1480px;
+    padding: 16px 24px 48px;
+}
+
+.site-header__inner.site-main--wide {
+    max-width: 1480px;
+}
+
 .page-header {
     display: flex;
     justify-content: space-between;

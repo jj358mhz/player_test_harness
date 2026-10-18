@@ -35,3 +35,7 @@ data/
 
 # Docker
 docker-compose.override.yml
+
+# Frontend (built into app/static/player by `npm run build`)
+frontend/node_modules/
+app/static/player/

@@ -1,5 +1,18 @@
 # syntax=docker/dockerfile:1.7
 
+# ---- Frontend stage: build the player (TypeScript + Vite) ----
+FROM node:24-slim AS frontend
+
+WORKDIR /src/frontend
+
+COPY frontend/package.json frontend/package-lock.json ./
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --no-audit --no-fund
+
+COPY frontend/ ./
+# Vite writes to ../app/static/player
+RUN npm run build
+
 # ---- Builder stage ----
 FROM python:3.12-slim AS builder
 
@@ -37,8 +50,9 @@ RUN groupadd -r app && useradd -r -g app -d /app -s /sbin/nologin app
 
 WORKDIR /app
 
-# Copy venv and app from builder
+# Copy venv and app from builder, then the built player
 COPY --from=builder --chown=app:app /app /app
+COPY --from=frontend --chown=app:app /src/app/static/player /app/app/static/player
 
 # Put venv on PATH
 ENV PATH="/app/.venv/bin:$PATH" \

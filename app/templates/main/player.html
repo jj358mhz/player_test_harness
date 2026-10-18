@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title_suffix %} — Player{% endblock %}
+{% block main_modifier %} site-main--wide{% endblock %}
+
+{% block extra_head %}
+{% if assets %}
+{% for href in assets.css %}<link rel="stylesheet" href="{{ href }}">
+{% endfor %}
+{% endif %}
+{% endblock %}
+
+{% block content %}
+{% if assets %}
+<div id="player-app"></div>
+<script id="player-config" type="application/json">{{ config|tojson }}</script>
+{% else %}
+<div class="card card--narrow">
+    <h2>Player not built</h2>
+    <p>The player's frontend hasn't been built on this server. Run
+        <code>npm --prefix frontend ci &amp;&amp; npm --prefix frontend run build</code>
+        (the Docker image does this for you).</p>
+    <p><a href="{{ config.endpoints.classic }}">Open the classic player</a></p>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if assets %}<script type="module" src="{{ assets.js }}"></script>{% endif %}
+{% endblock %}

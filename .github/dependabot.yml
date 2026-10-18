@@ -1,0 +1,21 @@
+version: 2
+updates:
+  # Player engines and frontend tooling. A new hls.js release opens a PR;
+  # CI typechecks the player against it, and merging deploys it as the
+  # default version. (Older versions stay selectable in the player.)
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+    groups:
+      player-engines:
+        patterns: ["hls.js", "shaka-player", "dashjs"]
+      tooling:
+        patterns: ["*"]
+        exclude-patterns: ["hls.js", "shaka-player", "dashjs"]
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
