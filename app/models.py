@@ -128,6 +128,14 @@ class Channel(Base):
     use_chsched: Mapped[int | None] = mapped_column(Integer, nullable=True)
     upstream_created_at: Mapped[str | None] = mapped_column(String(40), nullable=True)
 
+    # What a signed HLS media playlist showed last time we looked:
+    # 'drm' (Studio DRM: FairPlay keys), 'aes-128', 'sample-aes', 'none'.
+    # NULL until the first Play / Check. See app/uplynk/playback.py.
+    encryption: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    encryption_checked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     is_favorite: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -144,6 +152,10 @@ class Channel(Base):
     @property
     def display_name(self) -> str:
         return self.description or self.external_id or self.channel_id
+
+    @property
+    def is_drm(self) -> bool:
+        return self.encryption == "drm"
 
     def __repr__(self) -> str:
         return f"<Channel {self.channel_id}>"

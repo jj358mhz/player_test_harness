@@ -6,6 +6,8 @@ export interface ChannelOption {
     account: string;
     channelId: string;
     favorite: boolean;
+    /** Last HLS probe: 'drm' (Studio DRM), 'aes-128', 'sample-aes', 'none'; null = unchecked. */
+    encryption?: string | null;
 }
 
 export interface PlayerConfig {

@@ -47,6 +47,7 @@ def channels():
                 "slicer_id": c.slicer_id,
                 "account": c.uplynk_account.label,
                 "favorite": c.is_favorite,
+                "encryption": c.encryption,
             }
             for c in rows
         ]

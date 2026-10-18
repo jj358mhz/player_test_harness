@@ -1389,6 +1389,24 @@ form.inline {
     display: block;
 }
 
+.channel-card__title {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+}
+
+.badge--drm {
+    background: rgba(245, 158, 11, 0.12);
+    color: #fcd34d;
+    border-color: rgba(245, 158, 11, 0.4);
+}
+
+.channel-card__title .badge[hidden] {
+    display: none;
+}
+
 /* Name wraps at word boundaries, at most two lines; full name in the tooltip */
 .channel-card__name {
     min-width: 0;
@@ -1523,6 +1541,11 @@ select.input {
 .check-pill--ok {
     color: var(--success);
     border-color: rgba(34, 197, 94, .45);
+}
+
+.check-pill--drm {
+    color: #fcd34d;
+    border-color: rgba(245, 158, 11, .45);
 }
 
 .check-pill--bad {

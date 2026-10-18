@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.4.0] - 2026-10-18
+
+### Added
+- **DRM badge** on dashboard channel cards (🔒 DRM, and **▶ Play DRM**) and
+  🔒 in the player's channel picker, so Studio DRM channels are obvious
+  before you press Play. Filtering for `drm` finds them.
+- The harness learns each channel's encryption whenever it signs HLS: the
+  manifest probe follows the first variant and classifies its `EXT-X-KEY`
+  (FairPlay keys → Studio DRM, `AES-128`, `SAMPLE-AES`, none). A Preplay
+  answer with `drm.required` counts too. Stored on the channel
+  (`encryption`, `encryption_checked_at`; migration `9bcf3205d3d3`).
+- **Check HLS & DASH** shows a 🔒 DRM pill and updates the badge in place.
+- `flask check-encryption [--account LABEL]` probes every active channel's
+  HLS once (4 at a time) to fill in the badges without playing anything.
+
+### Changed
+- In Chrome/Edge/Firefox the player picks **DRM → Widevine** (DASH, Shaka)
+  for a DRM channel, and goes back to HLS/hls.js for a clear one unless you
+  chose the DRM setting yourself. A channel found to be DRM on first play
+  is replayed as Widevine automatically instead of stopping at the
+  FairPlay error. Safari is left alone (FairPlay is #21).
+
 ## [3.3.1] - 2026-10-18
 
 ### Documentation

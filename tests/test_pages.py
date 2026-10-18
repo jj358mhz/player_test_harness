@@ -55,7 +55,7 @@ def test_player_page_embeds_config_and_assets(auth_client, make_account, make_ch
             "css": ["/static/player/assets/main.css"],
         },
     )
-    ch = make_channel(make_account(), "abc", description="Alpha")
+    ch = make_channel(make_account(), "abc", description="Alpha", encryption="drm")
     html = auth_client.get(f"/player?channel={ch.id}").get_data(as_text=True)
     assert '<script type="module" src="/static/player/assets/main-abc.js">' in html
     assert '<link rel="stylesheet" href="/static/player/assets/main.css">' in html
@@ -65,6 +65,7 @@ def test_player_page_embeds_config_and_assets(auth_client, make_account, make_ch
     config = json.loads(raw.group(1))
     assert config["initialChannel"] == ch.id
     assert config["channels"][0]["name"] == "Alpha"
+    assert config["channels"][0]["encryption"] == "drm"
     assert config["endpoints"]["versions"] == {
         "hls.js": "/api/engines/hls.js/versions",
         "shaka-player": "/api/engines/shaka-player/versions",
@@ -231,3 +232,17 @@ def test_batch_favorite(auth_client, make_account, make_channel):
 
 def test_batch_favorite_validates(auth_client):
     assert auth_client.post("/api/channels/favorite", json={"ids": "x"}).status_code == 400
+
+
+def test_dashboard_marks_drm_channels(auth_client, make_account, make_channel):
+    import re
+
+    account = make_account()
+    make_channel(account, "chan0001", description="Clear one", encryption="aes-128")
+    make_channel(account, "chan0002", description="Locked one", encryption="drm")
+    html = auth_client.get("/").get_data(as_text=True)
+    badges = re.findall(r'<span class="badge badge--drm" data-drm-badge[^>]*>', html)
+    assert len(badges) == 2
+    assert sum("hidden" in b for b in badges) == 1  # only the DRM card shows it
+    assert html.count("▶ Play DRM") == 1 and html.count("▶ Play HLS") == 1
+    assert "aes-128" not in html.lower()  # Uplynk's default; not worth a badge

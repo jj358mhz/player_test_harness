@@ -72,8 +72,12 @@ The player switches to DASH and Shaka, signs a Preplay v2 session with
 - DRM errors with a plain-language explanation of the Shaka error code.
 
 Plain signed HLS of a Studio DRM channel is **FairPlay**, which only Safari
-can decrypt; in Chrome the player says so and offers **Play with Widevine
-(DASH)**. FairPlay playback in Safari is still to come.
+can decrypt. Channels known to be DRM show 🔒 in the channel picker (and a
+🔒 DRM badge on the dashboard); outside Safari the player selects
+**Widevine** for them automatically. A channel not yet known to be DRM is
+detected on first play (its media playlist carries FairPlay keys) and
+replayed as Widevine; for a pasted URL the player offers **Play with
+Widevine (DASH)** instead. FairPlay playback in Safari is still to come.
 
 For AES-128 HLS the tab shows the encryption method, keys seen and key load
 time. Uplynk key URIs include the ray (`r=`), so the same key on another

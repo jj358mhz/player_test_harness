@@ -19,7 +19,7 @@ import re
 import time
 from dataclasses import dataclass, field
 from typing import Any
-from urllib.parse import quote, urlencode
+from urllib.parse import quote, urlencode, urljoin
 
 import requests
 
@@ -185,6 +185,8 @@ class ProbeResult:
     status: int | None
     error: str | None
     elapsed_ms: int
+    # HLS only: see classify_hls_encryption. None when not determined.
+    encryption: str | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -192,6 +194,7 @@ class ProbeResult:
             "status": self.status,
             "error": self.error,
             "elapsed_ms": self.elapsed_ms,
+            "encryption": self.encryption,
         }
 
 
@@ -217,11 +220,60 @@ def probe_manifest(
     elapsed = _ms_since(start)
     body = response.text or ""
     if response.status_code == 200 and body.lstrip().startswith(_MANIFEST_MARKERS):
-        return ProbeResult(True, 200, None, elapsed)
+        encryption = None
+        if body.lstrip().startswith("#EXTM3U"):
+            encryption = _hls_encryption(body, url, timeout, http)
+        return ProbeResult(True, 200, None, elapsed, encryption)
     detail = _strip_html(body) or "response is not a manifest"
     return ProbeResult(
         False, response.status_code, f"HTTP {response.status_code}: {detail}", elapsed
     )
+
+
+def classify_hls_encryption(playlist: str) -> str:
+    """How an HLS media playlist is protected.
+
+    - ``drm``: Studio DRM. Uplynk's HLS flavour is FairPlay
+      (``KEYFORMAT="com.apple.streamingkeydelivery"``, ``skd://`` keys).
+    - ``aes-128``: clear-key AES-128 (``METHOD=AES-128``).
+    - ``sample-aes``: SAMPLE-AES without FairPlay keys.
+    - ``none``: no ``EXT-X-KEY`` (or ``METHOD=NONE``).
+    """
+    keys = [line for line in playlist.splitlines() if line.startswith("#EXT-X-KEY")]
+    if any("com.apple.streamingkeydelivery" in k or "skd://" in k for k in keys):
+        return "drm"
+    if any("METHOD=AES-128" in k for k in keys):
+        return "aes-128"
+    if any("METHOD=SAMPLE-AES" in k for k in keys):
+        return "sample-aes"
+    return "none"
+
+
+def first_variant_url(master: str, base_url: str) -> str | None:
+    """Absolute URL of the first variant in an HLS master playlist."""
+    lines = [line.strip() for line in master.splitlines()]
+    for i, line in enumerate(lines):
+        if line.startswith("#EXT-X-STREAM-INF"):
+            for uri in lines[i + 1 :]:
+                if uri and not uri.startswith("#"):
+                    return urljoin(base_url, uri)
+    return None
+
+
+def _hls_encryption(body: str, url: str, timeout: int, http: Any) -> str | None:
+    """Keys only appear in media playlists, so follow the first variant."""
+    if "#EXT-X-STREAM-INF" not in body:
+        return classify_hls_encryption(body)
+    variant = first_variant_url(body, url)
+    if variant is None:
+        return None
+    try:
+        response = http.get(variant, timeout=timeout)
+    except requests.RequestException:
+        return None
+    if response.status_code != 200 or not (response.text or "").lstrip().startswith("#EXTM3U"):
+        return None
+    return classify_hls_encryption(response.text)
 
 
 def _ms_since(start: float) -> int:

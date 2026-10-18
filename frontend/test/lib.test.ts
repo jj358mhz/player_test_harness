@@ -312,3 +312,13 @@ describe('detectBrowser', async () => {
         expect(detectBrowser(ua)).toBe(id);
     });
 });
+
+describe('channelLabel', async () => {
+    const {channelLabel} = await import('../src/app');
+    const base = {id: 1, name: 'Chan', account: 'acct', channelId: 'chan0001', favorite: false};
+    it('marks Studio DRM and pinned channels', () => {
+        expect(channelLabel(base)).toBe('Chan');
+        expect(channelLabel({...base, encryption: 'none'})).toBe('Chan');
+        expect(channelLabel({...base, encryption: 'drm', favorite: true})).toBe('🔒 ★ Chan');
+    });
+});

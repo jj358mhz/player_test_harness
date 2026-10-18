@@ -25,7 +25,9 @@ latency, drift, ABR, DRM keys, ID3/SCTE-35, captions and more.
   extra signed params (`rays`, `delay`, …).
 - 🔐 **DRM playback** — Widevine (and PlayReady) over DASH via Preplay v2 and
   Shaka Player, with a DRM panel: license timing and status, key status per
-  key (HDCP problems included), robustness and expiry. FairPlay (Safari) next.
+  key (HDCP problems included), robustness and expiry. Studio DRM channels
+  get a 🔒 DRM badge and play as Widevine in Chrome automatically. FairPlay
+  (Safari) next.
 - ▶️ **One-click play** — each channel card signs a fresh HLS URL and opens
   the monitoring player with it. Copy HLS/DASH buttons for use in other players.
 - 📊 **Monitoring player** — video first, with latency (ID3, PDT and
@@ -201,6 +203,13 @@ Sync channels from cron instead of the UI if you like:
 docker exec player-test-harness flask --app app sync-channels
 ```
 
+Fill in the 🔒 DRM badges for every channel at once (one HLS probe each;
+otherwise they appear as channels are played or checked):
+
+```bash
+docker exec player-test-harness flask --app app check-encryption
+```
+
 ### Caddy routing
 
 In `homelab-utility/caddy/Caddyfile`:
@@ -240,7 +249,7 @@ Secrets required for `deploy.yml`: `DEPLOY_HOST`, `DEPLOY_USER`,
 ```
 player_test_harness/
 ├── app/
-│   ├── __init__.py          # App factory + CLI (sync-channels, set-password)
+│   ├── __init__.py          # App factory + CLI (sync-channels, check-encryption, set-password)
 │   ├── config.py            # Env-var config
 │   ├── models.py            # SQLAlchemy models
 │   ├── crypto.py            # Fernet helpers
