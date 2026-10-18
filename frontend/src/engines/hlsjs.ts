@@ -5,6 +5,7 @@
 import type HlsType from 'hls.js';
 import type {Fragment, Level, LoaderStats} from 'hls.js';
 import {version as pinned} from 'hls.js/package.json';
+import {videoProfile} from '../lib/codecs';
 import {parseId3} from '../lib/id3';
 import {ptsToSeconds} from '../lib/latency';
 import {parseUplynkMedia, rayFromUri, type UplynkMedia} from '../lib/rays';
@@ -254,7 +255,7 @@ export class HlsJsEngine implements PlayerEngine {
             bitrate: level?.bitrate ?? 0,
             codecs: level?.codecs ?? '',
             fps: media?.fps ?? (level?.frameRate || null),
-            profile: media?.profile ?? null,
+            profile: media?.profile ?? videoProfile(level?.videoCodec),
         };
     }
 

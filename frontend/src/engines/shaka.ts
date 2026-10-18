@@ -4,12 +4,14 @@
 
 import type shakaNS from 'shaka-player';
 import {version as pinned} from 'shaka-player/package.json';
+import {videoProfile} from '../lib/codecs';
 import {
     type AudioTrack,
     type DrmConfig,
     type DrmState,
     Emitter,
     type Listener,
+    type MediaPlaylistInfo,
     type PlayerEngine,
     type Rendition,
     type RequestKind,
@@ -51,7 +53,7 @@ export function rayFromRepresentation(id: string | null | undefined): string | n
 
 /** Uplynk segment files start with the ray letter: …/D00003391.m4s, …/F00003391.ts */
 export function rayFromSegmentUrl(url: string): string | null {
-    const match = /\/([A-Za-z])\d{5,}\.(?:m4s|ts|mp4|m4v)(?:\?|$)/.exec(url);
+    const match = /\/([A-Za-z])\d{5,}\.\w+(?:\?|$)/.exec(url); // .m4f, .m4s, .ts…
     return match ? (match[1] as string).toLowerCase() : null;
 }
 
@@ -123,7 +125,7 @@ export class ShakaEngine implements PlayerEngine {
 
         const RT = shaka.net.NetworkingEngine.RequestType;
         const net = player.getNetworkingEngine();
-        net?.registerResponseFilter((type, response) => {
+        net?.registerResponseFilter((type, response, context) => {
             const ms = response.timeMs ?? 0;
             const end = performance.now();
             const bytes = byteLength(response.data);
@@ -137,13 +139,21 @@ export class ShakaEngine implements PlayerEngine {
                     error: null,
                 });
             }
-            if (type === RT.MANIFEST && !this.manifestText) {
+            if (type === RT.MANIFEST) {
+                // Live MPDs refresh every minimumUpdatePeriod; keep the latest.
                 this.manifestText = new TextDecoder().decode(toBytes(response.data));
+                this.events.emit('playlist', mpdInfo(this.manifestText));
             }
             const kind = requestKind(type, response.uri, RT);
             if (!kind) return;
-            const ray = rayFromSegmentUrl(response.uri);
-            if (kind === 'segment') {
+            // Audio and text are separate DASH streams, not rays.
+            const media = context?.stream?.type;
+            const other = media === 'audio' || media === 'text' ? media : null;
+            const ray = other
+                ? null
+                : (rayFromRepresentation(context?.stream?.originalId) ??
+                  rayFromSegmentUrl(response.uri));
+            if (kind === 'segment' && !other) {
                 this.events.emit('segment', {
                     ray,
                     sn: segmentNumber(response.uri),
@@ -153,7 +163,7 @@ export class ShakaEngine implements PlayerEngine {
             }
             this.events.emit('request', {
                 kind,
-                name: requestName(kind, response.uri, ray),
+                name: requestName(kind, response.uri, other ?? ray),
                 start: end - ms,
                 end,
                 status,
@@ -211,7 +221,7 @@ export class ShakaEngine implements PlayerEngine {
                 bitrate: t.videoBandwidth ?? t.bandwidth,
                 codecs: [t.videoCodec, t.audioCodec].filter(Boolean).join(','),
                 fps: t.frameRate ?? null,
-                profile: null,
+                profile: videoProfile(t.videoCodec),
             }));
         if (!this.announced) {
             this.announced = true;
@@ -386,7 +396,7 @@ function requestKind(
 }
 
 function segmentNumber(uri: string): string {
-    const match = /\/[A-Za-z](\d{5,})\./.exec(uri);
+    const match = /\/[A-Za-z_]*?(\d{5,})\./.exec(uri); // D00003391.m4f, TK_00005950.m4f
     return match ? String(Number(match[1])) : '?';
 }
 
@@ -395,4 +405,42 @@ function requestName(kind: RequestKind, uri: string, ray: string | null): string
     if (kind === 'license') return 'license';
     if (kind === 'init') return `${ray ?? '·'} · init`;
     return `${ray ?? '·'} · seg ${segmentNumber(uri)}`;
+}
+
+/** The MPD's own equivalents of the HLS playlist facts the Manifest tab shows. */
+export function mpdInfo(mpd: string): MediaPlaylistInfo {
+    const attr = (name: string) =>
+        new RegExp(`<MPD[^>]*\\s${name}="([^"]*)"`).exec(mpd)?.[1] ?? null;
+    const periods = (mpd.match(/<Period[\s>]/g) ?? []).length;
+    const ads = (mpd.match(/urn:com:uplynk:ad-asset-id/g) ?? []).length;
+    return {
+        format: 'dash',
+        ray: null,
+        live: attr('type') === 'dynamic',
+        targetDuration: isoSeconds(attr('maxSegmentDuration')) ?? 0,
+        windowSeconds: isoSeconds(attr('timeShiftBufferDepth')) ?? 0,
+        segments: 0,
+        firstSn: 0,
+        lastSn: 0,
+        hasProgramDateTime: Boolean(attr('availabilityStartTime')),
+        container: /mimeType="(video|audio)\/mp4"/.test(mpd) ? 'fMP4' : 'unknown',
+        text: mpd,
+        dash: {
+            updatePeriod: isoSeconds(attr('minimumUpdatePeriod')),
+            availabilityStart: attr('availabilityStartTime'),
+            periods,
+            adPeriods: ads,
+            profiles: attr('profiles'),
+        },
+    };
+}
+
+/** ISO 8601 duration (PT1H2M3.5S) → seconds. */
+export function isoSeconds(value: string | null): number | null {
+    const m = value && /^P(?:(\d+)D)?T?(?:(\d+)H)?(?:(\d+)M)?(?:([\d.]+)S)?$/.exec(value);
+    if (!m) return null;
+    const [, d, h, min, sec] = m;
+    return (
+        Number(d ?? 0) * 86400 + Number(h ?? 0) * 3600 + Number(min ?? 0) * 60 + Number(sec ?? 0)
+    );
 }

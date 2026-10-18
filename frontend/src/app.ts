@@ -1245,7 +1245,7 @@ export class PlayerApp {
                 s().fairplay = true;
                 if (!isSafari()) this.warnFairPlay();
             }
-            if (this.manifestView === 'media') this.renderManifest();
+            if (this.manifestView === 'media' || info.format === 'dash') this.renderManifest();
         });
         engine.on('asset', (asset) => {
             const previous = s().asset;
@@ -1980,7 +1980,8 @@ export class PlayerApp {
         const s = this.session;
         const rays = s.renditions.map((r) => r.ray).filter(Boolean) as string[];
         const pl = s.playlist;
-        kv(this.el('manifestKv'), [
+        const dash = pl?.format === 'dash' ? pl.dash : undefined;
+        const common: [string, string][] = [
             ['Type', this.engine ? (s.live ? 'Live' : 'VOD') : '--'],
             [
                 'Renditions',
@@ -1988,17 +1989,45 @@ export class PlayerApp {
                     ? `${s.renditions.length}${rays.length ? ` · rays ${rayRange(rays)}` : ''}`
                     : '--',
             ],
-            ['Container', pl ? pl.container : '--'],
-            ['Target duration', pl ? `${pl.targetDuration} s` : '--'],
-            ['Window', pl ? `${Math.round(pl.windowSeconds)} s · ${pl.segments} segments` : '--'],
-            [
-                'Media sequence',
-                pl ? `${pl.firstSn.toLocaleString()} – ${pl.lastSn.toLocaleString()}` : '--',
-            ],
-            ['Program date-time', pl ? (pl.hasProgramDateTime ? 'yes' : 'no') : '--'],
-            ['Playlist ray', pl?.ray ?? '--'],
-        ]);
+        ];
+        if (pl && dash) {
+            kv(this.el('manifestKv'), [
+                ...common,
+                ['Container', pl.container === 'fMP4' ? 'fMP4 (CMAF)' : pl.container],
+                ['Max segment', pl.targetDuration ? `${pl.targetDuration} s` : '--'],
+                [
+                    'Time-shift window',
+                    pl.windowSeconds ? `${Math.round(pl.windowSeconds)} s` : '--',
+                ],
+                ['MPD update', dash.updatePeriod ? `every ${dash.updatePeriod} s` : 'static'],
+                ['Periods', `${dash.periods}${dash.adPeriods ? ` · ${dash.adPeriods} ad` : ''}`],
+                [
+                    'Availability start',
+                    dash.availabilityStart
+                        ? new Date(dash.availabilityStart).toLocaleString()
+                        : '--',
+                ],
+            ]);
+        } else {
+            kv(this.el('manifestKv'), [
+                ...common,
+                ['Container', pl ? pl.container : '--'],
+                ['Target duration', pl ? `${pl.targetDuration} s` : '--'],
+                [
+                    'Window',
+                    pl ? `${Math.round(pl.windowSeconds)} s · ${pl.segments} segments` : '--',
+                ],
+                [
+                    'Media sequence',
+                    pl ? `${pl.firstSn.toLocaleString()} – ${pl.lastSn.toLocaleString()}` : '--',
+                ],
+                ['Program date-time', pl ? (pl.hasProgramDateTime ? 'yes' : 'no') : '--'],
+                ['Playlist ray', pl?.ray ?? '--'],
+            ]);
+        }
+        // DASH has one document (the MPD); HLS has a master and media playlists.
         const seg = this.el('manifestSeg');
+        seg.hidden = Boolean(dash);
         for (const b of seg.querySelectorAll('button')) {
             b.setAttribute(
                 'aria-pressed',
@@ -2006,6 +2035,10 @@ export class PlayerApp {
             );
         }
         const raw = this.el('manifestRaw');
+        if (dash && pl?.text) {
+            raw.textContent = redactSignatures(pl.text);
+            return;
+        }
         if (this.manifestView === 'media') {
             raw.textContent = pl?.text
                 ? redactSignatures(pl.text)
@@ -2304,5 +2337,5 @@ export function keyIdentity(uri: string): string {
 
 /** Hide token signatures in the master text shown on screen. */
 export function redactSignatures(text: string): string {
-    return text.replace(/([?&](?:sig|pbs)=)[^&\s"]+/g, '$1…');
+    return text.replace(/([?&](?:amp;)?(?:sig|pbs)=)[^&\s"<]+/g, '$1…');
 }
