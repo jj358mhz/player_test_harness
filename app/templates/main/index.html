@@ -67,7 +67,7 @@
         <article class="channel-card{% if ch.is_favorite %} channel-card--favorite{% endif %}"
                  id="channel-{{ ch.id }}"
                  data-channel
-                 data-search="{{ [ch.description, ch.channel_id, ch.external_id, ch.slicer_id]|select|join(' ')|lower }}">
+                 data-search="{{ [ch.description, ch.channel_id, ch.external_id, ch.slicer_id, 'drm' if ch.is_drm else None]|select|join(' ')|lower }}">
             <div class="channel-card__header">
                 <label class="channel-card__select">
                     <input type="checkbox" class="channel-checkbox" value="{{ ch.id }}"
@@ -76,7 +76,12 @@
                 <div class="channel-card__thumb">
                     {% if ch.thumb_url %}<img src="{{ ch.thumb_url }}" alt="" loading="lazy" referrerpolicy="no-referrer">{% endif %}
                 </div>
-                <div class="channel-card__name" title="{{ ch.display_name }}">{{ ch.display_name }}</div>
+                <div class="channel-card__title">
+                    <div class="channel-card__name" title="{{ ch.display_name }}">{{ ch.display_name }}</div>
+                    <span class="badge badge--drm" data-drm-badge
+                          title="Studio DRM: FairPlay over HLS (Safari only); Chrome plays DASH with Widevine"
+                          {% if not ch.is_drm %}hidden{% endif %}>🔒 DRM</span>
+                </div>
                 <form method="post" action="{{ url_for('main.toggle_favorite', channel_id=ch.id) }}">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button type="submit"
@@ -91,7 +96,8 @@
             </dl>
             <div class="channel-card__check" data-check hidden></div>
             <div class="channel-card__actions">
-                <a class="button button--primary" href="{{ url_for('main.play_channel', channel_id=ch.id) }}">▶ Play HLS</a>
+                <a class="button button--primary" href="{{ url_for('main.play_channel', channel_id=ch.id) }}"
+                   data-play-label>{{ '▶ Play DRM' if ch.is_drm else '▶ Play HLS' }}</a>
                 <button type="button" class="btn-ghost" data-copy-url
                         data-body='{{ {"channel_id": ch.id, "manifest": "m3u8"}|tojson }}'>Copy HLS</button>
                 <button type="button" class="btn-ghost" data-copy-url

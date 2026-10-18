@@ -115,6 +115,8 @@ export class PlayerApp {
     private engine: PlayerEngine | null = null;
     private session = new Session();
     private source: Source | null = null;
+    /** DRM → Widevine was chosen for a DRM channel, not by the user. */
+    private autoDrm = false;
     private versions: Record<EngineName, EngineVersion[]> = {'hls.js': [], 'shaka-player': []};
     private disabledRays = new Set<string>();
     private manifestView: 'master' | 'media' = 'master';
@@ -243,13 +245,7 @@ export class PlayerApp {
                     h(
                         'optgroup',
                         {label: account},
-                        ...channels.map((c) =>
-                            h(
-                                'option',
-                                {value: String(c.id)},
-                                `${c.favorite ? '★ ' : ''}${c.name}`,
-                            ),
-                        ),
+                        ...channels.map((c) => h('option', {value: String(c.id)}, channelLabel(c))),
                     ),
                 ),
                 h('option', {value: PASTE}, 'Paste a URL…'),
@@ -339,7 +335,14 @@ export class PlayerApp {
                     'drm',
                     h(
                         'select',
-                        {id: 'pl-drm', class: 'pl-control', onchange: () => this.syncDrm()},
+                        {
+                            id: 'pl-drm',
+                            class: 'pl-control',
+                            onchange: () => {
+                                this.autoDrm = false; // the user's choice sticks
+                                this.syncDrm();
+                            },
+                        },
                         h('option', {value: ''}, 'None'),
                         h('option', {value: 'wv'}, 'Widevine (DASH)'),
                         h('option', {value: 'pr'}, 'PlayReady (DASH)'),
@@ -868,6 +871,41 @@ export class PlayerApp {
         const url = this.el<HTMLInputElement>('url');
         url.hidden = !paste;
         if (paste) url.focus();
+        this.applyChannelDrm(paste ? null : this.selectedChannel());
+    }
+
+    private selectedChannel(): ChannelOption | null {
+        const value = this.el<HTMLSelectElement>('source').value;
+        return this.config.channels.find((c) => String(c.id) === value) ?? null;
+    }
+
+    /**
+     * Studio DRM channels play as DASH + Widevine outside Safari (their HLS is
+     * FairPlay). Set that for DRM channels and undo it when moving to a clear
+     * one, unless the user picked the DRM setting themselves.
+     */
+    private applyChannelDrm(channel: ChannelOption | null): void {
+        if (isSafari()) return;
+        if (channel?.encryption === 'drm') {
+            if (this.drm()) return;
+            this.el<HTMLSelectElement>('drm').value = 'wv';
+            this.syncDrm();
+            this.autoDrm = true;
+        } else if (this.autoDrm) {
+            this.el<HTMLSelectElement>('drm').value = '';
+            this.setFormat('m3u8');
+            this.selectEngine('hls.js');
+            this.autoDrm = false;
+        }
+    }
+
+    /** Remember a probe's verdict for this page and relabel the picker. */
+    private noteEncryption(channel: ChannelOption, encryption: string): void {
+        channel.encryption = encryption;
+        const option = this.el<HTMLSelectElement>('source').querySelector<HTMLOptionElement>(
+            `option[value="${channel.id}"]`,
+        );
+        if (option) option.textContent = channelLabel(channel);
     }
 
     private syncEngineInput(): void {
@@ -979,6 +1017,7 @@ export class PlayerApp {
             void this.loadFromForm();
         } else if (initialChannel && channels.some((c) => c.id === initialChannel)) {
             source.value = String(initialChannel);
+            this.applyChannelDrm(this.selectedChannel());
             void this.loadFromForm();
         } else if (!channels.length) {
             source.value = PASTE;
@@ -1033,6 +1072,21 @@ export class PlayerApp {
                 `Could not sign a URL for ${channel.name}: ${(err as Error).message}`,
             );
             return;
+        }
+        const encryption = response.probe?.encryption;
+        if (encryption) {
+            const learned = encryption === 'drm' && channel.encryption !== 'drm';
+            this.noteEncryption(channel, encryption);
+            if (learned && !drm && !isSafari()) {
+                // First time we've seen this channel's FairPlay keys: replay as Widevine.
+                this.applyChannelDrm(channel);
+                await this.loadFromForm(params);
+                this.notice(
+                    'info',
+                    `${channel.name} uses Studio DRM (FairPlay over HLS, Safari only), so it is playing as DASH with Widevine.`,
+                );
+                return;
+            }
         }
         let drmConfig: DrmConfig | null = null;
         if (drm) {
@@ -2356,6 +2410,11 @@ function shortUrlFull(url: string): string {
     } catch {
         return url.slice(0, 60);
     }
+}
+
+/** Picker text: 🔒 for Studio DRM, ★ for pinned. */
+export function channelLabel(c: ChannelOption): string {
+    return `${c.encryption === 'drm' ? '🔒 ' : ''}${c.favorite ? '★ ' : ''}${c.name}`;
 }
 
 function isSafari(): boolean {

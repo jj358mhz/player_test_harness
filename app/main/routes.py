@@ -69,6 +69,7 @@ def player() -> str:
                 "account": c.uplynk_account.label,
                 "channelId": c.channel_id,
                 "favorite": c.is_favorite,
+                "encryption": c.encryption,
             }
             for c in channels
         ],

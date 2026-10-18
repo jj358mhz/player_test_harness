@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -16,6 +17,7 @@ from app.uplynk.playback import (
     MANIFESTS,
     PlaybackError,
     PlaybackTarget,
+    ProbeResult,
     fetch_preplay,
     manifest_base_url,
     preplay_base_url,
@@ -130,6 +132,8 @@ def create_playback(req: PlaybackRequest) -> dict[str, Any]:
         if req.mode == "preplay":
             preplay = fetch_preplay(signed.url)
             event.status_code = 200
+            if req.channel and (preplay.drm or {}).get("required"):
+                record_encryption(req.channel, "drm")
             result.update(
                 url=preplay.play_url,
                 prefix=preplay.prefix,
@@ -150,10 +154,46 @@ def create_playback(req: PlaybackRequest) -> dict[str, Any]:
         probe = probe_manifest(result["url"])
         event.status_code = probe.status
         event.error = probe.error
+        if req.channel and probe.encryption:
+            record_encryption(req.channel, probe.encryption)
         result["probe"] = probe.as_dict()
     db.session.commit()
     result["event_id"] = event.id
     return result
+
+
+def record_encryption(channel: Channel, encryption: str) -> None:
+    """Remember how a channel is protected, for the dashboard badge."""
+    channel.encryption = encryption
+    channel.encryption_checked_at = datetime.now(UTC)
+
+
+def check_encryption(
+    channels: list[Channel], workers: int = 4
+) -> list[tuple[Channel, ProbeResult]]:
+    """Sign HLS for each channel, probe it, and record its encryption.
+
+    URLs are signed up front (signing needs the app context); only the
+    HTTP probes run in the thread pool. Not audited as playback events.
+    """
+    content_base = current_app.config["UPLYNK_CONTENT_BASE"]
+    ttl = current_app.config["PLAYBACK_TOKEN_TTL"]
+    keys: dict[int, str] = {}
+    urls = []
+    for channel in channels:
+        account = channel.uplynk_account
+        if account.id not in keys:
+            keys[account.id] = decrypt(account.api_key_encrypted)
+        target = PlaybackTarget(content_type="c", content_id=channel.channel_id)
+        base_url = manifest_base_url(content_base, target, "m3u8")
+        urls.append(sign_url(base_url, target, keys[account.id], ttl).url)
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        probes = list(pool.map(probe_manifest, urls))
+    for channel, probe in zip(channels, probes, strict=True):
+        if probe.encryption:
+            record_encryption(channel, probe.encryption)
+    db.session.commit()
+    return list(zip(channels, probes, strict=True))
 
 
 def _int(value: Any, name: str) -> int:

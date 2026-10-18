@@ -85,6 +85,27 @@ def _register_cli(app: Flask) -> None:
         if failed:
             raise SystemExit(1)
 
+    @app.cli.command("check-encryption")
+    @click.option("--account", "label", help="Only check the account with this label.")
+    def check_encryption_cmd(label: str | None) -> None:
+        """Probe each active channel's HLS and record its encryption (DRM badge)."""
+        from app.api.service import check_encryption
+        from app.models import Channel, UplynkAccount
+
+        query = db.session.query(Channel).filter_by(is_active=True).join(UplynkAccount)
+        if label:
+            query = query.filter(UplynkAccount.label == label)
+        channels = query.order_by(UplynkAccount.label, Channel.description).all()
+        if not channels:
+            raise click.ClickException("No matching channels.")
+        counts: dict[str, int] = {}
+        for channel, probe in check_encryption(channels):
+            state = probe.encryption or ("unknown" if probe.ok else "failed")
+            counts[state] = counts.get(state, 0) + 1
+            if not probe.ok:
+                click.echo(f"  {channel.display_name}: {probe.error}")
+        click.echo(", ".join(f"{n} {state}" for state, n in sorted(counts.items())))
+
     @app.cli.command("set-password")
     @click.argument("email")
     @click.password_option()

@@ -151,7 +151,7 @@
         }
     }
 
-    function showCheck(card, results) {
+    function showCheck(card, results, encryption) {
         const el = card.querySelector('[data-check]');
         el.hidden = false;
         el.replaceChildren(
@@ -163,6 +163,15 @@
                 return pill;
             }),
         );
+        // Only Studio DRM changes how to play; AES-128 is Uplynk's default.
+        if (encryption === 'drm') {
+            const pill = document.createElement('span');
+            pill.className = 'check-pill check-pill--drm';
+            pill.textContent = '🔒 DRM';
+            pill.title = 'Studio DRM: FairPlay over HLS (Safari); Play opens DASH + Widevine in Chrome';
+            el.append(pill);
+        }
+        if (encryption) markDrm(card, encryption === 'drm');
         const failed = results.find((r) => !r.ok);
         if (failed) {
             const why = document.createElement('span');
@@ -172,26 +181,38 @@
         }
     }
 
+    function markDrm(card, drm) {
+        card.querySelector('[data-drm-badge]').hidden = !drm;
+        card.querySelector('[data-play-label]').textContent = drm ? '▶ Play DRM' : '▶ Play HLS';
+        const terms = card.dataset.search.split(' ').filter((t) => t !== 'drm');
+        card.dataset.search = (drm ? [...terms, 'drm'] : terms).join(' ');
+    }
+
     async function check(boxes) {
         let bad = 0;
+        let drm = 0;
         await inBatches(boxes, 3, async (cb) => {
             const card = cardOf(cb);
             const results = [];
+            let encryption = null;
             for (const [label, manifest] of [['HLS', 'm3u8'], ['DASH', 'mpd']]) {
                 try {
                     const data = await requestPlayback({channel_id: Number(cb.value), manifest});
                     const ok = data.probe ? data.probe.ok : true;
+                    encryption = encryption || data.probe?.encryption || null;
                     results.push({label, ok, error: data.probe?.error});
                 } catch (err) {
                     results.push({label, ok: false, error: err.message});
                 }
             }
             if (results.some((r) => !r.ok)) bad++;
-            showCheck(card, results);
+            if (encryption === 'drm') drm++;
+            showCheck(card, results, encryption);
         });
         showNotice(
             `Checked ${boxes.length} channel${boxes.length === 1 ? '' : 's'}: ` +
-                (bad ? `${bad} with a manifest Uplynk refused (hover ✗ for why).` : 'every HLS and DASH manifest played.'),
+                (bad ? `${bad} with a manifest Uplynk refused (hover ✗ for why).` : 'every HLS and DASH manifest played.') +
+                (drm ? ` ${drm} use${drm === 1 ? 's' : ''} Studio DRM.` : ''),
             bad ? 'error' : 'success',
         );
     }

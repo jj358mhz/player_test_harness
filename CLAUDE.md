@@ -83,7 +83,8 @@ after dependency changes.
   - `playback.py` — URL templates, token signing, Preplay v2 fetch.
   - `sync.py` — channels → DB upsert; deactivates missing, keeps favorites.
 - `app/api/service.py` — validates playback requests, signs/Preplays,
-  writes `PlaybackEvent`. Both the JSON API and `/channels/<id>/play` use it.
+  writes `PlaybackEvent`, records `Channel.encryption` from the probe
+  (`check_encryption()` backs `flask check-encryption`). Both the JSON API and `/channels/<id>/play` use it.
 - `app/main/` — pages: channels dashboard, `/player`, `/sign`, `/activity`. `/player` renders `main/player.html` with a JSON
   config (channels, endpoints; never keys) and the Vite assets found by
   `app/vite.py`. `/channels/<id>/play` → `/player?channel=<id>`.
@@ -125,6 +126,9 @@ after dependency changes.
   letter (`D00003391.m4f`, `F_init.mp4`); FairPlay HLS segments are
   `FP_<RAY>…`. Ads are separate Periods with `AssetIdentifier
   urn:com:uplynk:ad-asset-id`; `InbandEventStream com.uplynk.asset.metadata`.
+- Encryption shows only in **media** playlists, not the master: the probe
+  follows the first variant. Nearly every Uplynk channel is `AES-128`
+  (the default, so no badge); Studio DRM ones carry FairPlay keys.
 - Studio DRM channels: plain signed HLS is FairPlay (`METHOD=SAMPLE-AES`,
   `skd://…/fp-spc/`, `KEYFORMAT="com.apple.streamingkeydelivery"`), Safari
   only. In Chrome use Preplay `manifest=mpd&rmt=wv`: CENC DASH whose license
@@ -167,8 +171,11 @@ in the `player_harness_data` volume.
 - [~] Phase 3 — DRM. **Done (v3.2.0):** Shaka engine, Widevine/PlayReady
       over DASH from Preplay, DRM panel (key system, license timing/status,
       robustness, expiry, per-key status with HDCP hints), FairPlay-in-Chrome
-      message. **Next:** FairPlay in Safari (SPC/CKC exchange with
-      `fairplayCertificateURL`), DRM badge on dashboard cards. PlayReady is
+      message. **v3.4.0:** `Channel.encryption` learned from each HLS probe
+      (first media playlist's `EXT-X-KEY`; Preplay `drm.required`), 🔒 DRM
+      badge, Widevine auto-selected for DRM channels outside Safari,
+      `flask check-encryption`. **Next:** FairPlay in Safari (SPC/CKC
+      exchange with `fairplayCertificateURL`). PlayReady is
       wired but untested (Chrome has no PlayReady; needs Edge).
 - [ ] Phase 4 — triage: recorded sessions with shareable links (retention
       setting), side-by-side compare, LL-HLS part/blocking-reload metrics,

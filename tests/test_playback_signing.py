@@ -12,7 +12,9 @@ import requests
 from app.uplynk.playback import (
     PlaybackError,
     PlaybackTarget,
+    classify_hls_encryption,
     fetch_preplay,
+    first_variant_url,
     manifest_base_url,
     preplay_base_url,
     probe_manifest,
@@ -199,3 +201,59 @@ def test_probe_manifest_failures(response, status, match):
     assert not result.ok
     assert result.status == status
     assert result.error == match
+
+
+FAIRPLAY = (
+    '#EXTM3U\n#EXT-X-KEY:METHOD=SAMPLE-AES,URI="skd://k.example/fp-spc/abc",'
+    'KEYFORMAT="com.apple.streamingkeydelivery",KEYFORMATVERSIONS="1"\n#EXTINF:4,\nFP_E0001.ts\n'
+)
+AES = '#EXTM3U\n#EXT-X-KEY:METHOD=AES-128,URI="https://k.example/key?r=e"\n#EXTINF:4,\ne1.ts\n'
+CLEAR = "#EXTM3U\n#EXT-X-TARGETDURATION:4\n#EXTINF:4,\ne1.ts\n"
+MASTER = (
+    "#EXTM3U\n#UPLYNK-MEDIA0:416x234x30,baseline-13,2x48000\n"
+    "#EXT-X-STREAM-INF:BANDWIDTH=300000\nchannel/chan0001/a.m3u8?pbs=x\n"
+    "#EXT-X-STREAM-INF:BANDWIDTH=900000\nchannel/chan0001/c.m3u8?pbs=x\n"
+)
+
+
+@pytest.mark.parametrize(
+    ("playlist", "expected"),
+    [
+        (FAIRPLAY, "drm"),
+        (AES, "aes-128"),
+        ('#EXTM3U\n#EXT-X-KEY:METHOD=SAMPLE-AES,URI="https://k.example/k"\n', "sample-aes"),
+        ("#EXTM3U\n#EXT-X-KEY:METHOD=NONE\n", "none"),
+        (CLEAR, "none"),
+    ],
+)
+def test_classify_hls_encryption(playlist, expected):
+    assert classify_hls_encryption(playlist) == expected
+
+
+def test_first_variant_url_resolves_relative():
+    url = first_variant_url(MASTER, "https://content.example.com/channel/chan0001.m3u8?tc=1")
+    assert url == "https://content.example.com/channel/channel/chan0001/a.m3u8?pbs=x"
+    assert first_variant_url(CLEAR, "https://u") is None
+
+
+@pytest.mark.parametrize(
+    ("media", "expected"), [(FAIRPLAY, "drm"), (AES, "aes-128"), (CLEAR, "none")]
+)
+def test_probe_follows_first_variant_for_encryption(media, expected):
+    session = FakeSession([FakeResponse(200, text=MASTER), FakeResponse(200, text=media)])
+    result = probe_manifest("https://content.example.com/x.m3u8", session=session)
+    assert result.ok and result.encryption == expected
+    assert session.calls[1][0].endswith("/a.m3u8?pbs=x")
+    assert result.as_dict()["encryption"] == expected
+
+
+def test_probe_encryption_unknown_when_variant_fails():
+    session = FakeSession([FakeResponse(200, text=MASTER), FakeResponse(404, text="gone")])
+    result = probe_manifest("https://u/x.m3u8", session=session)
+    assert result.ok and result.encryption is None
+
+
+def test_probe_dash_has_no_encryption_verdict():
+    session = FakeSession(FakeResponse(200, text="<MPD/>"))
+    result = probe_manifest("https://u/x.mpd", session=session)
+    assert result.ok and result.encryption is None and len(session.calls) == 1

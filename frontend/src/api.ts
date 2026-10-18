@@ -6,6 +6,8 @@ export interface Probe {
     status: number | null;
     error: string | null;
     elapsed_ms: number;
+    /** HLS only: how the first media playlist is protected. */
+    encryption?: string | null;
 }
 
 export interface PlaybackResponse {

@@ -126,6 +126,9 @@ def test_preplay_with_drm(auth_client, make_account, make_channel, monkeypatch):
     assert params["manifest"] == "mpd" and params["rmt"] == "wv"
     # manifest/rmt are inside the signed portion (before sig)
     assert parts.query.index("rmt=wv") < parts.query.index("&sig=")
+    # drm.required marks the channel for the dashboard badge
+    db.session.refresh(ch)
+    assert ch.encryption == "drm" and ch.encryption_checked_at is not None
 
 
 def test_preplay_failure_is_audited(auth_client, make_account, make_channel, monkeypatch):
@@ -154,7 +157,13 @@ def test_signed_url_is_probed(auth_client, make_account, make_channel, probe_cal
     ch = make_channel(make_account(), "abc")
     data = _post(auth_client, {"channel_id": ch.id}).get_json()
     assert probe_calls == [data["url"]]
-    assert data["probe"] == {"ok": True, "status": 200, "error": None, "elapsed_ms": 5}
+    assert data["probe"] == {
+        "ok": True,
+        "status": 200,
+        "error": None,
+        "elapsed_ms": 5,
+        "encryption": None,
+    }
     event = db.session.get(PlaybackEvent, data["event_id"])
     assert event.status_code == 200 and event.error is None
 
@@ -189,3 +198,42 @@ def test_preplay_probes_the_play_url(
     )
     _post(auth_client, {"channel_id": ch.id, "mode": "preplay"})
     assert probe_calls == [play_url]
+
+
+def test_probe_records_channel_encryption(auth_client, make_account, make_channel, probe_calls):
+    ch = make_channel(make_account())
+    probe_calls.result = ProbeResult(True, 200, None, 5, "drm")
+    data = _post(auth_client, {"channel_id": ch.id}).get_json()
+    assert data["probe"]["encryption"] == "drm"
+    db.session.refresh(ch)
+    assert ch.encryption == "drm"
+    items = auth_client.get("/api/channels").get_json()["items"]
+    assert items[0]["encryption"] == "drm"
+
+
+def test_unknown_encryption_keeps_previous(auth_client, make_account, make_channel, probe_calls):
+    ch = make_channel(make_account(), encryption="aes-128")
+    probe_calls.result = ProbeResult(True, 200, None, 5, None)
+    _post(auth_client, {"channel_id": ch.id, "manifest": "mpd"})
+    db.session.refresh(ch)
+    assert ch.encryption == "aes-128"
+
+
+def test_check_encryption_signs_and_records(app, make_account, make_channel, monkeypatch):
+    account = make_account()
+    clear = make_channel(account, "chan0001")
+    drm = make_channel(account, "chan0002")
+    answers = {"chan0001": "none", "chan0002": "drm"}
+    probed = []
+
+    def fake(url):
+        probed.append(url)
+        cid = dict(parse_qsl(urlsplit(url).query))["cid"]
+        return ProbeResult(True, 200, None, 5, answers[cid])
+
+    monkeypatch.setattr(service, "probe_manifest", fake)
+    results = service.check_encryption([clear, drm], workers=2)
+    assert [p.encryption for _, p in results] == ["none", "drm"]
+    assert all(".m3u8?" in u and "&sig=" in u for u in probed)
+    assert (clear.encryption, drm.encryption) == ("none", "drm")
+    assert db.session.query(PlaybackEvent).count() == 0

@@ -1,6 +1,6 @@
 [project]
 name = "player-test-harness"
-version = "3.3.1"
+version = "3.4.0"
 description = "Uplynk playback triage harness: signed playback, channel sync, and low-latency monitoring"
 readme = "README.md"
 requires-python = ">=3.12"
