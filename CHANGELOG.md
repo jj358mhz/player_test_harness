@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.3.1] - 2026-10-18
+
+### Documentation
+- New **[wiki](https://github.com/jj358mhz/player_test_harness/wiki)**:
+  getting started, accounts and sync, dashboard, signing and Preplay, the
+  player, latency and drift, DRM, browser compatibility, Uplynk
+  conventions, troubleshooting, deployment and development. Linked from
+  the README; CLAUDE.md says to keep it current with each release.
+
 ## [3.3.0] - 2026-10-18
 
 ### Added

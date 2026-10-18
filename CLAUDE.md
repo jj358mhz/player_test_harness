@@ -28,6 +28,16 @@ repo owner), reached over LAN/VPN only. Sister project and template:
   `vX.Y.Z — <summary>`), push the tag (it redeploys, so the header shows
   the clean version), and `gh release create` with that CHANGELOG section
   plus a **Full Changelog** compare link.
+- **Keep the wiki current.** User docs live in the GitHub wiki
+  (https://github.com/jj358mhz/player_test_harness/wiki, a separate repo:
+  `git clone https://github.com/jj358mhz/player_test_harness.wiki.git`).
+  When a release changes behaviour users see, update the matching page(s)
+  in the same session and push after the release. Same public-repo rules:
+  no workspace data, use `player.example.com` style examples. Pages:
+  Home, Getting Started, Uplynk Accounts and Channel Sync, Channels
+  Dashboard, Signing and Preplay, Using the Player, Latency and Drift, DRM
+  Playback, Browser Compatibility, Uplynk Conventions, Troubleshooting,
+  Deployment, Development (+ `_Sidebar.md`).
 - Commits are authored as `jj358mhz@gmail.com`. Don't touch the old GitLab
   remote (`gitlab`, branch `gitlab-main` locally) — it's kept as-is.
 
