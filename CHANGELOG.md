@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.0] - 2026-10-17
+
+### Added
+- **Dashboard navigation** carried over from CSL: account chips that jump to
+  a section and highlight the one in view, collapsible account sections, and
+  **Collapse all / Expand all** (remembered per browser).
+- **Select all** per account and a checkbox on each channel, with a batch
+  bar: **Check HLS & DASH** (signs both and marks each card ✓/✗ with
+  Uplynk's reason), **Copy HLS URLs / Copy DASH URLs** (signed, one per
+  channel), and **Pin / Unpin**.
+
 ## [3.0.1] - 2026-10-17
 
 ### Fixed

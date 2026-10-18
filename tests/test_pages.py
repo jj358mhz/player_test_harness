@@ -197,3 +197,34 @@ def test_sign_page_for_channel_links_back_to_its_card(auth_client, make_account,
     html = auth_client.get(f"/sign?channel={ch.id}").get_data(as_text=True)
     assert f'href="/#channel-{ch.id}">← Back to channels</a>' in html
     assert "Back to channels" not in auth_client.get("/sign").get_data(as_text=True)
+
+
+def test_dashboard_has_nav_collapse_and_select_all(auth_client, make_account, make_channel):
+    make_channel(make_account("acct-a"), "c1", description="Alpha")
+    make_channel(make_account("acct-b"), "c2", description="Beta")
+    html = auth_client.get("/").get_data(as_text=True)
+    assert 'id="workspace-nav"' in html and 'data-target="section-2"' in html
+    assert 'id="collapse-all-btn"' in html and 'id="expand-all-btn"' in html
+    assert html.count('class="section-selectall__cb"') == 2
+    assert html.count('class="channel-checkbox"') == 2
+    assert 'id="batch-bar"' in html
+
+
+def test_batch_favorite(auth_client, make_account, make_channel):
+    from app.models import Channel
+
+    acct = make_account()
+    a = make_channel(acct, "c1")
+    b = make_channel(acct, "c2")
+    response = auth_client.post(
+        "/api/channels/favorite", json={"ids": [a.id, b.id], "favorite": True}
+    )
+    assert response.get_json() == {"updated": 2, "favorite": True}
+    assert all(db.session.get(Channel, c.id).is_favorite for c in (a, b))
+    auth_client.post("/api/channels/favorite", json={"ids": [a.id], "favorite": False})
+    db.session.expire_all()
+    assert not db.session.get(Channel, a.id).is_favorite
+
+
+def test_batch_favorite_validates(auth_client):
+    assert auth_client.post("/api/channels/favorite", json={"ids": "x"}).status_code == 400
