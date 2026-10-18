@@ -1,0 +1,179 @@
+# Changelog
+
+All notable changes to the Uplynk HLS.js Advanced Latency Monitor will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [2.1.0] - 2026-05-22
+
+### Changed
+- **HLS.js** - Default to 1.6.16; version selector now offers 1.6.14-1.6.16
+- **Presets** - Removed workspace-specific Uplynk channel presets; public test streams remain
+- **Repository** - Moved to GitHub; docs updated to point to GitHub issues and pull requests
+
+## [2.0.0] - 2024-12-16
+
+### Added
+- **HLS.js Version Selector** - Switch between HLS.js versions (1.6.13-1.6.15) with hot reload
+- **Enhanced DRM Monitoring** - Complete key tracking system with:
+  - Unique key identification with color coding
+  - Key rotation detection and notifications
+  - Detailed key history log with hover tooltips
+  - Key legend showing all unique keys
+  - Support for custom license server URLs
+- **CMAF/Format Detection** - Automatic detection of:
+  - Container format (fMP4, MPEG-TS, CMAF)
+  - Init segments and byte-range mode
+  - Codec information
+  - Media segment counts
+- **Tab Visibility Monitoring** - Warns when stream drifts while tab is hidden
+  - Configurable auto-jump on return
+  - Visual notifications
+  - Drift tracking during hidden state
+- **Master Manifest Viewer** - Enhanced manifest inspection:
+  - Color-coded variant streams
+  - Hover tooltips with full details
+  - Raw manifest view with syntax highlighting
+  - Audio and subtitle group detection
+- **Discontinuity Tracking** - Comprehensive discontinuity monitoring:
+  - Real-time detection
+  - Historical log with context
+  - Line numbers and segment info
+- **Debug Mode Toggle** - Enable/disable verbose logging from UI
+- **Performance Optimizations**:
+  - DOM element caching
+  - Batch updates for multiple DOM changes
+  - Throttled graph rendering (30-60fps)
+  - Reduced getElementById calls
+
+### Changed
+- **Improved UI Layout** - Better organization of monitoring sections
+- **Enhanced Graphs** - More responsive and smooth animations
+- **Better Error Handling** - More informative error messages
+- **Updated Latency Classifications**:
+  - Awesome: <10s (dark green)
+  - Good: 10-19s (green)
+  - Average: 19-25s (light orange)
+  - Above Average: 25-40s (orange)
+  - Yuk: 40s+ (red, pulsing)
+
+### Fixed
+- Audio bitrate measurement now more accurate
+- Key rotation counting works correctly
+- Tab visibility warnings trigger reliably
+- Graph rendering performance improved
+- Memory leaks in long-running sessions
+
+## [1.5.0] - 2024-11-15
+
+### Added
+- **Audio Track Monitor** with Web Audio API
+  - Real-time audio level visualization
+  - Multi-track support
+  - Codec and bitrate detection
+- **Caption/Subtitle Monitor**
+  - Live caption display
+  - Caption history log
+  - Track selection
+  - Format detection (WebVTT, CEA-608/708)
+- **Program Date Time** tracking and comparison
+- **ABR Bandwidth Monitor**
+  - Bandwidth estimate graphing
+  - Quality switch logging
+  - Throughput tracking
+
+### Changed
+- Reorganized dashboard layout
+- Improved mobile responsiveness
+- Enhanced graph legends
+
+### Fixed
+- Caption cuechange events now fire correctly
+- Audio track switching more reliable
+- PDT parsing handles more formats
+
+## [1.0.0] - 2024-10-01
+
+### Added
+- Initial release
+- **ID3 Metadata Parser**
+  - PRIV, TXXX, and text frame support
+  - SCTE-35 detection
+  - Hex dumps
+- **Latency Monitoring**
+  - Wall-clock timestamp parsing
+  - Real-time latency calculation
+  - Historical statistics
+  - Latency graph
+- **Live Edge Drift Monitor**
+  - Visual gauge
+  - Auto-sync capability
+  - Drift history graph
+- **Performance Metrics**
+  - Buffer levels
+  - Download speeds
+  - Quality levels
+  - Dropped frames
+  - Rebuffer tracking
+- **DRM/Encryption Monitor**
+  - AES-128 detection
+  - Key URI tracking
+  - Basic DRM support
+- **HTTP Status Monitor**
+  - Request categorization
+  - Success rate calculation
+  - Request log
+- **Manifest Viewer**
+  - Media playlist display
+  - Segment information
+- **Preset Streams**
+  - Uplynk test streams
+  - Public test streams
+  - Encrypted test streams
+
+### Features
+- Jump to Live button
+- Quality level selector
+- Collapsible dashboard sections
+- Dark theme UI
+- No build process required
+- Single HTML file
+
+---
+
+## Version History Legend
+
+- 🎉 **Added** - New features
+- 🔄 **Changed** - Changes to existing functionality
+- 🐛 **Fixed** - Bug fixes
+- 🗑️ **Removed** - Removed features
+- 🔒 **Security** - Security improvements
+
+## Upgrade Notes
+
+### From 1.x to 2.0
+
+**Breaking Changes:**
+- None - fully backward compatible
+
+**New Requirements:**
+- None - same browser requirements
+
+**Migration Steps:**
+1. Replace old HTML file with new version
+2. Clear browser cache to load new HLS.js versions
+3. Re-select your preferred HLS.js version if different from default
+
+**New Features to Try:**
+1. Open DRM Monitor and click debug mode
+2. Try the new HLS.js version selector
+3. Load a stream and watch tab visibility warnings
+4. Check out the new master manifest viewer
+5. Review the enhanced key tracking in DRM monitor
+
+---
+
+## Future Releases
+
+See the [issue tracker](https://github.com/jj358mhz/player_test_harness/issues) for planned features and improvements.
