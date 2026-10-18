@@ -50,6 +50,18 @@ def test_play_channel_redirects_to_player_with_signed_src(auth_client, make_acco
     assert "/channel/abc.m3u8?tc=1" in src and "&sig=" in src
 
 
+def test_play_channel_stays_on_dashboard_when_probe_fails(
+    auth_client, make_account, make_channel, probe_calls
+):
+    from app.uplynk.playback import ProbeResult
+
+    ch = make_channel(make_account(), "abc")
+    probe_calls.result = ProbeResult(False, 403, "HTTP 403: Invalid signature", 9)
+    response = auth_client.get(f"/channels/{ch.id}/play", follow_redirects=True)
+    assert response.request.path == "/"
+    assert "Invalid signature" in response.get_data(as_text=True)
+
+
 def test_play_unknown_channel_404(auth_client):
     assert auth_client.get("/channels/999/play").status_code == 404
 

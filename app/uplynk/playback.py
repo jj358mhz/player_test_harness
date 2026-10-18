@@ -15,6 +15,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import random
+import re
 import time
 from dataclasses import dataclass, field
 from typing import Any
@@ -174,3 +175,59 @@ def fetch_preplay(
         drm=payload.get("drm"),
         raw=payload,
     )
+
+
+@dataclass
+class ProbeResult:
+    """What Uplynk answered when we fetched a signed manifest once."""
+
+    ok: bool
+    status: int | None
+    error: str | None
+    elapsed_ms: int
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "ok": self.ok,
+            "status": self.status,
+            "error": self.error,
+            "elapsed_ms": self.elapsed_ms,
+        }
+
+
+_MANIFEST_MARKERS = ("#EXTM3U", "<MPD", "<?xml")
+
+
+def probe_manifest(
+    url: str,
+    timeout: int = 8,
+    session: requests.Session | None = None,
+) -> ProbeResult:
+    """GET a signed manifest and report whether Uplynk served one.
+
+    Uplynk explains most failures in a short HTML body (``Non dash asset
+    <id>``, ``Invalid signature``…), so that text becomes the error.
+    """
+    http = session or requests
+    start = time.monotonic()
+    try:
+        response = http.get(url, timeout=timeout)
+    except requests.RequestException as e:
+        return ProbeResult(False, None, f"Request failed: {e}", _ms_since(start))
+    elapsed = _ms_since(start)
+    body = response.text or ""
+    if response.status_code == 200 and body.lstrip().startswith(_MANIFEST_MARKERS):
+        return ProbeResult(True, 200, None, elapsed)
+    detail = _strip_html(body) or "response is not a manifest"
+    return ProbeResult(
+        False, response.status_code, f"HTTP {response.status_code}: {detail}", elapsed
+    )
+
+
+def _ms_since(start: float) -> int:
+    return int((time.monotonic() - start) * 1000)
+
+
+def _strip_html(text: str, limit: int = 300) -> str:
+    plain = re.sub(r"<[^>]+>", " ", text)
+    return " ".join(plain.split())[:limit]

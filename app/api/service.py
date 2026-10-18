@@ -19,6 +19,7 @@ from app.uplynk.playback import (
     fetch_preplay,
     manifest_base_url,
     preplay_base_url,
+    probe_manifest,
     sign_url,
 )
 
@@ -33,6 +34,7 @@ class PlaybackRequest:
     ttl_seconds: int | None = None
     extra: tuple[tuple[str, str], ...] = ()
     channel: Channel | None = None
+    probe: bool = True  # fetch the manifest once and report Uplynk's answer
 
 
 def parse_request(data: dict[str, Any]) -> PlaybackRequest:
@@ -85,6 +87,7 @@ def parse_request(data: dict[str, Any]) -> PlaybackRequest:
         ttl_seconds=_int(ttl, "ttl_seconds") if ttl not in (None, "") else None,
         extra=extra,
         channel=channel,
+        probe=bool(data.get("probe", True)),
     )
 
 
@@ -139,6 +142,15 @@ def create_playback(req: PlaybackRequest) -> dict[str, Any]:
         event.error = str(e)
         db.session.commit()
         raise
+
+    if req.probe:
+        # A signed URL can still fail (content not packaged for DASH, token
+        # rejected...). Report Uplynk's answer rather than leaving the user
+        # with a silent failed download.
+        probe = probe_manifest(result["url"])
+        event.status_code = probe.status
+        event.error = probe.error
+        result["probe"] = probe.as_dict()
     db.session.commit()
     result["event_id"] = event.id
     return result

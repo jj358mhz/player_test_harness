@@ -58,7 +58,8 @@ after dependency changes.
 - `app/admin/` — Uplynk account CRUD + sync (admin-only).
 - `app/player/hls-id3-player.html` — the monitoring player, a single
   ~7k-line self-contained file served by `main.player` behind login.
-  `?src=<url>` autoloads. Must keep working standalone (opened from disk).
+  `?src=<url>` autoloads. Being replaced in Phase 2a; standalone use is no
+  longer required.
 
 ## Uplynk facts we rely on
 
@@ -71,6 +72,11 @@ after dependency changes.
 - Preplay v2: `/preplay/channel/<id>.json` (channels) and `/preplay/<id>.json`
   (assets); not events. Response: absolute `playURL`, `prefix`, `sid`, `drm`
   (`widevineLicenseURL`, `playreadyLicenseURL`, `fairplayCertificateURL`, `required`).
+- Rays: Uplynk names renditions by letter, `a` = lowest. In an HLS master
+  each variant URI's basename is the ray (`…/channel/<id>/e.m3u8`; `ifo` is
+  the I-frame playlist), preceded by `#UPLYNK-MEDIA0:<W>x<H>x<fps>,<profile-level>,<ch>x<rate>`.
+  The signed `rays=` param restricts playback to a set (e.g. `rays=fed`).
+  Always label renditions with their ray in the UI.
 - DRM: Widevine/PlayReady need DASH; FairPlay needs HLS. Studio DRM requires
   token-protected playback. License hosts: `content.uplynk.com/{wv,pr}` (use
   the Preplay `prefix` zone to avoid redirects). EME needs HTTPS.
@@ -92,8 +98,21 @@ in the `player_harness_data` volume.
 - [x] Phase 1 — backend: accounts, channel sync, signing + Preplay API,
       dashboard, Pi deploy, CI *(PR #1; live at player.telcomjj.com
       2026-10-17, login verified)*
-- [ ] Phase 2 — multi-player: split the player into ES modules (no build
-      step), `PlayerAdapter` interface (hls.js, Shaka, dash.js, native);
+- [ ] Phase 2a — player rewrite (decided 2026-10-17): TypeScript + Vite
+      (Node stage in the Dockerfile, typecheck/tests in CI), server-only
+      (drop the open-from-disk requirement), video-first layout: load bar,
+      pinned video + six vitals, 5-minute event timeline, tabbed inspector
+      (Latency, ABR, DRM & keys, Metadata, Tracks, Manifest, Network, Log).
+      Latency tab keeps the Current/Average/Max/Min tiles (running since
+      load, min/max timestamps) coloured by today's bands: Awesome <10 s,
+      Good 10–19, Average 19–25, Above avg 25–40, Yuk >40.
+      Renditions labelled by ray letter everywhere; ladder toggles build a
+      `rays=` param to re-sign with. Mockup approved before code.
+      Engine versions: the server reads npm (cached ~24 h) and offers the
+      latest patch of the last 3 minor lines (e.g. 1.7.3 · 1.6.19 · 1.5.20)
+      plus a Custom… exact version; loaded from jsDelivr. The default is the
+      npm-pinned dependency, bumped by Dependabot PRs. No pre-releases.
+- [ ] Phase 2 — multi-player: `PlayerAdapter` interface (hls.js, Shaka, dash.js, native);
       per-engine latency source (ID3 wallclock for HLS; emsg/prft/UTCTiming
       for DASH). Presets move into the DB.
 - [ ] Phase 3 — DRM playback from Preplay `drm` config; DRM panel (key
@@ -112,8 +131,10 @@ in the `player_harness_data` volume.
       (200 on every channel), Preplay v2. DASH is signed correctly but
       Uplynk answers `400 Non dash asset <id>` when the airing asset has
       no DASH packaging — a content setting, not a signing bug
-- [ ] Probe the manifest after signing and show Uplynk's error text
-      (e.g. `Non dash asset`) instead of a silent failed download
+- [x] Probe the manifest after signing and show Uplynk's error text
+      (`probe_manifest` in `app/uplynk/playback.py`; tests stub it via the
+      autouse `probe_calls` fixture)
+- [x] Review the player UI/structure before Phase 2 → Phase 2a above
 - [x] Merge PR #2 (bootstrap race between workers, gunicorn control socket)
 - [x] Port to CSL: PR #2 fixes and Dockerfile `LABEL` (csl-slicer-console
       #63, v1.15.3); CSL already had the deploy `concurrency` group

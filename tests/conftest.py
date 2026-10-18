@@ -35,6 +35,32 @@ def app(monkeypatch, tmp_path):
         db.drop_all()
 
 
+@pytest.fixture(autouse=True)
+def probe_calls(monkeypatch):
+    """Stub the post-signing manifest probe so tests never hit Uplynk.
+
+    Returns the list of probed URLs; set ``probe_calls.result`` to change
+    the answer.
+    """
+    from app.api import service
+    from app.uplynk.playback import ProbeResult
+
+    calls = ProbeCalls(ProbeResult(True, 200, None, 5))
+
+    def fake(url):
+        calls.append(url)
+        return calls.result
+
+    monkeypatch.setattr(service, "probe_manifest", fake)
+    return calls
+
+
+class ProbeCalls(list):
+    def __init__(self, result):
+        super().__init__()
+        self.result = result
+
+
 @pytest.fixture
 def client(app):
     return app.test_client()

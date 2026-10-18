@@ -49,12 +49,7 @@
                 <div class="channel-card__thumb">
                     {% if ch.thumb_url %}<img src="{{ ch.thumb_url }}" alt="" loading="lazy" referrerpolicy="no-referrer">{% endif %}
                 </div>
-                <div class="channel-card__title">
-                    <div class="channel-card__name">{{ ch.display_name }}</div>
-                    <div class="channel-card__meta mono">{{ ch.channel_id }}</div>
-                    {% if ch.external_id %}<div class="channel-card__meta">ext: <span class="mono">{{ ch.external_id }}</span></div>{% endif %}
-                    {% if ch.slicer_id %}<div class="channel-card__meta">slicer: <span class="mono">{{ ch.slicer_id }}</span></div>{% endif %}
-                </div>
+                <div class="channel-card__name" title="{{ ch.display_name }}">{{ ch.display_name }}</div>
                 <form method="post" action="{{ url_for('main.toggle_favorite', channel_id=ch.id) }}">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button type="submit"
@@ -62,6 +57,11 @@
                             title="{{ 'Unpin' if ch.is_favorite else 'Pin to top' }}">{{ '★' if ch.is_favorite else '☆' }}</button>
                 </form>
             </div>
+            <dl class="channel-card__ids">
+                <dt>ID</dt><dd class="mono" title="{{ ch.channel_id }}">{{ ch.channel_id }}</dd>
+                {% if ch.external_id %}<dt>Ext</dt><dd class="mono" title="{{ ch.external_id }}">{{ ch.external_id }}</dd>{% endif %}
+                {% if ch.slicer_id %}<dt>Slicer</dt><dd class="mono" title="{{ ch.slicer_id }}">{{ ch.slicer_id }}</dd>{% endif %}
+            </dl>
             <div class="channel-card__actions">
                 <a class="button button--primary" href="{{ url_for('main.play_channel', channel_id=ch.id) }}">▶ Play HLS</a>
                 <button type="button" class="btn-ghost" data-copy-url
