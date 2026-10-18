@@ -865,3 +865,115 @@ select.pl-control {
 .pl-legend .pl-legend__line--dashed {
     background: repeating-linear-gradient(90deg, var(--drift) 0 5px, transparent 5px 8px);
 }
+
+/* Compatibility panel */
+.pl-compat-panel summary {
+    cursor: pointer;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.pl-compat-panel summary::-webkit-details-marker {
+    display: none;
+}
+.pl-compat-panel summary::before {
+    content: "▸";
+    color: var(--text-dim);
+    transition: transform 150ms;
+}
+.pl-compat-panel[open] summary::before {
+    transform: rotate(90deg);
+}
+.pl-compat-body {
+    display: grid;
+    grid-template-columns: minmax(0, 260px) minmax(0, 1fr);
+    gap: 12px 24px;
+    margin-top: 12px;
+}
+.pl-compat-notes {
+    grid-column: 1 / -1;
+}
+.pl-compat-notes ul {
+    margin: 0;
+    padding-left: 18px;
+    display: grid;
+    gap: 4px;
+    font-size: 13px;
+    color: var(--text);
+    max-width: 120ch;
+}
+.pl-checks {
+    display: grid;
+    gap: 4px;
+    font-size: 12.5px;
+}
+.pl-check {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    padding: 5px 8px;
+    background: var(--inset);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+.pl-check > span:last-child {
+    text-align: right;
+    color: var(--text-dim);
+}
+.pl-compat {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12.5px;
+}
+.pl-compat th,
+.pl-compat td {
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+    vertical-align: top;
+}
+.pl-compat th {
+    font-weight: 400;
+    font-size: 11px;
+    color: var(--text-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+.pl-compat td small {
+    display: block;
+    color: var(--text-dim);
+    font-size: 11px;
+}
+.pl-compat tr.is-current td {
+    background: var(--accent-bg);
+}
+.pl-compat__you {
+    margin-left: 6px;
+    font-size: 10.5px;
+    color: var(--accent);
+    border: 1px solid rgba(236, 30, 121, 0.4);
+    border-radius: 999px;
+    padding: 0 6px;
+}
+.pl-compat__yes b {
+    color: var(--good);
+}
+.pl-compat__no b {
+    color: var(--error);
+}
+.pl-compat__partial b {
+    color: var(--warn);
+}
+.pl-compat__pending {
+    color: var(--text-faint);
+}
+.pl-notice__actions {
+    display: inline-flex;
+    gap: 6px;
+}
+@media (max-width: 900px) {
+    .pl-compat-body {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}

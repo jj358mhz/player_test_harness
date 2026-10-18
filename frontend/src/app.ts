@@ -33,6 +33,7 @@ import {
     type TimelineEvent,
     type TimelineKind,
 } from './ui/charts';
+import {buildCompatPanel} from './ui/compat';
 import {clock, h, kbps, mbps, resLabel, secs} from './ui/dom';
 
 const WINDOW_MS = 5 * 60 * 1000;
@@ -161,6 +162,7 @@ export class PlayerApp {
             {class: 'pl'},
             this.ref('notices', h('div', {class: 'pl-notices', 'aria-live': 'polite'})),
             this.buildLoadBar(),
+            this.ref('compat', buildCompatPanel()),
             this.ref('status', h('div', {class: 'pl-status', 'aria-label': 'Stream properties'})),
             h(
                 'div',
@@ -1325,6 +1327,11 @@ export class PlayerApp {
         this.notice(
             'error',
             'This stream uses FairPlay DRM (Studio DRM over HLS), which only Safari can play. In Chrome, play it as DASH with Widevine.',
+            h(
+                'button',
+                {type: 'button', class: 'pl-btn-ghost', onclick: () => this.showCompat()},
+                'Why?',
+            ),
             channel
                 ? h(
                       'button',
@@ -2218,10 +2225,26 @@ export class PlayerApp {
         while (tl.length && (tl[0] as TimelineEvent).t < now - WINDOW_MS) tl.shift();
     }
 
-    private notice(kind: 'error' | 'info', message: string, action?: HTMLElement): void {
+    private notice(
+        kind: 'error' | 'info',
+        message: string,
+        ...actions: (HTMLElement | undefined)[]
+    ): void {
         this.el('notices').append(
-            h('div', {class: `flash flash--${kind} pl-notice`}, h('span', {}, message), action),
+            h(
+                'div',
+                {class: `flash flash--${kind} pl-notice`},
+                h('span', {}, message),
+                h('span', {class: 'pl-notice__actions'}, ...actions),
+            ),
         );
+    }
+
+    /** Open the compatibility panel and bring it into view. */
+    private showCompat(): void {
+        const panel = this.el<HTMLDetailsElement>('compat');
+        panel.open = true;
+        panel.scrollIntoView({behavior: 'smooth', block: 'start'});
     }
 
     private clearNotices(): void {
