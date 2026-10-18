@@ -177,7 +177,7 @@ const CHECKS: Check[] = [
         label: 'Media Source Extensions',
         run: async () => {
             const w = window as unknown as {MediaSource?: unknown; ManagedMediaSource?: unknown};
-            if (w.MediaSource) return ['yes', 'hls.js and Shaka can run'];
+            if (w.MediaSource) return ['yes', 'hls.js and Shaka run'];
             if (w.ManagedMediaSource) return ['partial', 'ManagedMediaSource only'];
             return ['no', 'only native playback'];
         },
@@ -188,9 +188,7 @@ const CHECKS: Check[] = [
             const can = document
                 .createElement('video')
                 .canPlayType('application/vnd.apple.mpegurl');
-            return can
-                ? ['yes', 'Safari-style <video src=…m3u8>']
-                : ['no', 'HLS needs hls.js here'];
+            return can ? ['yes', 'plays .m3u8 itself'] : ['no', 'HLS needs hls.js here'];
         },
     },
     {

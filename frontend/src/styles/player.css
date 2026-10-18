@@ -887,7 +887,7 @@ select.pl-control {
 }
 .pl-compat-body {
     display: grid;
-    grid-template-columns: minmax(0, 260px) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 330px) minmax(0, 1fr);
     gap: 12px 24px;
     margin-top: 12px;
 }
