@@ -14,9 +14,12 @@ Uplynk stream is doing while it plays.
 - **Video** with the current ray and latency overlaid.
 - **Vitals:** latency, live-edge drift, buffer, ray, rebuffers, errors. The
   coloured top edge shows state.
-- **Timeline (last 5 minutes):** the latency line, ray switches, key
-  rotations, SCTE-35 cues, discontinuities and errors on one axis. Ad breaks
-  are shaded.
+- **Timeline (last 5 minutes):** latency (solid) and live-edge drift
+  (dashed) on one seconds scale, with current values at the right; ray
+  switches, key/license loads, SCTE-35 cues, discontinuities and errors in
+  the lane below. Ad breaks are shaded. Latency rising *with* drift means
+  the player is falling behind the edge; rising while drift stays flat means
+  the stream itself is arriving late.
 - **Inspector tabs** (deep-link with `#latency`, `#abr`, `#keys`, `#meta`,
   `#tracks`, `#manifest`, `#network`, `#log`).
 
