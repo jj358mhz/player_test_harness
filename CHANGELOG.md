@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.6.0] - 2026-10-18
+
+### Added
+- **Deep links.** The player's address bar now describes the whole view:
+  source (`channel=` or `src=`), `format=dash`,
+  `engine=<hlsjs|shaka|dashjs|native>@<version>`, `drm=wv|pr`, `rays=`,
+  and the tab in the hash. Opening the link sets the load bar and plays.
+  A **Copy link** button next to Load copies it. DRM chosen automatically
+  for a DRM channel isn't written, so the channel decides again on open.
+
+### Security
+- Engine versions from a link or the custom-version box must be exact
+  releases (`1.6.15`, `5.0.0-beta.2`); anything else falls back to the
+  default, so a link can't point the jsDelivr import elsewhere.
+
 ## [3.5.0] - 2026-10-18
 
 ### Added

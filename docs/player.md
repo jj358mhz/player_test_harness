@@ -7,8 +7,14 @@ Uplynk stream is doing while it plays.
 ## Layout
 
 - **Load bar:** channel or pasted URL, format (HLS or DASH), player engine
-  and version, DRM, Load.
-  `?channel=<id>` or `?src=<url>` in the address loads on open.
+  and version, DRM, Load, **Copy link**.
+- **Deep links:** the address bar always describes the view, so it can be
+  shared or reloaded: `?channel=<id>` (or `?src=<url>`), `format=dash`,
+  `engine=<hlsjs|shaka|dashjs|native>[@<version>]`, `drm=wv|pr`,
+  `rays=fed`, plus the tab as `#latency` etc. Example:
+  `/player?channel=12&format=dash&engine=dashjs@5.2.1&drm=wv&rays=fed#keys`.
+  Values are checked (exact versions only); a DRM channel still picks
+  Widevine itself, so `drm=` is only written when you chose it.
 - **Status chips:** live/VOD, engine version, encryption, codecs, rays,
   and time left on the playback token.
 - **Video** with the current ray and latency overlaid.
