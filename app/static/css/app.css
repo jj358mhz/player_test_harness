@@ -1589,3 +1589,8 @@ select.input {
 .batch-bar .button--action {
     text-transform: none;
 }
+
+/* Recorded session title: Uplynk URLs are one long word */
+.session-title {
+    overflow-wrap: anywhere;
+}

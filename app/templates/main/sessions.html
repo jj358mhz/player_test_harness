@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title_suffix %} — Sessions{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Recorded sessions <span class="page-header__meta">{{ sessions|length }}</span></h1>
+</div>
+
+{% if sessions %}
+<table class="data-table">
+    <thead>
+    <tr>
+        <th>Saved (UTC)</th>
+        <th>Source</th>
+        <th>Engine</th>
+        <th>Length</th>
+        <th>Latency avg / max</th>
+        <th>Rebuffers</th>
+        <th>Errors</th>
+        <th>Expires</th>
+    </tr>
+    </thead>
+    <tbody>
+    {% for s in sessions %}
+    {% set exp = expires_at(s) %}
+    <tr>
+        <td class="mono"><a href="{{ url_for('main.session_detail', slug=s.slug) }}">{{ s.created_at.strftime('%Y-%m-%d %H:%M') }}</a></td>
+        <td>{{ s.title }}{% if s.drm %} <span class="badge badge--drm">{{ s.drm }}</span>{% endif %}</td>
+        <td>{{ s.engine }} {{ s.engine_version }} · {{ 'DASH' if s.manifest == 'mpd' else 'HLS' }}</td>
+        <td class="mono">{{ (s.duration_s // 60) }}:{{ '%02d'|format(s.duration_s % 60) }}</td>
+        <td class="mono">
+            {% if s.latency_avg is not none %}{{ '%.1f'|format(s.latency_avg) }} / {{ '%.1f'|format(s.latency_max or 0) }} s{% if s.latency_name %} <span class="muted">{{ s.latency_name }}</span>{% endif %}{% else %}—{% endif %}
+        </td>
+        <td>{{ s.rebuffers }}</td>
+        <td>{{ s.errors }}</td>
+        <td class="mono">{{ exp.strftime('%Y-%m-%d') if exp else 'never' }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<div class="card"><p class="muted">No recorded sessions yet. In the <a href="{{ url_for('main.player') }}">player</a>,
+    load a stream and press <strong>Save session</strong>.</p></div>
+{% endif %}
+{% endblock %}

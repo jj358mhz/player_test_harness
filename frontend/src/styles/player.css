@@ -977,3 +977,18 @@ select.pl-control {
         grid-template-columns: minmax(0, 1fr);
     }
 }
+
+/* Recorded session (/sessions/<id>) */
+.pl-rec-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+.pl-rec-grid .pl-chart {
+    margin-bottom: 8px;
+}
+@media (max-width: 900px) {
+    .pl-rec-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}

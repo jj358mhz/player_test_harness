@@ -12,7 +12,8 @@ from app.uplynk.sync import SyncResult
 
 
 @pytest.mark.parametrize(
-    "path", ["/", "/player", "/sign", "/activity", "/admin/uplynk-accounts", "/api/channels"]
+    "path",
+    ["/", "/player", "/sign", "/activity", "/sessions", "/admin/uplynk-accounts", "/api/channels"],
 )
 def test_pages_require_login(client, path):
     response = client.get(path)
@@ -20,7 +21,9 @@ def test_pages_require_login(client, path):
     assert "/auth/login" in response.headers["Location"]
 
 
-@pytest.mark.parametrize("path", ["/", "/player", "/sign", "/activity", "/admin/uplynk-accounts"])
+@pytest.mark.parametrize(
+    "path", ["/", "/player", "/sign", "/activity", "/sessions", "/admin/uplynk-accounts"]
+)
 def test_pages_render(auth_client, path):
     assert auth_client.get(path).status_code == 200
 

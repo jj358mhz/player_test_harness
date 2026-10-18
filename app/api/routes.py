@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from flask import Blueprint, jsonify, request
-from flask_login import login_required
+from flask import Blueprint, abort, current_app, jsonify, request, url_for
+from flask_login import current_user, login_required
 
 from app.api.service import create_playback, parse_request
 from app.engines import EngineVersionsError
 from app.engines import engine_versions as list_engine_versions
-from app.models import Channel, UplynkAccount, db
+from app.models import Channel, PlaybackSession, UplynkAccount, db
+from app.sessions import RecordingError, save_recording
 from app.uplynk.playback import PlaybackError
 
 bp = Blueprint("api", __name__, url_prefix="/api")
@@ -81,3 +82,35 @@ def favorite_channels():
     )
     db.session.commit()
     return jsonify(updated=updated, favorite=value)
+
+
+@bp.route("/sessions", methods=["POST"])
+@login_required
+def save_session():
+    """Store a recorded player session; answers with its replay link."""
+    limit = current_app.config["MAX_RECORDING_BYTES"]
+    if (request.content_length or 0) > limit:
+        return jsonify(error=f"Recording is larger than {limit // 1024} KB"), 413
+    try:
+        row = save_recording(request.get_json(silent=True), current_user)
+    except RecordingError as e:
+        return jsonify(error=str(e)), 400
+    return (
+        jsonify(
+            id=row.slug,
+            url=url_for("main.session_detail", slug=row.slug),
+            size_kb=round(row.size_bytes / 1024),
+            retention_days=current_app.config["SESSION_RETENTION_DAYS"],
+        ),
+        201,
+    )
+
+
+@bp.route("/sessions/<slug>")
+@login_required
+def session_json(slug: str):
+    """The stored (redacted) recording, for download."""
+    row = db.session.query(PlaybackSession).filter_by(slug=slug).first() or abort(404)
+    response = current_app.response_class(row.data, mimetype="application/json")
+    response.headers["Content-Disposition"] = f'attachment; filename="session-{row.slug}.json"'
+    return response

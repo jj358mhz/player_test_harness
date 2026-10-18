@@ -112,6 +112,12 @@ after dependency changes.
     `bands.ts`, `stats.ts`, `deeplink.ts` (address bar ⇄ load bar; validates
     engine versions because they end up in a jsDelivr URL).
   - Feature reference for users: `docs/player.md`.
+- `app/sessions.py` — recorded sessions: validate, redact (`sig=`, `pbs=`,
+  percent-encoded forms, `/preplay2/…/<session>` paths, license URL
+  queries), store, prune. The browser redacts too (`lib/recording.ts`);
+  keep both lists in step. Page `/sessions/<slug>` embeds the JSON with
+  `|tojson` and draws it with `frontend/src/recording.ts` (second Vite
+  entry; `app/vite.py` collects CSS from imported chunks).
 - `app/admin/` — Uplynk account CRUD + sync (admin-only).
 
 ## Uplynk facts we rely on
@@ -194,8 +200,10 @@ in the `player_harness_data` volume.
       exchange with `fairplayCertificateURL`). PlayReady is
       wired but untested (Chrome has no PlayReady; needs Edge).
 - [~] Phase 4 — triage (#24). **Done (v3.6.0):** deep links (source,
-      format, engine@version, DRM, rays, tab) + Copy link. **Left:**
-      recorded sessions with shareable links (retention setting),
+      format, engine@version, DRM, rays, tab) + Copy link. **v3.7.0:**
+      recorded sessions (`PlaybackSession`, `POST /api/sessions`,
+      `/sessions/<slug>` replay via the `recording.ts` Vite entry,
+      `SESSION_RETENTION_DAYS`, `flask prune-sessions`). **Left:**
       side-by-side compare, LL-HLS part/blocking-reload metrics, CMCD
       toggle, request waterfall detail, CSL cross-link via slicer_id,
       old-Preplay-session latency investigation

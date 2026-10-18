@@ -38,5 +38,8 @@ class Config:
         self.UPLYNK_API_BASE = os.getenv("UPLYNK_API_BASE", "https://services.uplynk.com")
         self.UPLYNK_CONTENT_BASE = os.getenv("UPLYNK_CONTENT_BASE", "https://content.uplynk.com")
         self.PLAYBACK_TOKEN_TTL = int(os.getenv("PLAYBACK_TOKEN_TTL", "3600"))
+        # Recorded sessions: days to keep (0 = until deleted) and upload cap.
+        self.SESSION_RETENTION_DAYS = int(os.getenv("SESSION_RETENTION_DAYS", "30"))
+        self.MAX_RECORDING_BYTES = int(os.getenv("MAX_RECORDING_BYTES", str(8 * 1024 * 1024)))
 
         self.WTF_CSRF_ENABLED = os.getenv("WTF_CSRF_ENABLED", "true").lower() == "true"

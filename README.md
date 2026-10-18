@@ -28,6 +28,11 @@ latency, drift, ABR, DRM keys, ID3/SCTE-35, captions and more.
   key (HDCP problems included), robustness and expiry. Studio DRM channels
   get a 🔒 DRM badge and play as Widevine in Chrome automatically. FairPlay
   (Safari) next.
+- 📼 **Recorded sessions** — **Save session** in the player keeps what a
+  load measured (latency and drift over the whole session, events, log,
+  rays, request stats, DRM) at `/sessions/<id>`, redacted of signatures
+  and tokens, for `SESSION_RETENTION_DAYS` (default 30). Deep links put the
+  whole player view in the address bar.
 - ▶️ **One-click play** — each channel card signs a fresh HLS URL and opens
   the monitoring player with it. Copy HLS/DASH buttons for use in other players.
 - 📊 **Monitoring player** — video first, with latency (ID3, PDT and
@@ -49,7 +54,7 @@ latency, drift, ABR, DRM keys, ID3/SCTE-35, captions and more.
 | 2a    | Player rewrite: TypeScript + Vite, video-first layout, rays, versions    | ✅ done |
 | 2     | Multi-player: player adapter interface; hls.js, Shaka, dash.js, native   | ✅ done |
 | 3     | DRM playback driven by Preplay; DRM diagnostics panel                    | 🟡 Widevine/PlayReady done; FairPlay next |
-| 4     | Triage: recorded sessions, side-by-side compare, LL-HLS metrics, links   | planned |
+| 4     | Triage: recorded sessions, side-by-side compare, LL-HLS metrics, links   | 🟡 links, sessions done |
 
 ## 🏗️ Architecture
 
@@ -189,6 +194,8 @@ a Docker Compose stack on the shared `auth-net` network, fronted by Caddy at
 | `UPLYNK_API_BASE`          | Uplynk API base (default `https://services.uplynk.com`)       |
 | `UPLYNK_CONTENT_BASE`      | Playback host (default `https://content.uplynk.com`)          |
 | `PLAYBACK_TOKEN_TTL`       | Default signed-token lifetime in seconds (default 3600)       |
+| `SESSION_RETENTION_DAYS`   | Days to keep recorded sessions (default 30; 0 = forever)      |
+| `MAX_RECORDING_BYTES`      | Largest recorded session accepted (default 8 MiB)             |
 | `LOG_LEVEL`                | `info` / `debug` / `warning`                                  |
 | `GUNICORN_WORKERS`         | Worker count (default 2)                                      |
 

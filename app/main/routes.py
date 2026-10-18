@@ -2,16 +2,18 @@
 
 from __future__ import annotations
 
+import json
 from itertools import groupby
 
-from flask import abort, jsonify, redirect, render_template, request, url_for
+from flask import abort, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import login_required
 
 from app.engines import ENGINES
 from app.main import bp
-from app.models import AdminEvent, Channel, PlaybackEvent, UplynkAccount, db
+from app.models import AdminEvent, Channel, PlaybackEvent, PlaybackSession, UplynkAccount, db
+from app.sessions import expires_at
 from app.uplynk.playback import CONTENT_TYPES
-from app.vite import vite_assets
+from app.vite import RECORDING_ENTRY, vite_assets
 
 
 @bp.route("/")
@@ -78,6 +80,7 @@ def player() -> str:
         "initialSrc": request.args.get("src") or None,
         "endpoints": {
             "playback": url_for("api.playback"),
+            "sessions": url_for("api.save_session"),
             "versions": {
                 package: url_for("api.engine_versions", package=package) for package in ENGINES
             },
@@ -113,6 +116,44 @@ def activity() -> str:
     return render_template(
         "main/activity.html", playback_events=playback_events, admin_events=admin_events
     )
+
+
+@bp.route("/sessions")
+@login_required
+def sessions() -> str:
+    rows = (
+        db.session.query(PlaybackSession)
+        .order_by(PlaybackSession.created_at.desc())
+        .limit(500)
+        .all()
+    )
+    return render_template("main/sessions.html", sessions=rows, expires_at=expires_at)
+
+
+@bp.route("/sessions/<slug>")
+@login_required
+def session_detail(slug: str) -> str:
+    row = db.session.query(PlaybackSession).filter_by(slug=slug).first() or abort(404)
+    recording = json.loads(row.data)
+    link = str((recording.get("source") or {}).get("link") or "").lstrip("?")
+    return render_template(
+        "main/session.html",
+        session=row,
+        recording=recording,
+        player_link=f"{url_for('main.player')}?{link}" if link else None,
+        expires=expires_at(row),
+        assets=vite_assets(RECORDING_ENTRY),
+    )
+
+
+@bp.route("/sessions/<slug>/delete", methods=["POST"])
+@login_required
+def delete_session(slug: str):
+    row = db.session.query(PlaybackSession).filter_by(slug=slug).first() or abort(404)
+    db.session.delete(row)
+    db.session.commit()
+    flash(f"Deleted the recording of {row.title}.", "success")
+    return redirect(url_for("main.sessions"))
 
 
 @bp.route("/health")
