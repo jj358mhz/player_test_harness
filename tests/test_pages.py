@@ -33,12 +33,12 @@ def test_dashboard_lists_channels_grouped(auth_client, make_account, make_channe
     assert html.index("acct-a") < html.index("acct-b")
 
 
-def test_player_page_without_build_points_to_classic(auth_client, monkeypatch):
+def test_player_page_without_build_explains(auth_client, monkeypatch):
     from app.main import routes
 
     monkeypatch.setattr(routes, "vite_assets", lambda: None)
     html = auth_client.get("/player").get_data(as_text=True)
-    assert "Player not built" in html and "/player/classic" in html
+    assert "Player not built" in html and "npm --prefix frontend" in html
 
 
 def test_player_page_embeds_config_and_assets(auth_client, make_account, make_channel, monkeypatch):
@@ -67,12 +67,6 @@ def test_player_page_embeds_config_and_assets(auth_client, make_account, make_ch
     assert config["channels"][0]["name"] == "Alpha"
     assert config["endpoints"]["versions"] == "/api/engines/hls.js/versions"
     assert "api_key" not in raw.group(1)  # keys never reach the browser
-
-
-def test_classic_player_still_served(auth_client):
-    response = auth_client.get("/player/classic")
-    assert response.mimetype == "text/html"
-    assert b"autoSrc" in response.data
 
 
 def test_play_channel_opens_player_on_channel(auth_client, make_account, make_channel, probe_calls):

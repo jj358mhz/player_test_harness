@@ -11,13 +11,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **New player (Phase 2a, part 1)** in TypeScript + Vite at `/player`:
   load bar (synced channel or pasted URL, hls.js version, DRM placeholder),
   video with six vitals, a five-minute event timeline, and tabs for Latency,
-  ABR, DRM & keys, Metadata, Manifest, Network and Log. The original player
-  stays at `/player/classic` until the new one covers everything.
+  ABR, DRM & keys, Metadata, Tracks, Manifest, Network and Log. It replaces
+  the original single-file player, which has been removed.
 - Latency is measured **at the playhead**: ID3 wallclock and PDT now account
   for the buffer, so they read lower and steadier than the classic player's
   download-time numbers. Bands (Awesome <10 s … Yuk >40 s) unchanged.
 - Renditions are labelled by **Uplynk ray** with fps/profile from
   `#UPLYNK-MEDIA0`; toggling rays re-signs the channel with `rays=`.
+- **SCTE-35 decoding** (splice_insert, time_signal, segmentation
+  descriptors) from ID3 PRIV and `#EXT-X-DATERANGE`, applied when the cue
+  reaches the playhead; ad breaks are shaded on the timeline. Uplynk
+  `#UPLYNK-SEGMENT` tags show the asset playing and its kind.
+- **Tracks tab:** audio and caption/subtitle switching (incl. CEA-608) with
+  live cue text, and an audio level meter that logs silence.
+- **Network tab:** request waterfall for the last 30 s; Manifest tab shows
+  the current media playlist and its container, window and sequence range.
 - **hls.js version menu** from npm: latest patch of the last three minor
   lines plus any custom version, loaded from jsDelivr. Dependabot bumps the
   default.

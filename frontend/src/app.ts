@@ -10,19 +10,34 @@ import {
 } from './api';
 import type {ChannelOption, PlayerConfig} from './config';
 import {DEFAULT_HLS_VERSION, HlsJsEngine, loadHlsJs} from './engines/hlsjs';
-import type {EngineEvents, PlayerEngine, Rendition} from './engines/types';
+import type {
+    AudioTrack,
+    EngineEvents,
+    MediaPlaylistInfo,
+    PlayerEngine,
+    Rendition,
+    RequestTiming,
+} from './engines/types';
 import {BANDS, bandFor} from './lib/bands';
 import {parsePriv, parseTxxx, toHex} from './lib/id3';
 import {Id3Clock} from './lib/latency';
 import {raysParam} from './lib/rays';
+import {decodeScte35, describeScte35, hexToBytes, type SpliceInfo} from './lib/scte35';
 import {RunningStats, Series} from './lib/stats';
-import {drawLatencyChart, drawTimeline, type TimelineEvent, type TimelineKind} from './ui/charts';
+import {
+    type AdBreak,
+    drawLatencyChart,
+    drawTimeline,
+    type TimelineEvent,
+    type TimelineKind,
+} from './ui/charts';
 import {clock, h, kbps, mbps, resLabel, secs} from './ui/dom';
 
 const WINDOW_MS = 5 * 60 * 1000;
 const LOG_LIMIT = 300;
 const CUSTOM = '__custom__';
 const PASTE = '__paste__';
+const WATERFALL_MS = 30 * 1000;
 
 type LogKind = TimelineKind | 'id3' | 'info';
 
@@ -60,6 +75,13 @@ class Session {
     id3Count = 0;
     scteCount = 0;
     lastSync = 0;
+    breaks: AdBreak[] = [];
+    lastScte: {info: SpliceInfo; at: Date; source: string} | null = null;
+    requests: RequestTiming[] = [];
+    playlist: MediaPlaylistInfo | null = null;
+    audio: {tracks: AudioTrack[]; current: number} = {tracks: [], current: -1};
+    asset: {assetId: string; kind: string} | null = null;
+    pending: number[] = []; // timers to cancel on reload
 }
 
 export class PlayerApp {
@@ -68,6 +90,7 @@ export class PlayerApp {
     private source: Source | null = null;
     private versions: EngineVersion[] = [];
     private disabledRays = new Set<string>();
+    private manifestView: 'master' | 'media' = 'master';
     private readonly video: HTMLVideoElement;
     private readonly refs: Record<string, HTMLElement> = {};
     private readonly svgs: Record<'chart' | 'timeline', SVGSVGElement>;
@@ -284,7 +307,6 @@ export class PlayerApp {
                 {class: 'pl-field pl-field--actions'},
                 h('button', {class: 'pl-btn-primary', type: 'submit'}, 'Load'),
             ),
-            h('a', {class: 'pl-classic', href: this.config.endpoints.classic}, 'Classic player'),
         );
     }
 
@@ -522,6 +544,12 @@ export class PlayerApp {
                 h('span', {class: 'pl-muted'}, 's'),
                 this.ref('target', h('span', {class: 'pl-muted'})),
             ),
+            h(
+                'label',
+                {class: 'pl-toggle'},
+                this.ref('returnJump', h('input', {type: 'checkbox', checked: true})),
+                'Jump to live when I come back to this tab, if drift is over the auto-sync limit',
+            ),
         );
     }
 
@@ -584,6 +612,7 @@ export class PlayerApp {
             'div',
             {},
             this.ref('metaKv', h('dl', {class: 'pl-kv'})),
+            this.ref('scteLast', h('div', {class: 'pl-scte', hidden: true})),
             this.ref('metaLog', h('div', {class: 'pl-log'})),
         );
     }
@@ -593,20 +622,177 @@ export class PlayerApp {
             'div',
             {},
             h(
-                'p',
-                {class: 'pl-muted'},
-                'Audio and caption track monitoring is being ported next. Until then, use the ',
-                h('a', {href: this.config.endpoints.classic}, 'classic player'),
-                '.',
+                'div',
+                {},
+                h('p', {class: 'pl-subhead'}, 'Audio'),
+                this.ref('audioTracks', h('div', {class: 'pl-row pl-row--flush'})),
+            ),
+            h(
+                'div',
+                {},
+                h('p', {class: 'pl-subhead'}, 'Captions and subtitles'),
+                this.ref('textTracks', h('div', {class: 'pl-row pl-row--flush'})),
+                this.ref('lastCue', h('p', {class: 'pl-cue', hidden: true})),
+            ),
+            this.ref('cueLog', h('div', {class: 'pl-log'})),
+            h(
+                'div',
+                {},
+                h('p', {class: 'pl-subhead'}, 'Audio levels'),
+                h(
+                    'div',
+                    {class: 'pl-row pl-row--flush'},
+                    this.ref(
+                        'meterStart',
+                        h(
+                            'button',
+                            {
+                                type: 'button',
+                                class: 'pl-btn-ghost',
+                                onclick: () => this.startMeter(),
+                            },
+                            'Start audio meter',
+                        ),
+                    ),
+                    h(
+                        'label',
+                        {class: 'pl-toggle'},
+                        this.ref(
+                            'meterListen',
+                            h('input', {type: 'checkbox', onchange: () => this.applyListen()}),
+                        ),
+                        'Listen',
+                    ),
+                ),
+                this.ref('meter', h('div', {class: 'pl-meter', hidden: true})),
+                h(
+                    'p',
+                    {class: 'pl-muted'},
+                    'The meter reads the decoded audio, so it works while you are not listening. It logs silence longer than 5 s.',
+                ),
             ),
         );
     }
 
+    // --------------------------------------------------------- audio meter
+
+    private meterState: {
+        ctx: AudioContext;
+        analysers: AnalyserNode[];
+        gain: GainNode;
+        silentSince: number | null;
+        reported: boolean;
+    } | null = null;
+
+    private startMeter(): void {
+        if (this.meterState) return;
+        const ctx = new AudioContext();
+        // A media element can feed only one source node, ever; keep it for the page's life.
+        const source = ctx.createMediaElementSource(this.video);
+        const splitter = ctx.createChannelSplitter(2);
+        const analysers = [ctx.createAnalyser(), ctx.createAnalyser()];
+        const gain = ctx.createGain();
+        source.connect(splitter);
+        analysers.forEach((a, i) => {
+            a.fftSize = 2048;
+            splitter.connect(a, i);
+        });
+        source.connect(gain).connect(ctx.destination);
+        this.meterState = {ctx, analysers, gain, silentSince: null, reported: false};
+        this.video.muted = false; // the element must output audio for the meter to see it
+        this.applyListen();
+        this.el<HTMLButtonElement>('meterStart').disabled = true;
+        this.el('meter').hidden = false;
+    }
+
+    private applyListen(): void {
+        const m = this.meterState;
+        if (!m) return;
+        m.gain.gain.value = this.el<HTMLInputElement>('meterListen').checked ? 1 : 0;
+        void m.ctx.resume();
+    }
+
+    private renderMeter(): void {
+        const m = this.meterState;
+        if (!m) return;
+        const buf = new Float32Array(2048);
+        const levels = m.analysers.map((a) => {
+            a.getFloatTimeDomainData(buf);
+            let sum = 0;
+            for (const v of buf) sum += v * v;
+            const rms = Math.sqrt(sum / buf.length);
+            return rms > 0 ? 20 * Math.log10(rms) : -Infinity;
+        });
+        this.el('meter').replaceChildren(
+            ...levels.map((db, i) => {
+                const pct = Number.isFinite(db)
+                    ? Math.max(0, Math.min(100, ((db + 60) / 60) * 100))
+                    : 0;
+                return h(
+                    'div',
+                    {class: 'pl-meter__row'},
+                    h('span', {}, i === 0 ? 'L' : 'R'),
+                    h(
+                        'span',
+                        {class: 'pl-meter__bar'},
+                        h('span', {class: 'pl-meter__fill', style: `width:${pct.toFixed(1)}%`}),
+                    ),
+                    h(
+                        'span',
+                        {class: 'num'},
+                        Number.isFinite(db) ? `${db.toFixed(1)} dBFS` : 'silent',
+                    ),
+                );
+            }),
+        );
+        const silent = !this.video.paused && levels.every((db) => !Number.isFinite(db) || db < -60);
+        const now = Date.now();
+        if (silent) {
+            m.silentSince ??= now;
+            if (!m.reported && now - m.silentSince > 5000) {
+                m.reported = true;
+                this.logEntry('err', 'AUDIO SILENT', 'both channels below -60 dBFS for over 5 s');
+                this.mark('err', 'Audio silent');
+            }
+        } else {
+            if (m.reported)
+                this.logEntry(
+                    'info',
+                    'AUDIO BACK',
+                    `audio after ${Math.round((now - (m.silentSince ?? now)) / 1000)} s of silence`,
+                );
+            m.silentSince = null;
+            m.reported = false;
+        }
+    }
+
     private buildManifestPanel(): HTMLElement {
+        const view = (key: 'master' | 'media', label: string) =>
+            h(
+                'button',
+                {
+                    type: 'button',
+                    'aria-pressed': String(key === 'master'),
+                    onclick: () => {
+                        this.manifestView = key;
+                        this.renderManifest();
+                    },
+                },
+                label,
+            );
         return h(
             'div',
             {},
             this.ref('manifestKv', h('dl', {class: 'pl-kv'})),
+            this.ref(
+                'manifestSeg',
+                h(
+                    'div',
+                    {class: 'pl-seg pl-seg--small', role: 'group', 'aria-label': 'Playlist'},
+                    view('master', 'Master'),
+                    view('media', 'Media playlist'),
+                ),
+            ),
             this.ref(
                 'manifestRaw',
                 h('pre', {class: 'pl-code'}, 'Load a stream to see its master playlist.'),
@@ -619,6 +805,12 @@ export class PlayerApp {
             'div',
             {},
             this.ref('netKv', h('dl', {class: 'pl-kv'})),
+            h(
+                'div',
+                {},
+                h('p', {class: 'pl-subhead'}, 'Requests, last 30 seconds'),
+                this.ref('waterfall', h('div', {class: 'pl-waterfall'})),
+            ),
             this.ref('netLog', h('div', {class: 'pl-log'})),
         );
     }
@@ -775,6 +967,7 @@ export class PlayerApp {
         this.clearNotices();
         this.engine?.destroy();
         this.engine = null;
+        for (const timer of this.session.pending) clearTimeout(timer);
         this.session = new Session();
         this.source = source;
         this.renderAll();
@@ -848,6 +1041,45 @@ export class PlayerApp {
             n.bytes += seg.bytes;
             n.last = seg;
         });
+        engine.on('audio', (audio) => {
+            s().audio = audio;
+            this.renderTracks();
+        });
+        engine.on('request', (req) => {
+            const list = s().requests;
+            list.push(req);
+            const cutoff = performance.now() - WATERFALL_MS * 2;
+            while (list.length && (list[0] as RequestTiming).end < cutoff) list.shift();
+        });
+        engine.on('playlist', (info) => {
+            s().playlist = info;
+            if (this.manifestView === 'media') this.renderManifest();
+        });
+        engine.on('asset', (asset) => {
+            const previous = s().asset;
+            s().asset = asset;
+            const ad = asset.kind === 'ad';
+            this.logEntry(
+                ad ? 'scte' : 'info',
+                ad ? 'AD ASSET' : 'ASSET',
+                `${asset.assetId} (${asset.kind})`,
+            );
+            if (ad && previous?.kind !== 'ad') this.openBreak('Uplynk ad', null);
+            if (!ad && previous?.kind === 'ad') this.closeBreak();
+        });
+        engine.on('daterange', (range) => {
+            if (range.scte35) {
+                const date = engine.playingDate();
+                const delay = date ? Math.max(0, range.start.getTime() - date.getTime()) : 0;
+                this.onScte35(hexToBytes(range.scte35), `DATERANGE ${range.attribute}`, delay);
+            } else {
+                this.logEntry(
+                    'info',
+                    'DATERANGE',
+                    `${range.id}${range.cls ? ` · ${range.cls}` : ''}`,
+                );
+            }
+        });
         engine.on('discontinuity', ({cc}) => {
             this.logEntry('disc', 'DISCONTINUITY', `sequence ${cc}`);
             this.mark('disc', `Discontinuity ${cc}`);
@@ -873,6 +1105,67 @@ export class PlayerApp {
         });
     }
 
+    private onScte35(bytes: Uint8Array, source: string, delayMs: number): void {
+        let info: SpliceInfo;
+        try {
+            info = decodeScte35(bytes);
+        } catch (err) {
+            this.logEntry(
+                'err',
+                'SCTE-35',
+                `${source} · could not decode: ${(err as Error).message} · ${toHex(bytes, 48)}`,
+                'meta',
+            );
+            return;
+        }
+        const session = this.session;
+        const act = () => {
+            if (this.session !== session) return; // stream was reloaded
+            session.scteCount += 1;
+            session.lastScte = {info, at: new Date(), source};
+            const text = describeScte35(info);
+            this.logEntry(
+                'scte',
+                info.direction === 'in'
+                    ? 'SCTE-35 IN'
+                    : info.direction === 'out'
+                      ? 'SCTE-35 OUT'
+                      : 'SCTE-35',
+                `${text} · ${source}`,
+                'meta',
+            );
+            this.mark('scte', text);
+            if (info.direction === 'out') this.openBreak(text, info.duration);
+            if (info.direction === 'in') this.closeBreak();
+            this.renderMeta();
+        };
+        if (delayMs > 50) session.pending.push(window.setTimeout(act, delayMs));
+        else act();
+    }
+
+    private openBreak(label: string, plannedSeconds: number | null): void {
+        const now = Date.now();
+        const breaks = this.session.breaks;
+        const open = breaks.find((b) => b.end === null);
+        if (open) return; // already in a break
+        breaks.push({start: now, end: null, planned: plannedSeconds, label});
+    }
+
+    /** Close breaks that ran past their planned duration without a cue-in. */
+    private expireBreaks(): void {
+        const now = Date.now();
+        for (const b of this.session.breaks) {
+            if (b.end === null && b.planned && now > b.start + b.planned * 1000 + 2000) {
+                b.end = b.start + b.planned * 1000;
+            }
+        }
+    }
+
+    private closeBreak(): void {
+        const open = this.session.breaks.find((b) => b.end === null);
+        if (open) open.end = Date.now();
+    }
+
     private onId3(mediaTime: number, frames: {id: string; data: Uint8Array}[]): void {
         const s = this.session;
         s.id3Count += 1;
@@ -889,14 +1182,9 @@ export class PlayerApp {
             } else if (frame.id === 'PRIV') {
                 const priv = parsePriv(frame.data);
                 if (priv.isScte35) {
-                    s.scteCount += 1;
-                    this.mark('scte', `SCTE-35 · ${priv.owner}`);
-                    this.logEntry(
-                        'scte',
-                        'SCTE-35',
-                        `${priv.owner} · ${toHex(priv.data, 48)}`,
-                        'meta',
-                    );
+                    // ID3 arrives when the segment downloads; act when it plays.
+                    const delay = Math.max(0, mediaTime - this.video.currentTime) * 1000;
+                    this.onScte35(priv.data, `ID3 PRIV ${priv.owner}`, delay);
                 } else {
                     this.logEntry(
                         'id3',
@@ -934,6 +1222,56 @@ export class PlayerApp {
         this.video.addEventListener('emptied', () => {
             started = false;
         });
+
+        // Captions/subtitles: hls.js adds TextTracks for subtitle playlists
+        // and in-band CEA-608/708, so watch the video element directly.
+        const tracks = this.video.textTracks;
+        const watch = (track: TextTrack) => {
+            track.addEventListener('cuechange', () => this.onCue(track));
+            this.renderTracks();
+        };
+        tracks.addEventListener('addtrack', (e) => {
+            if (e.track) watch(e.track);
+        });
+        tracks.addEventListener('removetrack', () => this.renderTracks());
+        tracks.addEventListener('change', () => this.renderTracks());
+
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState !== 'visible' || !this.engine) return;
+            if (!this.el<HTMLInputElement>('returnJump').checked) return;
+            const drift = this.engine.liveEdgeDrift();
+            const limit = Number(this.el<HTMLInputElement>('autosyncSecs').value) || 30;
+            if (drift !== null && drift > limit) {
+                this.engine.jumpToLive();
+                this.logEntry(
+                    'info',
+                    'TAB RETURN',
+                    `drift ${drift.toFixed(1)} s > ${limit} s · jumped to live`,
+                );
+            }
+        });
+    }
+
+    private onCue(track: TextTrack): void {
+        if (track.mode !== 'showing' && track.mode !== 'hidden') return;
+        if (!isCaptionTrack(track)) return;
+        const cue = track.activeCues?.[0] as VTTCue | undefined;
+        if (!cue?.text) return;
+        const text = cue.text
+            .replace(/<[^>]+>/g, '')
+            .replace(/\s+/g, ' ')
+            .trim();
+        const last = this.el('lastCue');
+        last.hidden = false;
+        last.textContent = `${track.label || track.language || 'track'}: ${text}`;
+        const row = h(
+            'div',
+            {},
+            h('time', {}, clock(new Date())),
+            h('b', {class: 't-info'}, track.language || track.kind),
+            h('span', {class: 'pl-log__text'}, text),
+        );
+        prependCapped(this.el('cueLog'), row, 100);
     }
 
     // ----------------------------------------------------------------- tick
@@ -942,16 +1280,19 @@ export class PlayerApp {
         const engine = this.engine;
         if (engine && !this.video.paused) this.measure(engine);
         this.renderVitals();
+        this.renderMeter();
         this.renderLatency();
         this.renderAbrKv();
         this.renderKeys();
         this.renderMeta();
         this.renderNetwork();
         this.renderStatus();
+        this.expireBreaks();
         drawTimeline(
             this.svgs.timeline,
             this.session.series.points,
             this.session.timeline,
+            this.session.breaks,
             WINDOW_MS,
         );
         drawLatencyChart(this.svgs.chart, this.session.series.points, WINDOW_MS);
@@ -1003,6 +1344,9 @@ export class PlayerApp {
         this.el('keysLog').replaceChildren();
         this.el('metaLog').replaceChildren();
         this.el('netLog').replaceChildren();
+        this.el('cueLog').replaceChildren();
+        this.el('lastCue').hidden = true;
+        this.renderTracks();
         this.renderLadder();
         this.renderManifest();
         this.tick();
@@ -1247,16 +1591,106 @@ export class PlayerApp {
 
     private renderMeta(): void {
         const s = this.session;
+        const open = s.breaks.find((b) => b.end === null);
         kv(this.el('metaKv'), [
             ['ID3 samples', String(s.id3Count)],
-            ['SCTE-35', String(s.scteCount)],
+            ['SCTE-35 cues', String(s.scteCount)],
+            [
+                'Ad break',
+                open ? `in progress · ${Math.round((Date.now() - open.start) / 1000)} s` : 'no',
+            ],
+            ['Asset', s.asset ? `${s.asset.kind} · ${s.asset.assetId}` : '--'],
         ]);
+        const last = this.el('scteLast');
+        last.hidden = !s.lastScte;
+        if (s.lastScte) {
+            const {info, at, source} = s.lastScte;
+            last.replaceChildren(
+                h('p', {class: 'pl-subhead'}, `Last SCTE-35 · ${clock(at)} · ${source}`),
+                h('pre', {class: 'pl-code'}, scteDetails(info)),
+            );
+        }
         this.el('count-meta').textContent = s.id3Count ? String(s.id3Count) : '';
+    }
+
+    private renderTracks(): void {
+        const {tracks, current} = this.session.audio;
+        const audio = this.el('audioTracks');
+        audio.replaceChildren(
+            ...(tracks.length
+                ? tracks.map((t) =>
+                      h(
+                          'button',
+                          {
+                              type: 'button',
+                              class: 'pl-btn-ghost',
+                              'aria-pressed': String(t.id === current),
+                              onclick: () => this.engine?.setAudioTrack(t.id),
+                          },
+                          `${t.name || 'audio'}${t.lang ? ` (${t.lang})` : ''}${t.isDefault ? ' · default' : ''}`,
+                      ),
+                  )
+                : [
+                      h(
+                          'span',
+                          {class: 'pl-muted'},
+                          this.engine
+                              ? 'One audio track (muxed or default only).'
+                              : 'Load a stream to see its tracks.',
+                      ),
+                  ]),
+        );
+
+        const text = [...this.video.textTracks].filter(isCaptionTrack);
+        const showing = text.find((t) => t.mode === 'showing');
+        const choose = (track: TextTrack | null) => {
+            for (const t of text) t.mode = t === track ? 'showing' : 'disabled';
+            this.renderTracks();
+        };
+        this.el('textTracks').replaceChildren(
+            ...(text.length
+                ? [
+                      h(
+                          'button',
+                          {
+                              type: 'button',
+                              class: 'pl-btn-ghost',
+                              'aria-pressed': String(!showing),
+                              onclick: () => choose(null),
+                          },
+                          'Off',
+                      ),
+                      ...text.map((t) =>
+                          h(
+                              'button',
+                              {
+                                  type: 'button',
+                                  class: 'pl-btn-ghost',
+                                  'aria-pressed': String(t === showing),
+                                  onclick: () => choose(t),
+                              },
+                              `${t.label || t.kind}${t.language ? ` (${t.language})` : ''}`,
+                          ),
+                      ),
+                  ]
+                : [
+                      h(
+                          'span',
+                          {class: 'pl-muted'},
+                          this.engine
+                              ? 'No caption or subtitle tracks found yet.'
+                              : 'Load a stream to see its tracks.',
+                      ),
+                  ]),
+        );
+        this.el('count-tracks').textContent =
+            tracks.length + text.length ? String(tracks.length + text.length) : '';
     }
 
     private renderManifest(): void {
         const s = this.session;
         const rays = s.renditions.map((r) => r.ray).filter(Boolean) as string[];
+        const pl = s.playlist;
         kv(this.el('manifestKv'), [
             ['Type', this.engine ? (s.live ? 'Live' : 'VOD') : '--'],
             [
@@ -1265,8 +1699,33 @@ export class PlayerApp {
                     ? `${s.renditions.length}${rays.length ? ` · rays ${rayRange(rays)}` : ''}`
                     : '--',
             ],
+            ['Container', pl ? pl.container : '--'],
+            ['Target duration', pl ? `${pl.targetDuration} s` : '--'],
+            ['Window', pl ? `${Math.round(pl.windowSeconds)} s · ${pl.segments} segments` : '--'],
+            [
+                'Media sequence',
+                pl ? `${pl.firstSn.toLocaleString()} – ${pl.lastSn.toLocaleString()}` : '--',
+            ],
+            ['Program date-time', pl ? (pl.hasProgramDateTime ? 'yes' : 'no') : '--'],
+            ['Playlist ray', pl?.ray ?? '--'],
         ]);
-        this.el('manifestRaw').textContent = s.master
+        const seg = this.el('manifestSeg');
+        for (const b of seg.querySelectorAll('button')) {
+            b.setAttribute(
+                'aria-pressed',
+                String((b.textContent === 'Master') === (this.manifestView === 'master')),
+            );
+        }
+        const raw = this.el('manifestRaw');
+        if (this.manifestView === 'media') {
+            raw.textContent = pl?.text
+                ? redactSignatures(pl.text)
+                : this.engine
+                  ? 'Waiting for a media playlist…'
+                  : 'Load a stream to see its media playlist.';
+            return;
+        }
+        raw.textContent = s.master
             ? redactSignatures(s.master)
             : this.engine
               ? 'Master playlist text is not available from this engine.'
@@ -1285,6 +1744,56 @@ export class PlayerApp {
         dot.textContent = '';
         dot.className = this.session.errors ? 'pl-tab__dot' : 'pl-tab__count';
         dot.title = this.session.errors ? `${this.session.errors} errors` : '';
+        this.renderWaterfall();
+    }
+
+    private renderWaterfall(): void {
+        const now = performance.now();
+        const from = now - WATERFALL_MS;
+        const target = (this.session.playlist?.targetDuration ?? 6) * 1000;
+        const rows = this.session.requests.filter((r) => r.end >= from).slice(-40);
+        const pct = (t: number) => Math.max(0, ((t - from) / WATERFALL_MS) * 100);
+        this.el('waterfall').replaceChildren(
+            ...(rows.length
+                ? rows.map((r) => {
+                      const ms = Math.round(r.end - r.start);
+                      const state = r.failed
+                          ? 'err'
+                          : r.kind === 'segment' && ms > target * 0.5
+                            ? 'slow'
+                            : r.kind;
+                      return h(
+                          'div',
+                          {
+                              class: 'pl-wf',
+                              title: `${r.name} · ${r.status ?? ''} · ${ms} ms · ${(r.bytes / 1024).toFixed(0)} KB`,
+                          },
+                          h('span', {class: 'pl-wf__name'}, r.name),
+                          h(
+                              'span',
+                              {class: 'pl-wf__track'},
+                              h('span', {
+                                  class: `pl-wf__bar pl-wf--${state}`,
+                                  style: `left:${pct(r.start).toFixed(2)}%;width:${Math.max(0.4, pct(r.end) - pct(r.start)).toFixed(2)}%`,
+                              }),
+                          ),
+                          h(
+                              'span',
+                              {class: 'pl-wf__ms'},
+                              r.failed ? String(r.status ?? 'ERR') : `${ms} ms`,
+                          ),
+                      );
+                  })
+                : [
+                      h(
+                          'p',
+                          {class: 'pl-muted'},
+                          this.engine
+                              ? 'Waiting for requests…'
+                              : 'Load a stream to see its requests.',
+                      ),
+                  ]),
+        );
     }
 
     private renderStatus(): void {
@@ -1363,6 +1872,32 @@ export class PlayerApp {
 }
 
 // ------------------------------------------------------------------ helpers
+
+function isCaptionTrack(track: TextTrack): boolean {
+    return track.kind === 'captions' || track.kind === 'subtitles';
+}
+
+function scteDetails(info: SpliceInfo): string {
+    const lines = [`command        ${info.command}`];
+    if (info.eventId !== undefined) lines.push(`event id       ${info.eventId}`);
+    if (info.outOfNetwork !== undefined) lines.push(`out of network ${info.outOfNetwork}`);
+    if (info.spliceTime != null) lines.push(`splice time    ${info.spliceTime.toFixed(3)} s (pts)`);
+    if (info.breakDuration != null)
+        lines.push(
+            `break duration ${info.breakDuration.toFixed(3)} s${info.autoReturn ? ' · auto return' : ''}`,
+        );
+    for (const seg of info.segmentations) {
+        lines.push(
+            `segmentation   ${seg.typeName} (0x${seg.typeId.toString(16)}) · event ${seg.eventId}`,
+            ...(seg.duration ? [`  duration     ${seg.duration.toFixed(3)} s`] : []),
+            ...(seg.upid
+                ? [`  upid         type 0x${seg.upidType.toString(16)} · ${seg.upid}`]
+                : []),
+            `  segment      ${seg.segmentNum} of ${seg.segmentsExpected}`,
+        );
+    }
+    return lines.join('\n');
+}
 
 function kv(el: HTMLElement, rows: [string, string][]): void {
     el.replaceChildren(

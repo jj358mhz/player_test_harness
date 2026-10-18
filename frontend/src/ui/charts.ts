@@ -99,10 +99,18 @@ export interface TimelineEvent {
     label: string;
 }
 
+export interface AdBreak {
+    start: number; // ms since epoch
+    end: number | null;
+    planned: number | null; // seconds
+    label: string;
+}
+
 export function drawTimeline(
     el: SVGSVGElement,
     latency: Point[],
     events: TimelineEvent[],
+    breaks: AdBreak[],
     windowMs: number,
 ): void {
     el.textContent = '';
@@ -112,6 +120,34 @@ export function drawTimeline(
     el.setAttribute('preserveAspectRatio', 'none');
     const now = Date.now();
     const x = (t: number) => (1 - (now - t) / windowMs) * W;
+
+    for (const b of breaks) {
+        const x1 = Math.max(0, x(b.start));
+        const x2 = Math.min(W, x(b.end ?? now));
+        if (x2 <= 0) continue;
+        const rect = svg(
+            'rect',
+            {
+                x: x1,
+                y: 0,
+                width: Math.max(2, x2 - x1),
+                height: H,
+                fill: 'var(--scte)',
+                'fill-opacity': 0.14,
+            },
+            el,
+        );
+        svg('title', {}, rect).textContent = `Ad break · ${b.label}`;
+        if (x2 - x1 > 60) {
+            const seconds = Math.round(((b.end ?? now) - b.start) / 1000);
+            svg(
+                'text',
+                {x: x1 + 6, y: 11, class: 'chart-label chart-label--scte'},
+                el,
+            ).textContent =
+                `Ad break · ${seconds}${b.planned ? ` of ${Math.round(b.planned)}` : ''} s`;
+        }
+    }
 
     if (latency.length > 1) {
         const vs = latency.map((p) => p.v);

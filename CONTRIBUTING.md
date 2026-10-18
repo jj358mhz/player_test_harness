@@ -91,57 +91,29 @@ Links to test streams (if applicable).
    git checkout -b feature/your-feature-name
 ```
 
-3. **Open the file**
+3. **Build and run**
 ```bash
-   # Edit app/player/hls-id3-player.html
-   open app/player/hls-id3-player.html
+   uv sync
+   npm --prefix frontend ci
+   npm --prefix frontend run dev        # rebuilds the player into app/static/player on change
+   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
 ```
 
 ### Development Guidelines
 
 #### Code Style
 
-- Use ES6+ JavaScript
-- 4-space indentation
-- Clear variable names
-- Comment complex logic
-- Follow existing patterns
-
-#### Example:
-```javascript
-// Good
-function updateLatencyStats(latencyMs) {
-    latencyData.current = latencyMs;
-    latencyData.samples.push(latencyMs);
-    
-    // Calculate average
-    const avg = latencyData.samples.reduce((a, b) => a + b, 0) / latencyData.samples.length;
-}
-
-// Avoid
-function f(x) {
-    return x.reduce((a, b) => a + b) / x.length;
-}
-```
-
-#### Performance Considerations
-
-- Cache DOM elements
-- Throttle expensive operations
-- Use batch updates
-- Prefer `requestAnimationFrame` for animations
-```javascript
-// Good - cached and throttled
-const domCache = { element: document.getElementById('foo') };
-const updateElement = throttle(() => {
-    domCache.element.textContent = 'bar';
-}, 100);
-
-// Avoid - repeated lookups
-setInterval(() => {
-    document.getElementById('foo').textContent = 'bar';
-}, 16);
-```
+- **Python:** ruff (`uv run ruff check . && uv run ruff format .`).
+- **Player:** strict TypeScript in `frontend/src`, formatted and linted by
+  Biome (`npx biome check --write .` in `frontend/`): 4-space indentation,
+  single quotes, 100 columns.
+- Keep measurement and parsing logic in `frontend/src/lib/` as pure
+  functions with Vitest tests; `app.ts` wires them to the page.
+- Engine-specific code goes in an adapter under `frontend/src/engines/`
+  behind the `PlayerEngine` interface, so the UI never touches hls.js
+  (or later Shaka/dash.js) directly.
+- Clear names, comments for the non-obvious (Uplynk conventions, spec
+  details), and follow existing patterns.
 
 #### Testing Your Changes
 

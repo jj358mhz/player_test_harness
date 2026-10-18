@@ -39,8 +39,8 @@ npm --prefix frontend run build      # → app/static/player (gitignored); `run 
 npm --prefix frontend run lint && npm --prefix frontend run typecheck && npm --prefix frontend test
 ```
 
-Without a build, `/player` says "Player not built" and links to
-`/player/classic`; the Python tests don't need Node. Biome is the TS
+Without a build, `/player` says "Player not built"; the Python tests don't
+need Node. Biome is the TS
 linter/formatter (4-space, single quotes, 100 cols) — run `npx biome check
 --write .` in `frontend/` before committing.
 
@@ -64,8 +64,7 @@ after dependency changes.
   - `sync.py` — channels → DB upsert; deactivates missing, keeps favorites.
 - `app/api/service.py` — validates playback requests, signs/Preplays,
   writes `PlaybackEvent`. Both the JSON API and `/channels/<id>/play` use it.
-- `app/main/` — pages: channels dashboard, `/player`, `/player/classic`,
-  `/sign`, `/activity`. `/player` renders `main/player.html` with a JSON
+- `app/main/` — pages: channels dashboard, `/player`, `/sign`, `/activity`. `/player` renders `main/player.html` with a JSON
   config (channels, endpoints; never keys) and the Vite assets found by
   `app/vite.py`. `/channels/<id>/play` → `/player?channel=<id>`.
 - `app/engines.py` — engine version menu from npm (latest patch of the last
@@ -77,11 +76,10 @@ after dependency changes.
     dependency gives types and `DEFAULT_HLS_VERSION`.
   - `lib/` — pure, unit-tested: `latency.ts` (ID3 latency at the playhead),
     `id3.ts`, `rays.ts` (ray from URI, `#UPLYNK-MEDIA0`, `rays=`),
+    `scte35.ts` (splice_insert, time_signal, segmentation descriptors),
     `bands.ts`, `stats.ts`.
+  - Feature reference for users: `docs/player.md`.
 - `app/admin/` — Uplynk account CRUD + sync (admin-only).
-- `app/player/hls-id3-player.html` — the original player, served at
-  `/player/classic` until the new one reaches parity (Tracks tab, SCTE-35
-  decode, caption/audio monitors, HTTP waterfall), then deleted.
 
 ## Uplynk facts we rely on
 
@@ -120,26 +118,18 @@ in the `player_harness_data` volume.
 - [x] Phase 1 — backend: accounts, channel sync, signing + Preplay API,
       dashboard, Pi deploy, CI *(PR #1; live at player.telcomjj.com
       2026-10-17, login verified)*
-- [ ] Phase 2a — player rewrite (decided 2026-10-17). **2a-1 done**
-      (PR "Phase 2a part 1"): toolchain, Docker/CI, version menu, load bar,
-      vitals, timeline, Latency/ABR/DRM & keys/Metadata/Manifest/Network/Log
-      tabs. **2a-2 next**: Tracks (audio + captions), SCTE-35 decode and ad
-      breaks on the timeline, request waterfall, then delete the classic
-      player. Plan: TypeScript + Vite
-      (Node stage in the Dockerfile, typecheck/tests in CI), server-only
-      (drop the open-from-disk requirement), video-first layout: load bar,
-      pinned video + six vitals, 5-minute event timeline, tabbed inspector
-      (Latency, ABR, DRM & keys, Metadata, Tracks, Manifest, Network, Log).
-      Latency tab keeps the Current/Average/Max/Min tiles (running since
-      load, min/max timestamps) coloured by today's bands: Awesome <10 s,
-      Good 10–19, Average 19–25, Above avg 25–40, Yuk >40.
-      Renditions labelled by ray letter everywhere; ladder toggles build a
-      `rays=` param to re-sign with. Mockup approved before code.
-      Engine versions: the server reads npm (cached ~24 h) and offers the
-      latest patch of the last 3 minor lines (e.g. 1.7.3 · 1.6.19 · 1.5.20)
-      plus a Custom… exact version; loaded from jsDelivr. The default is the
-      npm-pinned dependency, bumped by Dependabot PRs. No pre-releases.
-- [ ] Phase 2 — multi-player: `PlayerAdapter` interface (hls.js, Shaka, dash.js, native);
+- [x] Phase 2a — player rewrite (2026-10-17): TypeScript + Vite,
+      server-only, video-first layout (load bar, video + six vitals,
+      5-minute timeline with ad-break shading, tabs: Latency, ABR, DRM &
+      keys, Metadata, Tracks, Manifest, Network, Log). Latency at the
+      playhead; Current/Avg/Max/Min tiles with the original bands. Rays
+      everywhere with `rays=` re-sign. SCTE-35 decode (ID3 PRIV and
+      DATERANGE) acted on at playback time; `#UPLYNK-SEGMENT` asset kind.
+      Tracks with CEA-608 cues and an audio meter; request waterfall.
+      Engine versions: npm latest patch of the last 3 minors + Custom,
+      loaded from jsDelivr; default pinned in npm, bumped by Dependabot.
+      Classic player deleted.
+- [ ] Phase 2 — multi-player: more `PlayerEngine` adapters (Shaka, dash.js, native);
       per-engine latency source (ID3 wallclock for HLS; emsg/prft/UTCTiming
       for DASH). Presets move into the DB.
 - [ ] Phase 3 — DRM playback from Preplay `drm` config; DRM panel (key
