@@ -226,3 +226,42 @@ describe('chart scale', async () => {
         expect(niceStep(Number.POSITIVE_INFINITY)).toBe(5);
     });
 });
+
+describe('videoProfile', async () => {
+    const {videoProfile} = await import('../src/lib/codecs');
+    it.each([
+        ['avc1.64001f', 'high-31'],
+        ['avc1.640028,mp4a.40.5', 'high-40'],
+        ['mp4a.40.5,avc1.4d001e', 'main-30'],
+        ['avc1.42000b', 'baseline-11'],
+        ['hvc1.2.4.L123.B0', 'hevc'],
+        ['mp4a.40.2', null],
+    ])('%s → %s', (codecs, expected) => {
+        expect(videoProfile(codecs)).toBe(expected);
+    });
+});
+
+describe('mpdInfo', async () => {
+    const {mpdInfo, isoSeconds} = await import('../src/engines/shaka');
+    const {redactSignatures} = await import('../src/app');
+    const mpd = `<MPD type="dynamic" availabilityStartTime="2026-10-18T06:14:03Z" maxSegmentDuration="PT2.048S" minimumUpdatePeriod="PT8.000S" timeShiftBufferDepth="PT1M30S" profiles="urn:mpeg:dash:profile:isoff-live:2011">
+<Period id="0"><AssetIdentifier schemeIdUri="urn:com:uplynk:ad-asset-id" value="x"/><AdaptationSet mimeType="video/mp4"/></Period>
+<Period id="1"><AdaptationSet mimeType="video/mp4"/></Period>
+<BaseURL>https://cdn.example.com/a/?pbs=abc&amp;sig=def</BaseURL></MPD>`;
+
+    it('reads the MPD root and periods', () => {
+        const info = mpdInfo(mpd);
+        expect(info.format).toBe('dash');
+        expect(info.live).toBe(true);
+        expect(info.targetDuration).toBeCloseTo(2.048);
+        expect(info.windowSeconds).toBe(90);
+        expect(info.container).toBe('fMP4');
+        expect(info.dash).toMatchObject({updatePeriod: 8, periods: 2, adPeriods: 1});
+    });
+
+    it('parses ISO durations and hides MPD signatures', () => {
+        expect(isoSeconds('PT1H2M3.5S')).toBeCloseTo(3723.5);
+        expect(isoSeconds('bogus')).toBeNull();
+        expect(redactSignatures(mpd)).toContain('?pbs=…&amp;sig=…<');
+    });
+});

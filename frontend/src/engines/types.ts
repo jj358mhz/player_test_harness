@@ -35,6 +35,7 @@ export interface RequestTiming {
 }
 
 export interface MediaPlaylistInfo {
+    format?: 'hls' | 'dash';
     ray: string | null;
     live: boolean;
     targetDuration: number;
@@ -46,6 +47,14 @@ export interface MediaPlaylistInfo {
     container: 'TS' | 'fMP4' | 'unknown';
     /** Raw text when the engine exposes it (signatures still present). */
     text: string | null;
+    /** DASH-only facts from the MPD root and Periods. */
+    dash?: {
+        updatePeriod: number | null;
+        availabilityStart: string | null;
+        periods: number;
+        adPeriods: number;
+        profiles: string | null;
+    };
 }
 
 export interface DrmConfig {

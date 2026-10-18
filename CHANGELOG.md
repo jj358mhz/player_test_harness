@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.2.1] - 2026-10-17
+
+### Fixed
+- **DASH ray ladder** shows Uplynk-style profiles (`high-31`, `main-13`)
+  from the codec instead of a truncated codec string; HLS falls back to the
+  same when `#UPLYNK-MEDIA0` is missing.
+- **Last segment / waterfall** under DASH: audio segments are labelled
+  `audio` instead of `ray ?`, and video segments carry their ray (from the
+  Representation id; Uplynk DASH segments end in `.m4f`).
+- **Manifest tab under DASH** shows the MPD's facts — container, max segment
+  duration, time-shift window, update period, periods (ad periods counted),
+  availability start — and the latest MPD text with signatures hidden,
+  instead of empty HLS fields and "Waiting for a media playlist".
+
 ## [3.2.0] - 2026-10-17
 
 ### Added
