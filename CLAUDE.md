@@ -21,6 +21,13 @@ repo owner), reached over LAN/VPN only. Sister project and template:
   in `app/uplynk/playback.py`. Don't add endpoints that return keys.
 - **Never store signatures.** `playback_events` keeps the base URL and
   params only.
+- **Every PR bumps the version and the CHANGELOG** (same as CSL): patch for
+  fixes, minor for features, major for breaking changes. Version lives in
+  `pyproject.toml` (and `uv.lock`); add a `## [x.y.z] - YYYY-MM-DD` section.
+  After merging, tag the merge commit `vX.Y.Z` (annotated, message
+  `vX.Y.Z — <summary>`), push the tag (it redeploys, so the header shows
+  the clean version), and `gh release create` with that CHANGELOG section
+  plus a **Full Changelog** compare link.
 - Commits are authored as `jj358mhz@gmail.com`. Don't touch the old GitLab
   remote (`gitlab`, branch `gitlab-main` locally) — it's kept as-is.
 
