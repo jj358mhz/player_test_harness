@@ -90,7 +90,8 @@ in the `player_harness_data` volume.
 
 - [x] Phase 0 — public GitHub repo, fresh history, scrubbed data
 - [x] Phase 1 — backend: accounts, channel sync, signing + Preplay API,
-      dashboard, Pi deploy, CI *(branch `feat/phase-1-backend`)*
+      dashboard, Pi deploy, CI *(PR #1; live at player.telcomjj.com
+      2026-10-17, login verified)*
 - [ ] Phase 2 — multi-player: split the player into ES modules (no build
       step), `PlayerAdapter` interface (hls.js, Shaka, dash.js, native);
       per-engine latency source (ID3 wallclock for HLS; emsg/prft/UTCTiming
@@ -101,3 +102,12 @@ in the `player_harness_data` volume.
       setting), side-by-side compare, LL-HLS part/blocking-reload metrics,
       CMCD toggle, request waterfall, deep links, CSL cross-link via slicer_id
 - [ ] Periodic background channel sync (for now: UI, CLI, or host cron)
+
+### Todo
+
+- [x] Own app icon (pink play tile in `app/static/favicons/`, SVG data URI
+      in the player) — was the 📺 emoji, showed CSL's icon in the browser
+- [ ] Verify against a real workspace: account Sync, ▶ Play HLS, DASH and
+      Preplay URLs
+- [ ] Merge PR #2 (bootstrap race between workers, gunicorn control socket)
+- [ ] Port PR #2 fixes and the Dockerfile `LABEL` (deploy image prune) to CSL
