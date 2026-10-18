@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+{% block title_suffix %} — Sign URL{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Sign a playback URL</h1>
+</div>
+
+{% if not accounts %}
+<div class="card">
+    <p class="muted">Add an Uplynk account first — its API key signs the token.</p>
+</div>
+{% else %}
+<div class="card">
+    <form id="sign-form" novalidate>
+        {% if channel %}
+        <input type="hidden" name="channel_id" value="{{ channel.id }}">
+        <div class="field">
+            <label>Channel</label>
+            <div><strong>{{ channel.display_name }}</strong>
+                <span class="muted">· {{ channel.uplynk_account.label }} ·</span>
+                <span class="mono">{{ channel.channel_id }}</span>
+                <a href="{{ url_for('main.sign_tool') }}" class="muted">(sign something else)</a>
+            </div>
+        </div>
+        {% else %}
+        <div class="field-row">
+            <div class="field">
+                <label for="account_id">Account</label>
+                <select id="account_id" name="account_id" class="input">
+                    {% for acct in accounts %}<option value="{{ acct.id }}">{{ acct.label }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="field">
+                <label for="content_type">Content type</label>
+                <select id="content_type" name="content_type" class="input">
+                    {% for code, name in content_types.items() %}
+                    <option value="{{ code }}" {% if code == 'c' %}selected{% endif %}>{{ name|capitalize }} ({{ code }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div class="field-row">
+            <div class="field">
+                <label for="content_id">Content ID (GUID)</label>
+                <input id="content_id" name="content_id" class="input mono" autocomplete="off">
+            </div>
+            <div class="field">
+                <label for="external_id">…or External ID</label>
+                <input id="external_id" name="external_id" class="input mono" autocomplete="off">
+                <p class="field__help">Uses the account's workspace ID as the owner.</p>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="field-row">
+            <div class="field">
+                <label for="mode">Mode</label>
+                <select id="mode" name="mode" class="input">
+                    <option value="url">Signed manifest URL</option>
+                    <option value="preplay">Preplay v2 session</option>
+                </select>
+            </div>
+            <div class="field">
+                <label for="manifest">Manifest</label>
+                <select id="manifest" name="manifest" class="input">
+                    <option value="m3u8">HLS (.m3u8)</option>
+                    <option value="mpd">DASH (.mpd)</option>
+                </select>
+            </div>
+            <div class="field">
+                <label for="drm">DRM (Preplay only)</label>
+                <select id="drm" name="drm" class="input">
+                    <option value="">None</option>
+                    <option value="wv">Widevine (DASH)</option>
+                    <option value="pr">PlayReady (DASH)</option>
+                    <option value="fps">FairPlay (HLS)</option>
+                </select>
+            </div>
+            <div class="field">
+                <label for="ttl_seconds">Token lifetime (s)</label>
+                <input id="ttl_seconds" name="ttl_seconds" type="number" min="10" class="input"
+                       placeholder="{{ config.PLAYBACK_TOKEN_TTL }}">
+            </div>
+        </div>
+
+        <div class="field">
+            <label for="params">Extra query params</label>
+            <textarea id="params" name="params" class="input params-input"
+                      placeholder="one per line, e.g.&#10;rays=dcba&#10;delay=10"></textarea>
+            <p class="field__help">Signed along with the token. See Uplynk's
+                <a href="https://docs.uplynk.com/docs/customize-playback-via-parameters" target="_blank"
+                   rel="noopener noreferrer">playback parameters</a>.</p>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="button button--primary">Sign</button>
+        </div>
+    </form>
+
+    <div id="sign-result" class="sign-result" hidden>
+        <div class="field">
+            <label for="result-url">Playback URL <span id="result-expiry" class="muted"></span></label>
+            <textarea id="result-url" class="input sign-result__url" readonly></textarea>
+        </div>
+        <div class="form-actions">
+            <button type="button" id="copy-url" class="btn-ghost">Copy</button>
+            <a id="open-player" class="button button--primary" href="#" hidden>▶ Open in player</a>
+        </div>
+        <div id="preplay-details" hidden>
+            <h3>Preplay response</h3>
+            <pre id="preplay-json" class="mono"></pre>
+        </div>
+    </div>
+    <p id="sign-error" class="flash flash--error" hidden></p>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+<script>
+    (function () {
+        const form = document.getElementById('sign-form');
+        if (!form) return;
+        const out = document.getElementById('sign-result');
+        const errorEl = document.getElementById('sign-error');
+        const drm = form.elements.drm;
+        const mode = form.elements.mode;
+        const manifest = form.elements.manifest;
+
+        // Keep DRM, mode and manifest consistent: DRM needs Preplay and a fixed manifest.
+        drm.addEventListener('change', () => {
+            if (!drm.value) return;
+            mode.value = 'preplay';
+            manifest.value = drm.value === 'fps' ? 'm3u8' : 'mpd';
+        });
+
+        function parseParams(text) {
+            const params = {};
+            text.split('\n').map(l => l.trim()).filter(Boolean).forEach(line => {
+                const i = line.indexOf('=');
+                if (i > 0) params[line.slice(0, i).trim()] = line.slice(i + 1).trim();
+            });
+            return params;
+        }
+
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            errorEl.hidden = true;
+            const f = form.elements;
+            const body = {
+                mode: f.mode.value,
+                manifest: f.manifest.value,
+                drm: f.drm.value || null,
+                ttl_seconds: f.ttl_seconds.value || null,
+                params: parseParams(f.params.value),
+            };
+            if (f.channel_id) {
+                body.channel_id = f.channel_id.value;
+            } else {
+                Object.assign(body, {
+                    account_id: f.account_id.value,
+                    content_type: f.content_type.value,
+                    content_id: f.content_id.value,
+                    external_id: f.external_id.value,
+                });
+            }
+            try {
+                const data = await requestPlayback(body);
+                document.getElementById('result-url').value = data.url;
+                document.getElementById('result-expiry').textContent =
+                    `· token expires ${new Date(data.expires_at).toLocaleString()}`;
+                const open = document.getElementById('open-player');
+                // The built-in player is hls.js only until the multi-player work lands.
+                open.hidden = !(data.manifest === 'm3u8' && !data.drm);
+                open.href = `{{ url_for('main.player') }}?src=${encodeURIComponent(data.url)}`;
+                const details = document.getElementById('preplay-details');
+                details.hidden = data.mode !== 'preplay';
+                document.getElementById('preplay-json').textContent =
+                    JSON.stringify({prefix: data.prefix, sid: data.sid, drm: data.drm_config}, null, 2);
+                out.hidden = false;
+            } catch (err) {
+                out.hidden = true;
+                errorEl.textContent = err.message;
+                errorEl.hidden = false;
+            }
+        });
+
+        document.getElementById('copy-url').addEventListener('click', async (event) => {
+            await navigator.clipboard.writeText(document.getElementById('result-url').value);
+            flashButton(event.target, 'Copied ✓');
+        });
+    })();
+</script>
+{% endblock %}

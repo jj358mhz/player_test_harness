@@ -1,438 +1,252 @@
-# 📺 Uplynk HLS.js - Advanced Latency Monitor
+# 📺 player-test-harness
 
-A comprehensive, browser-based monitoring tool for HLS (HTTP Live Streaming) streams with advanced metrics, ID3 metadata parsing, DRM detection, and real-time performance analytics.
-
-![Version](https://img.shields.io/badge/version-2.1.0-blue.svg)
-![HLS.js](https://img.shields.io/badge/hls.js-1.6.16-green.svg)
+[![Release](https://img.shields.io/github/v/release/jj358mhz/player_test_harness?label=release&color=ec1e79)](https://github.com/jj358mhz/player_test_harness/releases/latest)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 
-## ✨ Features
-
-### Core Monitoring
-- **Real-time Latency Tracking** - Monitor stream latency with wall-clock timestamps from ID3 metadata
-- **Live Edge Drift Detection** - Track and visualize drift from the live edge with auto-sync capabilities
-- **Performance Metrics** - Buffer levels, dropped frames, rebuffer counts, segment load times
-- **HTTP Status Monitoring** - Track all network requests with detailed success/error rates
-
-### Advanced Features
-- **ID3 Metadata Parser** - Parse and display all ID3 frames including SCTE-35 markers
-- **DRM/Encryption Monitor** - Support for Widevine, PlayReady, FairPlay with key rotation tracking
-- **CMAF Detection** - Automatic detection of CMAF, fMP4, and MPEG-TS formats
-- **ABR Bandwidth Monitor** - Track bandwidth estimates and quality switching decisions
-- **Audio Track Monitor** - Multi-audio track support with real-time level monitoring via Web Audio API
-- **Caption/Subtitle Monitor** - WebVTT and CEA-608/708 caption tracking and history
-- **Program Date Time** - Compare PDT-based latency with ID3-based measurements
-- **Manifest Viewer** - Raw and parsed views of master and media playlists
-
-### User Experience
-- **HLS.js Version Selector** - Switch between HLS.js versions (1.6.14-1.6.16) with hot reload
-- **Tab Visibility Warnings** - Detect and warn about drift when tab is hidden
-- **Auto-Jump to Live** - Configurable auto-sync when drift exceeds threshold
-- **Preset URLs** - Quick access to Uplynk and public test streams
-- **Responsive Design** - Works on desktop and mobile browsers
-
-## ⚠️ Important: Uplynk Slicer Configuration
-
-### Required Setting for Latency Monitoring
-
-For latency monitoring to work with Uplynk streams, your slicer **MUST** have this setting enabled:
-```yaml
-wallclock: 1
-```
-
-**What this does:**
-- Injects wall-clock timestamps into ID3 metadata
-- Enables real-time latency calculation
-- Required for all latency metrics to function
-
-**Without this setting:**
-- ⚠️ You'll see: "No wall-clock timestamps detected in ID3 metadata"
-- ⚠️ Latency metrics will show: "--"
-- ⚠️ Latency graph will remain empty
-
-**To verify it's working:**
-1. Load your stream
-2. Look for: "✅ Wall-clock timestamps detected! Latency monitoring active."
-3. Latency metrics should populate within a few seconds
-
-**Need help configuring your slicer?** See the [Uplynk documentation](https://docs.uplynk.com) or contact Uplynk support.
-
-## 🚀 Quick Start
-
-### Installation
-
-1. **Clone the repository:**
-```bash
-   git clone https://github.com/jj358mhz/player_test_harness.git
-   cd player_test_harness
-```
-
-2. **Open in browser:**
-```bash
-   # Option 1: Direct file open
-   open hls-id3-player.html
-   
-   # Option 2: Local server (recommended)
-   python -m http.server 8000
-   # Then open http://localhost:8000/hls-id3-player.html
-```
-
-3. **No build process required!** This is a standalone HTML file with no dependencies.
-
-## 📁 File Structure
-```
-player_test_harness/
-├── hls-id3-player.html    # Main application (standalone)
-├── README.md              # This file
-├── CHANGELOG.md           # Version history
-├── CONTRIBUTING.md        # Contribution guidelines
-└── LICENSE                # MIT License
-```
-
-**Note:** The entire application is contained in a single HTML file (`hls-id3-player.html`) with no external dependencies.
-
-### Basic Usage
-
-1. **Load a Stream:**
-   - Enter an HLS manifest URL (.m3u8) in the input field
-   - Or click a preset button for quick testing
-   - Click "Load Stream" to start monitoring
-
-2. **View Metrics:**
-   - Latency metrics appear automatically when ID3 timestamps are detected
-   - All panels are collapsible - click "Show/Hide" to customize your view
-   - Graphs update in real-time
-
-3. **DRM Streams:**
-   - Select a license server from the dropdown (Widevine, PlayReady, or custom)
-   - For custom URLs, select "Custom URL" and enter your license server
-   - Load the stream - DRM key tracking happens automatically
-
-## ⚙️ Prerequisites
-
-### For Uplynk Streams
-
-**CRITICAL:** Your Uplynk slicer **must** have `wallclock: 1` enabled in its configuration.
-
-**How to enable:**
-1. Access your Uplynk slicer configuration
-2. Set `wallclock: 1` in the slicer settings
-3. Restart the slicer
-4. Verify timestamps appear in the stream
-
-For help configuring your slicer, see the [Uplynk documentation](https://docs.uplynk.com) or contact Uplynk support.
-
-### For Non-Uplynk Streams
-
-Your encoder must include one of the following in ID3 metadata:
-- `#EXT-X-DATERANGE` with `START-DATE` attribute
-- TXXX frames with "wallclock", "timestamp", or "time" descriptions
-- Program Date Time (`#EXT-X-PROGRAM-DATE-TIME`)
-
-## 📊 Dashboard Sections
-
-### Latency Metrics
-- **Current Latency** - Real-time latency with color-coded status (Awesome/Good/Average/Above Average/Yuk)
-- **Average/Min/Max** - Historical statistics across all samples
-- **Latency Graph** - 60-second rolling history with threshold zones
-- **Jump to Live** - Manual or auto-sync when drift is high
-
-### Performance Metrics
-- **Buffer Level** - Current buffer with visual indicator
-- **Download Speed** - Measured from actual segment downloads
-- **Quality/Bitrate** - Current video quality and bitrate
-- **Dropped Frames** - Frame drop count and percentage
-- **Rebuffers** - Count and total time spent rebuffering
-- **Segment Load Time** - Average load time for media segments
-
-### ID3 Metadata
-- **Frame Parser** - Displays all ID3 frames (PRIV, TXXX, etc.)
-- **SCTE-35 Detection** - Highlights ad markers with hex dumps
-- **Timestamp Tracking** - Shows wall-clock timestamps for latency calculation
-- **History Log** - Last 50 metadata entries with timestamps
-
-### DRM/Encryption Monitor
-- **Encryption Detection** - Automatic detection of AES-128, SAMPLE-AES, CBCS, CENC
-- **Key Tracking** - Monitors all loaded keys with unique key identification
-- **Key Rotation** - Detects and counts key rotations with notifications
-- **Session Monitoring** - Tracks EME sessions and DRM system info
-- **Key History** - Detailed log with hover tooltips showing full key details
-
-### CMAF/Format Detection
-- **Container Format** - Detects fMP4, MPEG-TS, or CMAF
-- **Init Segments** - Counts and tracks initialization segments
-- **Byte Range Mode** - Detects byte-range requests
-- **Codec Detection** - Shows video and audio codecs
-
-### Live Edge Drift Monitor
-- **Visual Gauge** - Color-coded drift indicator (0-50+ seconds)
-- **Drift Stats** - Current drift, buffer, playback rate, status
-- **Auto-Sync** - Configurable threshold for automatic jump to live
-- **History Graph** - 60-second rolling drift history
-- **Tab Return Auto-Jump** - Optional auto-jump when returning to tab
-
-### ABR Bandwidth Monitor
-- **Bandwidth Estimate** - Current bandwidth with trend indicator
-- **Throughput** - Estimated throughput from segment downloads
-- **Quality Switches** - Count and log of all quality changes
-- **Bandwidth Graph** - 60-second rolling bandwidth history
-- **Decision Log** - Recent ABR decisions with reasons
-
-### Audio Track Monitor
-- **Multi-Track Support** - Switch between multiple audio tracks
-- **Codec Detection** - Shows audio codec and bitrate
-- **Real-Time Level** - Visual audio level meter using Web Audio API
-- **Track Selector** - Click to switch audio tracks
-
-### Caption/Subtitle Monitor
-- **Live Display** - Shows current caption text in real-time
-- **Track Selector** - Enable/disable caption tracks
-- **Caption History** - Last 50 captions with timestamps
-- **Format Detection** - WebVTT, CEA-608/708
-
-### Manifest Viewer
-- **Master Manifest** - Parsed variant streams with color coding
-- **Media Playlist** - Current playlist with discontinuity tracking
-- **Raw View** - Syntax-highlighted raw manifest
-- **Discontinuity Log** - Tracks all discontinuities with context
-
-### HTTP Status Monitor
-- **Success/Redirect/Error Counts** - Categorized by status code
-- **Success Rate** - Percentage of successful requests
-- **Request Log** - Last 20 requests with URLs (hover for full URL)
-
-### Program Date Time
-- **PDT Latency** - Latency calculated from EXT-X-PROGRAM-DATE-TIME
-- **ID3 Comparison** - Delta between PDT and ID3 latencies
-- **Timestamp Display** - Shows program time vs system time
-
-## 🎯 Preset Streams
-
-### Uplynk Streams
-- **Event Base URL** - Pre-event testing (requires Event GUID)
-
-### Encrypted Test Streams (AES-128)
-- **Apple Bipbop fMP4** - Apple's test stream with encryption
-- **Apple Bipbop HEVC** - HEVC encoded with encryption
-- **Bitmovin Art of Motion** - DRM test stream
-
-### Public Test Streams (Clear)
-- **Mux Big Buck Bunny** - Popular test stream
-- **Tears of Steel (4K)** - High-quality 4K test stream
-
-## 🔧 Configuration
-
-### HLS.js Version Selection
-- Click the version dropdown in the banner
-- Select your desired version (1.6.14-1.6.16)
-- Page will prompt for reload to apply new version
-- Selection persists across sessions
-
-### DRM Configuration
-1. Select a license server from the dropdown:
-   - **Widevine** - `https://content.uplynk.com/wv`
-   - **PlayReady** - `https://content.uplynk.com/pr`
-   - **Custom URL** - Enter your own license server
-
-2. For custom URLs:
-   - Select "Custom URL" from dropdown
-   - Enter full HTTPS URL
-   - Click "Apply"
-   - Load your stream
-
-### Debug Mode
-- Toggle "Debug Mode" in the DRM panel
-- Enables verbose console logging for:
-  - DRM key operations
-  - Bandwidth calculations
-  - Performance metrics
-  - All HLS.js events
-
-### Auto-Sync Configuration
-- Enable "Auto-sync" checkbox in Drift Monitor
-- Set threshold (10-120 seconds)
-- Stream auto-jumps to live when drift exceeds threshold
-- Optional: Enable "Auto-jump on return to tab"
-
-## 🛠️ Technical Details
-
-### Requirements
-- Modern browser with:
-  - HLS.js support (or native HLS on Safari)
-  - ES6+ JavaScript support
-  - Web Audio API (optional, for audio levels)
-  - Encrypted Media Extensions (optional, for DRM)
-
-### Browser Compatibility
-- ✅ Chrome/Edge 90+
-- ✅ Firefox 88+
-- ✅ Safari 14+
-- ✅ Mobile browsers (iOS Safari, Chrome Android)
-
-### Performance Optimizations
-- **Throttled Updates** - UI updates throttled to 30-60fps
-- **DOM Caching** - Frequently accessed elements cached
-- **Batch Updates** - Multiple DOM updates batched together
-- **RequestAnimationFrame** - Smooth graph animations
-- **Web Workers** - HLS.js uses workers when available
-
-### ID3 Timestamp Requirements
-
-**For Uplynk Streams:**
-
-Your Uplynk slicer **must** have `wallclock: 1` enabled to inject wall-clock timestamps into ID3 metadata. This is **required** for accurate latency monitoring.
-
-**Slicer Configuration:**
-```yaml
-# Uplynk Slicer Configuration
-wallclock: 1  # REQUIRED for latency monitoring
-```
-
-**What happens when enabled:**
-- Wall-clock timestamps injected into ID3 TXXX frames
-- Timestamps include millisecond precision
-- Format: ISO 8601 (e.g., `2024-12-16T12:34:56.789Z`)
-
-**For Other Platforms:**
-
-Your stream must include wall-clock timestamps in one of these formats:
-```
-# Option 1: EXT-X-DATERANGE (Recommended)
-#EXT-X-DATERANGE:ID="...",START-DATE="2024-12-16T12:00:00.000Z"
-
-# Option 2: ID3 TXXX frames
-TXXX frame with description "wallclock", "timestamp", or "time"
-ISO 8601 formatted timestamp value
-
-# Option 3: Program Date Time
-#EXT-X-PROGRAM-DATE-TIME:2024-12-16T12:00:00.000Z
-```
-
-## 📈 Interpreting Metrics
-
-### Latency Classifications
-- **🟢 Awesome** - <10 seconds (dark green)
-- **🟢 Good** - 10-19 seconds (green)
-- **🟡 Average** - 19-25 seconds (light orange)
-- **🟠 Above Average** - 25-40 seconds (orange)
-- **🔴 Yuk** - 40+ seconds (red, pulsing)
-
-### Drift Status
-- **Good** - <10 seconds behind live
-- **Fair** - 10-20 seconds behind
-- **Behind** - 20-30 seconds behind
-- **Far** - 30-50 seconds behind
-- **Critical** - 50+ seconds behind
-
-### Buffer Levels
-- **🟢 Good** - >10 seconds
-- **🟡 Warning** - 5-10 seconds
-- **🔴 Critical** - <5 seconds
-
-## 🐛 Troubleshooting
-
-### No Latency Data
-
-**For Uplynk Streams:**
-1. ✅ **Verify `wallclock: 1` is enabled** in your slicer configuration
-2. ✅ Restart the slicer after making configuration changes
-3. ✅ Check that the stream is actively encoding (not a static VOD file)
-4. ✅ Enable debug mode and check console for ID3 metadata
-5. ✅ Look for the success message: "✅ Wall-clock timestamps detected!"
-
-**Debug Steps:**
-```bash
-# Check console for these messages:
-# ✅ Good: "Successfully parsed wallclock: ..."
-# ❌ Bad: "No wall-clock timestamps detected"
-
-# Enable debug mode to see all ID3 frames
-# Look for TXXX frames with wallclock data
-```
-
-**For All Streams:**
-- Ensure stream includes ID3 metadata with timestamps
-- Check that TXXX frames contain wall-clock data
-- Enable debug mode to see metadata in console
-- Verify encoder is configured to inject timestamps
-
-**Common Issues:**
-- ❌ `wallclock: 0` or not set → No timestamps will be injected
-- ❌ VOD file without ID3 → Timestamps may not be present in static files
-- ❌ Manifest-only latency → Use Program Date Time instead
-- ❌ Incorrect timestamp format → Must be ISO 8601
-
-**Still not working?**
-Open a [GitHub issue](https://github.com/jj358mhz/player_test_harness/issues) with:
-- Stream URL (if shareable)
-- Slicer configuration (especially wallclock setting)
-- Browser console output with debug mode enabled
-- Screenshot of the latency panel
-
-### DRM Not Working
-- Check license server URL is correct
-- Verify DRM system matches your stream (Widevine/PlayReady/FairPlay)
-- Check browser console for EME errors
-- Ensure HTTPS (DRM requires secure context)
-
-### High Latency
-- Check your encoder's target latency settings
-- Verify segment duration (shorter = lower latency)
-- Check network conditions
-- Use "Jump to Live" button to sync
-- Consider reducing `wallclock` reporting frequency if very high
-
-### Tab Visibility Issues
-- Enable "Auto-jump on return to tab" in Drift Monitor
-- Browsers throttle hidden tabs - this is expected behavior
-- Keep tab visible for accurate monitoring
-
-## 🤝 Contributing
-
-Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for details.
-
-### Development Setup
-1. Clone the repository
-2. Make your changes in `hls-id3-player.html`
-3. Test with multiple streams (especially with/without wallclock enabled)
-4. Open a pull request
-
-### Feature Requests
-Open an issue with the `enhancement` label describing:
-- Use case
-- Expected behavior
-- Example streams (if applicable)
-
-## 📝 License
-
-MIT License - see [LICENSE](LICENSE) for details.
-
-## 🙏 Acknowledgments
-
-- **HLS.js** - The amazing HLS player library
-- **Uplynk** - Streaming platform and test streams
-- **Apple** - HLS specification and test streams
-- **Community** - All the testers and contributors
-
-## 📞 Support
-
-- 🐛 **Issues**: [GitHub Issues](https://github.com/jj358mhz/player_test_harness/issues)
-- 💬 **Pull Requests**: [GitHub PRs](https://github.com/jj358mhz/player_test_harness/pulls)
+Engineering harness for triaging Uplynk playback. Syncs live channels from
+your Uplynk workspaces, signs playback URLs server-side (HLS and DASH, with
+Preplay v2 for DRM), and opens them in a monitoring player that tracks
+latency, drift, ABR, DRM keys, ID3/SCTE-35, captions and more.
+
+## 🌟 Highlights
+
+- 🏢 **Uplynk account management** — register workspaces with their API key
+  (signs playback tokens) and an optional Scoped API Key `.env`. All
+  credentials are **Fernet-encrypted** at rest; keys never reach the browser.
+- 🔄 **Channel sync** — pulls live channels from
+  [`GET /api/v4/channels`](https://docs.uplynk.com/reference/get-all-live-channels)
+  using the scoped key (JWT) when present, otherwise classic API-key auth.
+  One click per account, **Sync all** on the dashboard, or `flask sync-channels`.
+- 🔏 **Signed playback** — HMAC-SHA256 tokens per
+  [Uplynk's spec](https://docs.uplynk.com/docs/sign-playback-urls-with-a-token):
+  channel GUID or external ID, `.m3u8` or `.mpd`, configurable lifetime, and
+  extra signed params (`rays`, `delay`, …).
+- 🔐 **Preplay v2 + DRM** — request Widevine / PlayReady (DASH) or FairPlay
+  (HLS) sessions and get back the zone `prefix` and license/certificate URLs.
+- ▶️ **One-click play** — each channel card signs a fresh HLS URL and opens
+  the monitoring player with it. Copy HLS/DASH buttons for use in other players.
+- 📊 **Monitoring player** — the HLS.js Advanced Latency Monitor; see
+  [docs/player.md](docs/player.md).
+- 📜 **Audit trail** — every signing / Preplay request (base URL and params,
+  never the signature) and every account or sync action.
 
 ## 🗺️ Roadmap
 
-- [ ] Export metrics to CSV/JSON
-- [ ] Real-time alerts and notifications
-- [ ] Multi-stream comparison mode
-- [ ] Historical data storage
-- [ ] Custom dashboard layouts
-- [ ] Player controls (play/pause/seek)
-- [ ] Screenshot capture
-- [ ] WebRTC latency comparison
-- [ ] Docker container for easy deployment
-- [ ] API for programmatic access
-- [ ] Slicer configuration validator
+| Phase | Scope                                                                    | Status  |
+|-------|--------------------------------------------------------------------------|---------|
+| 0     | Move to GitHub, scrub workspace-specific data                            | ✅ done |
+| 1     | Flask backend: accounts, channel sync, signing + Preplay API, Pi deploy  | ✅ done |
+| 2     | Multi-player: player adapter interface; hls.js, Shaka, dash.js, native   | planned |
+| 3     | DRM playback driven by Preplay; DRM diagnostics panel                    | planned |
+| 4     | Triage: recorded sessions, side-by-side compare, LL-HLS metrics, links   | planned |
 
----
+## 🏗️ Architecture
 
-**Made with ❤️ for the streaming community**
+| Layer            | Tech                                                       |
+|------------------|------------------------------------------------------------|
+| Web framework    | Flask 3 + Jinja2                                           |
+| ORM & migrations | SQLAlchemy 2 + Alembic                                     |
+| Auth             | Flask-Login + Flask-WTF (CSRF) + argon2                    |
+| Database         | SQLite (single-file, volume-mounted)                       |
+| Frontend         | Server-rendered HTML + a little vanilla JS (no build step) |
+| Player           | Self-contained HTML + HLS.js (loaded from jsDelivr)        |
+| Crypto           | `cryptography` (Fernet at rest, ES256 JWT, HMAC-SHA256)    |
+| WSGI server      | gunicorn                                                   |
+| Runtime          | Python 3.12 in a slim Debian container                     |
+| Package manager  | [uv](https://docs.astral.sh/uv/)                           |
+| Reverse proxy    | Caddy (homelab-utility stack) with Cloudflare DNS TLS      |
+
+## 🗂️ Data model
+
+| Table             | Purpose                                                       |
+|-------------------|---------------------------------------------------------------|
+| `users`           | Login accounts                                                |
+| `uplynk_accounts` | Workspaces + encrypted API key / scoped key                   |
+| `channels`        | Synced live channels (plus local favorite flag)               |
+| `playback_events` | Every signing / Preplay request (no signatures stored)        |
+| `admin_events`    | Account CRUD and sync history                                 |
+
+## 🔌 API
+
+Session-authenticated JSON. Send the page's CSRF token in `X-CSRFToken`.
+
+`POST /api/playback`
+
+```jsonc
+// a synced channel
+{"channel_id": 12, "manifest": "m3u8"}
+
+// anything else, signed with an account's key
+{
+  "account_id": 1,
+  "content_type": "c",          // a | c | e | p
+  "content_id": "<guid>",       // or "external_id": "..."
+  "manifest": "mpd",            // m3u8 | mpd
+  "mode": "preplay",            // url | preplay
+  "drm": "wv",                  // wv | pr (mpd) · fps (m3u8) — Preplay only
+  "ttl_seconds": 3600,
+  "params": {"delay": "10"}     // signed along with the token
+}
+```
+
+Returns `{url, expires_at, mode, manifest, drm, event_id}`; Preplay adds
+`prefix`, `sid` and `drm_config` (license/certificate URLs).
+
+`GET /api/channels` lists active synced channels.
+
+## 🧑‍💻 Developing on this repo
+
+Prerequisites: Docker Desktop, [uv](https://docs.astral.sh/uv/), Python 3.12.
+
+```bash
+git clone https://github.com/jj358mhz/player_test_harness.git
+cd player_test_harness
+uv sync
+
+cp .env.example .env
+uv run python -c "import secrets; print(secrets.token_urlsafe(32))"   # SECRET_KEY
+uv run python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"  # FERNET_KEY
+
+# Dev overlay hot-reloads code and runs migrations on start
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+curl http://localhost:5051/health
+```
+
+Tests and lint (same as CI):
+
+```bash
+uv run pytest -v
+uv run ruff check .
+uv run ruff format --check .
+```
+
+After changing `app/models.py`, generate a migration:
+
+```bash
+uv run alembic revision --autogenerate -m "describe the change"
+```
+
+## 🏠 Running your own instance
+
+Docker only — no Caddy, no `auth-net` network:
+
+```bash
+git clone https://github.com/jj358mhz/player_test_harness.git
+cd player_test_harness
+cp .env.example .env
+docker build -t player-test-harness:local .
+docker run --rm --entrypoint python player-test-harness:local -c "import secrets; print(secrets.token_urlsafe(32))"   # SECRET_KEY
+docker run --rm --entrypoint python player-test-harness:local -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"  # FERNET_KEY
+# Paste both into .env with your BOOTSTRAP_ADMIN_EMAIL / BOOTSTRAP_ADMIN_PASSWORD
+
+docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
+```
+
+Sign in at `http://localhost:5051`, add an Uplynk account, then **Sync**.
+DRM playback needs a secure context (HTTPS or `localhost`).
+
+## 🚢 Production deployment
+
+Runs on the homelab Utility Pi exactly like
+[csl-slicer-console](https://github.com/jj358mhz/csl-slicer-console):
+a Docker Compose stack on the shared `auth-net` network, fronted by Caddy at
+**player.telcomjj.com** *(LAN / VPN only)*.
+
+### Environment variables
+
+| Variable                   | Purpose                                                       |
+|----------------------------|---------------------------------------------------------------|
+| `SECRET_KEY`               | Signs Flask session cookies                                   |
+| `FERNET_KEY`               | Encrypts Uplynk credentials at rest — back it up              |
+| `BOOTSTRAP_ADMIN_EMAIL`    | First-run admin login                                         |
+| `BOOTSTRAP_ADMIN_PASSWORD` | First-run admin password                                      |
+| `UPLYNK_API_BASE`          | Uplynk API base (default `https://services.uplynk.com`)       |
+| `UPLYNK_CONTENT_BASE`      | Playback host (default `https://content.uplynk.com`)          |
+| `PLAYBACK_TOKEN_TTL`       | Default signed-token lifetime in seconds (default 3600)       |
+| `LOG_LEVEL`                | `info` / `debug` / `warning`                                  |
+| `GUNICORN_WORKERS`         | Worker count (default 2)                                      |
+
+Bootstrap only runs while the `users` table is empty. Reset a password with:
+
+```bash
+docker exec -it player-test-harness flask --app app set-password you@example.com
+```
+
+Sync channels from cron instead of the UI if you like:
+
+```bash
+docker exec player-test-harness flask --app app sync-channels
+```
+
+### Caddy routing
+
+In `homelab-utility/caddy/Caddyfile`:
+
+```caddy
+player.telcomjj.com {
+	import cf_tls
+	reverse_proxy player-test-harness:5000
+	import security_headers
+	log {
+		output file /data/logs/player.log {
+			roll_size 10mb
+			roll_keep 5
+		}
+		format json
+	}
+}
+```
+
+## ⚙️ CI/CD
+
+- **`.github/workflows/ci.yml`** — `ruff check` + `ruff format --check` +
+  `pytest` on every PR and non-main push.
+- **`.github/workflows/deploy.yml`** — on push to `main`, a `v*` tag, or
+  manual dispatch: SSH to the Utility Pi, `git pull`, `docker compose up -d
+  --build`, prune old images. `git describe` is baked in as `APP_VERSION`
+  and shown in the header.
+
+Secrets required for `deploy.yml`: `DEPLOY_HOST`, `DEPLOY_USER`,
+`DEPLOY_SSH_KEY`.
+
+## 📁 Repo layout
+
+```
+player_test_harness/
+├── app/
+│   ├── __init__.py          # App factory + CLI (sync-channels, set-password)
+│   ├── config.py            # Env-var config
+│   ├── models.py            # SQLAlchemy models
+│   ├── crypto.py            # Fernet helpers
+│   ├── admin/               # Uplynk account CRUD + sync
+│   ├── api/                 # /api/playback, /api/channels + playback service
+│   ├── auth/                # Login / logout / argon2
+│   ├── main/                # Channels dashboard, player, sign tool, activity
+│   ├── player/              # The monitoring player (standalone HTML)
+│   ├── uplynk/
+│   │   ├── auth.py          # Scoped JWT + classic msg/sig auth
+│   │   ├── channels.py      # v4 channels client
+│   │   ├── playback.py      # URL building, token signing, Preplay v2
+│   │   ├── scoped_env.py    # Scoped key .env parser
+│   │   └── sync.py          # Channels → DB upsert
+│   ├── static/              # CSS + JS
+│   └── templates/
+├── docs/player.md           # Player feature reference
+├── migrations/              # Alembic
+├── tests/                   # Pytest suite
+├── .github/workflows/       # CI + deploy
+├── docker-compose.yml       # Production stack (Utility Pi)
+├── docker-compose.dev.yml   # Local dev overlay
+├── docker-compose.local.yml # Self-host overlay
+├── Dockerfile
+└── pyproject.toml
+```
+
+## 🤝 Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Never commit workspace-specific data
+(API keys, channel IDs, customer names) — it belongs in the database.
+
+## 📄 License
+
+MIT — see [LICENSE](LICENSE).

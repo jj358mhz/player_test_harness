@@ -1,9 +1,29 @@
 # Changelog
 
-All notable changes to the Uplynk HLS.js Advanced Latency Monitor will be documented in this file.
+All notable changes to player-test-harness (formerly the standalone Uplynk HLS.js Advanced Latency Monitor) will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased] - 3.0.0
+
+### Added
+- **Backend service** (Flask, SQLAlchemy, Alembic) modelled on csl-slicer-console:
+  login, CSRF, argon2 passwords, Fernet-encrypted credentials at rest
+- **Uplynk accounts** - API key (signs playback tokens) plus optional Scoped API Key `.env`
+- **Channel sync** from `GET /api/v4/channels`, scoped JWT or classic auth;
+  per-account Sync, Sync all, and `flask sync-channels`
+- **Signed playback API** (`POST /api/playback`) - channel GUID or external ID,
+  HLS or DASH, custom TTL and signed extra params
+- **Preplay v2** with Widevine / PlayReady / FairPlay license URLs in the response
+- **Channels dashboard** with filter, favorites, one-click play and copy-URL buttons
+- **Sign URL tool** for ad-hoc assets, events and channels
+- **Activity log** for playback requests and account/sync actions
+- **Player** served behind login at `/player`; `?src=` autoloads a stream
+- Docker image, Compose stack for the Utility Pi, CI and SSH deploy workflows
+
+### Changed
+- Player moved to `app/player/hls-id3-player.html`; its reference docs moved to `docs/player.md`
 
 ## [2.1.0] - 2026-05-22
 

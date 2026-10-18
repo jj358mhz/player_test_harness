@@ -1,0 +1,176 @@
+"""Build and sign Uplynk playback URLs, and call Preplay v2.
+
+Signing: https://docs.uplynk.com/docs/sign-playback-urls-with-a-token
+The token is HMAC-SHA256 (keyed with the account API key) over the URL-encoded
+query string, in the order the params appear, with `sig` appended last. Every
+param in the query — core and customization (rays, delay, rmt, manifest, ...)
+— is part of the signed string.
+
+Preplay v2: https://docs.uplynk.com/reference/preplay-v2
+Returns an absolute `playURL`, zone `prefix`, and DRM license/certificate URLs.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import hmac
+import random
+import time
+from dataclasses import dataclass, field
+from typing import Any
+from urllib.parse import quote, urlencode
+
+import requests
+
+# ct values from the token spec.
+CONTENT_TYPES = {
+    "a": "asset",
+    "c": "channel",
+    "e": "event",
+    "p": "playlist",
+}
+MANIFESTS = ("m3u8", "mpd")
+# Preplay `rmt` values. FairPlay pairs with HLS; Widevine/PlayReady with DASH.
+DRM_TYPES = {"fps": "m3u8", "wv": "mpd", "pr": "mpd"}
+# Core token params we generate — callers can't override these via `extra`.
+RESERVED_PARAMS = frozenset({"tc", "exp", "rn", "ct", "cid", "eid", "oid", "sig"})
+MIN_TTL_SECONDS = 10
+MAX_TTL_SECONDS = 7 * 24 * 3600
+
+
+class PlaybackError(ValueError):
+    """Raised for invalid playback requests or Preplay failures."""
+
+
+@dataclass(frozen=True)
+class PlaybackTarget:
+    """What to play.
+
+    Use either `content_id` (system GUID) or `external_id` (+ owner_id).
+    """
+
+    content_type: str  # a | c | e | p
+    content_id: str | None = None
+    external_id: str | None = None
+    owner_id: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.content_type not in CONTENT_TYPES:
+            raise PlaybackError(f"Unknown content type {self.content_type!r}")
+        if bool(self.content_id) == bool(self.external_id):
+            raise PlaybackError("Provide exactly one of content_id or external_id")
+        if self.external_id and not self.owner_id:
+            raise PlaybackError("external_id playback needs the workspace (owner) ID")
+
+    @property
+    def path_id(self) -> str:
+        """Path segment identifying the content, without extension."""
+        if self.content_id:
+            return quote(self.content_id, safe="")
+        return f"ext/{quote(self.owner_id, safe='')}/{quote(self.external_id, safe='')}"
+
+
+@dataclass
+class SignedPlayback:
+    url: str
+    base_url: str
+    params: list[tuple[str, str]]  # signed params, excluding sig
+    expires_at: int
+
+
+@dataclass
+class PreplayResult:
+    play_url: str
+    prefix: str | None
+    sid: str | None
+    drm: dict[str, Any] | None
+    raw: dict[str, Any] = field(repr=False)
+
+
+def manifest_base_url(content_base: str, target: PlaybackTarget, manifest: str) -> str:
+    if manifest not in MANIFESTS:
+        raise PlaybackError(f"Unknown manifest type {manifest!r}")
+    base = content_base.rstrip("/")
+    prefix = {"a": "", "c": "channel/", "e": "event/", "p": "playlist/"}[target.content_type]
+    return f"{base}/{prefix}{target.path_id}.{manifest}"
+
+
+def preplay_base_url(content_base: str, target: PlaybackTarget) -> str:
+    base = content_base.rstrip("/")
+    if target.content_type == "c":
+        return f"{base}/preplay/channel/{target.path_id}.json"
+    if target.content_type == "a":
+        return f"{base}/preplay/{target.path_id}.json"
+    raise PlaybackError("Preplay v2 supports channels and assets only")
+
+
+def sign_url(
+    base_url: str,
+    target: PlaybackTarget,
+    api_key: str,
+    ttl_seconds: int,
+    extra: list[tuple[str, str]] | None = None,
+    now: int | None = None,
+    rn: str | None = None,
+) -> SignedPlayback:
+    """Append a signed token to `base_url`."""
+    if not api_key:
+        raise PlaybackError("Account has no API key to sign with")
+    if not MIN_TTL_SECONDS <= ttl_seconds <= MAX_TTL_SECONDS:
+        raise PlaybackError(f"Token TTL must be between {MIN_TTL_SECONDS}s and {MAX_TTL_SECONDS}s")
+    extra = list(extra or [])
+    clashes = sorted({k for k, _ in extra} & RESERVED_PARAMS)
+    if clashes:
+        raise PlaybackError(f"Reserved token params can't be overridden: {', '.join(clashes)}")
+
+    now = int(time.time()) if now is None else now
+    expires_at = now + ttl_seconds
+    params: list[tuple[str, str]] = [
+        ("tc", "1"),
+        ("exp", str(expires_at)),
+        ("rn", rn if rn is not None else str(random.randint(0, 2**32))),
+        ("ct", target.content_type),
+    ]
+    if target.content_id:
+        params.append(("cid", target.content_id))
+    else:
+        params += [("eid", target.external_id), ("oid", target.owner_id)]
+    params += [(str(k), str(v)) for k, v in extra]
+
+    query = urlencode(params)
+    sig = hmac.new(api_key.encode(), query.encode(), hashlib.sha256).hexdigest()
+    return SignedPlayback(
+        url=f"{base_url}?{query}&sig={sig}",
+        base_url=base_url,
+        params=params,
+        expires_at=expires_at,
+    )
+
+
+def fetch_preplay(
+    signed_url: str,
+    timeout: int = 15,
+    session: requests.Session | None = None,
+) -> PreplayResult:
+    """GET a signed Preplay v2 URL and parse the response."""
+    http = session or requests
+    try:
+        response = http.get(signed_url, timeout=timeout, headers={"Accept": "application/json"})
+    except requests.RequestException as e:
+        raise PlaybackError(f"Preplay request failed: {e}") from e
+    if response.status_code != 200:
+        raise PlaybackError(f"Preplay returned HTTP {response.status_code}: {response.text[:200]}")
+    try:
+        payload = response.json()
+    except ValueError as e:
+        raise PlaybackError("Preplay returned non-JSON response") from e
+    if not payload.get("playURL"):
+        detail = payload.get("error") or payload.get("msg") or "no playURL in response"
+        raise PlaybackError(f"Preplay failed: {detail}")
+    return PreplayResult(
+        play_url=payload["playURL"],
+        prefix=payload.get("prefix"),
+        sid=payload.get("sid"),
+        drm=payload.get("drm"),
+        raw=payload,
+    )
