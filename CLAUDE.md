@@ -247,9 +247,9 @@ in the `player_harness_data` volume.
       message. **v3.4.0:** `Channel.encryption` learned from each HLS probe
       (first media playlist's `EXT-X-KEY`; Preplay `drm.required`), 🔒 DRM
       badge, Widevine auto-selected for DRM channels outside Safari,
-      `flask check-encryption`. **v3.13.0:** FairPlay in Safari (Native
-      engine + EME, #21) — built from Uplynk's docs, to verify in real
-      Safari. PlayReady is wired but untested (Chrome has no PlayReady;
+      `flask check-encryption`. **v3.13.0–.1:** FairPlay in Safari (Native
+      engine, WebKit legacy EME for TS, #21), verified 2026-10-19:
+      keys usable, ray f 720p. PlayReady is wired but untested (Chrome has no PlayReady;
       needs Edge).
 - [~] Phase 4 — triage (#24). **Done (v3.6.0):** deep links (source,
       format, engine@version, DRM, rays, tab) + Copy link. **v3.7.0:**
