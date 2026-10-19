@@ -33,6 +33,14 @@ export interface RequestTiming {
     status: number | null;
     bytes: number;
     failed: boolean;
+    /** Full request URL, signatures included: redact before showing or storing. */
+    url?: string;
+    /** performance.now() when the first byte arrived, where the engine (or Resource Timing) says. */
+    ttfb?: number | null;
+    /** Media seconds in a segment, where known. */
+    mediaDuration?: number | null;
+    /** Network protocol from Resource Timing (h2, h3…), where the browser shares it. */
+    protocol?: string | null;
 }
 
 export interface MediaPlaylistInfo {

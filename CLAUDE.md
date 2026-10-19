@@ -117,6 +117,7 @@ after dependency changes.
     `scte35.ts` (splice_insert, time_signal, segmentation descriptors),
     `clock.ts` (which clock program dates use; `delay=` parsing),
     `bands.ts`, `stats.ts`, `cmcd.ts` (CMCD param parsing, ids),
+    `waterfall.ts` (request detail; first byte from the engine or Resource Timing),
     `deeplink.ts` (address bar ⇄ load bar; validates
     engine versions because they end up in a jsDelivr URL).
   - `compare.ts` — third Vite entry, `/compare`: two `/player?embed=1`
@@ -184,6 +185,11 @@ after dependency changes.
   synthesised so the newest segment ends ≈ now; it shifts with `delay`,
   is the same for every URL of a channel+delay, and ignores `pdts`. DASH
   `$Number$` = HLS slice number (hex in `#UPLYNK-SEGMENT`) within an asset.
+- **Timing from the browser**: no `Timing-Allow-Origin` on content or CDN
+  hosts (Resource Timing has no first byte/connect detail cross-origin);
+  segments come from CloudFront (`X-Cache`, `Via`) but `X-Cache`/`Age`
+  aren't in `Access-Control-Expose-Headers`. No LL-HLS tags on the channels
+  checked (HLS v6, 4.096 s segments).
 - **CMCD**: a `CMCD=` query param is fine on signed playlists, MPDs and
   segments (after `sig`). Headers aren't: content.uplynk.com's preflight
   has no `Access-Control-Allow-Headers` and the CDN answers 403.
@@ -234,11 +240,12 @@ in the `player_harness_data` volume.
       recorded sessions (`PlaybackSession`, `POST /api/sessions`,
       `/sessions/<slug>` replay via the `recording.ts` Vite entry,
       `SESSION_RETENTION_DAYS`, `flask prune-sessions`). **Left:**
-      LL-HLS part/blocking-reload metrics, request waterfall detail.
+      LL-HLS part/blocking-reload metrics (no channel serves LL-HLS yet).
       **v3.8.0:** latency investigation done: `pdts=latency` for synced
       HLS, DASH clock offset from the server, Delay control, Clock table.
       **v3.9.0:** side-by-side compare (`/compare`), startup time.
-      **v3.10.0:** CMCD toggle (query mode), slicer-console links both ways
+      **v3.10.0:** CMCD toggle (query mode), slicer-console links both ways.
+      **v3.11.0:** request detail in the waterfall (first byte vs download)
 - [ ] Periodic background channel sync (for now: UI, CLI, or host cron)
 
 ### Todo

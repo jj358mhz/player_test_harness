@@ -260,15 +260,16 @@ export function renderRecording(root: HTMLElement, r: Recording): void {
                 'Last requests',
                 `${r.requests.length} most recent`,
                 table(
-                    ['Time', 'Kind', 'URL', 'Status', 'ms', 'KB'],
+                    ['Time', 'Kind', 'Request', 'Status', 'ms', 'First byte', 'KB'],
                     [...r.requests]
                         .reverse()
                         .map((q) => [
                             clock(new Date(q.start)),
                             q.kind,
-                            q.name,
+                            q.url ? `${q.name} · ${q.url}` : q.name,
                             q.failed ? `✗ ${q.status ?? ''}` : String(q.status ?? ''),
                             String(q.end - q.start),
+                            q.ttfbMs == null ? '--' : `${q.ttfbMs}`,
                             (q.bytes / 1024).toFixed(0),
                         ]),
                 ),

@@ -190,6 +190,15 @@ Segment count, average load time, bytes and HTTP errors, plus a
 init and media segments and key fetches. Slow segments (over half the
 target duration) are orange; failures are red.
 
+**Click a request** for its detail: URL (tokens redacted), host, status,
+size, total time, **first byte** and **download** (with a split bar),
+throughput, a segment's media duration and the share of it the load took,
+protocol, and the CMCD it sent. The waterfall stops updating while the
+pointer is over it, so rows stay put. First byte comes from hls.js and
+dash.js; Shaka and native don't report it and Uplynk's hosts send no
+`Timing-Allow-Origin`, so the browser hides it (the panel says which). Cache
+hit/miss can't be shown: the CDN's `X-Cache`/`Age` aren't exposed to pages.
+
 **CMCD** (load bar checkbox, `cmcd=1` in links): hls.js, Shaka and dash.js
 add a `CMCD=` query param to every request (CTA-5004: object type,
 bitrate, buffer length, measured throughput, session and content ids…), so

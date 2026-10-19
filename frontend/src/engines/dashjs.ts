@@ -51,6 +51,8 @@ interface RequestContext {
     type?: string | null; // InitializationSegment | MediaSegment
     mediaType?: string; // video | audio | text
     representationId?: string;
+    duration?: number; // media seconds
+    firstByteDate?: Date;
 }
 
 export class DashJsEngine implements PlayerEngine {
@@ -196,6 +198,9 @@ export class DashJsEngine implements PlayerEngine {
             status,
             bytes,
             failed: status >= 400,
+            url,
+            ttfb: firstByte(context, start, end),
+            mediaDuration: kind === 'segment' && context?.duration ? context.duration : null,
         });
     }
 
@@ -421,6 +426,14 @@ function requestName(kind: RequestKind, uri: string, ray: string | null): string
     if (kind === 'manifest') return 'manifest.mpd';
     if (kind === 'init') return `${ray ?? '·'} · init`;
     return `${ray ?? '·'} · seg ${segmentNumber(uri)}`;
+}
+
+/** dash.js stamps fragment requests with Date objects; map onto performance.now(). */
+function firstByte(context: RequestContext | undefined, start: number, end: number): number | null {
+    const date = context?.firstByteDate;
+    if (!(date instanceof Date)) return null;
+    const t = date.getTime() - performance.timeOrigin;
+    return t >= start - 5 && t <= end + 5 ? Math.min(Math.max(t, start), end) : null;
 }
 
 function textOf(data: unknown): string | null {

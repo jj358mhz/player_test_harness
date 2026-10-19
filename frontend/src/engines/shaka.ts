@@ -179,6 +179,8 @@ export class ShakaEngine implements PlayerEngine {
                 status,
                 bytes,
                 failed: false,
+                // Shaka reports only the total; the app tries Resource Timing for first byte.
+                url: response.uri,
             });
         });
 
