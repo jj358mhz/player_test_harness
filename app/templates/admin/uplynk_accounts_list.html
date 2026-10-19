@@ -7,6 +7,12 @@
     <a href="{{ url_for('admin.new_account') }}" class="button button--primary">+ Add Account</a>
 </div>
 
+<p class="muted">
+    {% if sync_interval %}Channels sync automatically every {{ sync_interval }} min
+    (<code>CHANNEL_SYNC_INTERVAL</code>); Sync runs one now.{% else %}Automatic sync is off
+    (<code>CHANNEL_SYNC_INTERVAL=0</code>): use Sync, <code>flask sync-channels</code> or cron.{% endif %}
+</p>
+
 {% if accounts %}
 <table class="data-table">
     <thead>

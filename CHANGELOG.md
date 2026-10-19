@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.12.0] - 2026-10-18
+
+### Added
+- **Automatic channel sync** every `CHANNEL_SYNC_INTERVAL` minutes
+  (default 60; 0 = off). An account syncs when its last successful sync,
+  manual or automatic, is older than that; a failed one is retried after 5
+  minutes. Activity gets an entry only when channels were added or removed,
+  or the sync failed. One gunicorn worker runs it (file lock); if it
+  restarts, another takes over. The Uplynk Accounts page shows the
+  interval.
+
+### Fixed
+- `docker-compose.yml` passes only the variables it lists, so
+  `SESSION_RETENTION_DAYS`, `MAX_RECORDING_BYTES` and `CSL_BASE_URL` set in
+  `.env` never reached the app. They're passed now, with
+  `CHANNEL_SYNC_INTERVAL`.
+
 ## [3.11.1] - 2026-10-18
 
 ### Fixed

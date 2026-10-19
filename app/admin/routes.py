@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from flask import Blueprint, abort, flash, redirect, render_template, url_for
+from flask import Blueprint, abort, current_app, flash, redirect, render_template, url_for
 
 from app.admin.audit import log_admin_event
 from app.admin.decorators import admin_required
@@ -43,7 +43,12 @@ def list_accounts():
             previews[acct.id] = mask(decrypt(acct.api_key_encrypted))
         except Exception:
             previews[acct.id] = "(decrypt failed)"
-    return render_template("admin/uplynk_accounts_list.html", accounts=accounts, previews=previews)
+    return render_template(
+        "admin/uplynk_accounts_list.html",
+        accounts=accounts,
+        previews=previews,
+        sync_interval=current_app.config["CHANNEL_SYNC_INTERVAL"],
+    )
 
 
 @bp.route("/uplynk-accounts/new", methods=["GET", "POST"])

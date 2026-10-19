@@ -135,6 +135,10 @@ after dependency changes.
   `|tojson` and draws it with `frontend/src/recording.ts` (second Vite
   entry; `app/vite.py` collects CSS from imported chunks).
 - `app/admin/` — Uplynk account CRUD + sync (admin-only).
+- `app/autosync.py` — background channel sync, started per worker by
+  gunicorn's `post_worker_init`; one worker syncs (flock on a temp file).
+  Never started by the CLI or tests. **Env vars reach the container only
+  if `docker-compose.yml` lists them**: add new settings there too.
 
 ## Uplynk facts we rely on
 
@@ -246,7 +250,7 @@ in the `player_harness_data` volume.
       **v3.9.0:** side-by-side compare (`/compare`), startup time.
       **v3.10.0:** CMCD toggle (query mode), slicer-console links both ways.
       **v3.11.0:** request detail in the waterfall (first byte vs download)
-- [ ] Periodic background channel sync (for now: UI, CLI, or host cron)
+- [x] Periodic background channel sync (v3.12.0, `CHANNEL_SYNC_INTERVAL`)
 
 ### Todo
 
