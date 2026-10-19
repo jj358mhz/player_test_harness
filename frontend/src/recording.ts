@@ -192,7 +192,7 @@ export function renderRecording(root: HTMLElement, r: Recording): void {
                     table(
                         ['Source', 'Last', 'Avg', 'Min', 'Max', 'Samples'],
                         [
-                            statsRow('ID3', r.stats.id3),
+                            statsRow('Encoder', r.stats.id3),
                             statsRow('PDT', r.stats.pdt),
                             statsRow('Drift', r.stats.drift),
                         ],

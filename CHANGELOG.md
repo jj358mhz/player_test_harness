@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.15.0] - 2026-10-19
+
+### Added
+- **DASH encoder latency from `prft`.** Shaka and dash.js now read each
+  DASH video segment's `prft` (ProducerReferenceTime) box and anchor its
+  wall-clock time at the segment's presentation start (corrected by
+  `tfdt` and the init segment's timescale). That feeds the same
+  at-the-playhead clock as HLS ID3, so DASH gets a real encoder latency
+  instead of the MPD clock + offset, and it drives the headline when
+  present. The Latency tab's first row is now **Encoder wallclock**
+  (ID3 on HLS, prft on DASH); the Metadata tab has a **prft** row
+  (count and type, or "none in N segments"), and the log notes the
+  first one. Whether Uplynk's packager writes `prft` isn't documented:
+  this release is how we find out.
+- **emsg payloads** in the log: text when printable, else leading hex
+  (e.g. the 66-byte `com.uplynk.asset.metadata`), to learn what they carry.
+
 ## [3.14.1] - 2026-10-19
 
 ### Fixed

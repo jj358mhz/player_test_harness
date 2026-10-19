@@ -115,8 +115,10 @@ export interface EngineEvents {
         error: string | null;
     };
     keystatus: {statuses: Record<string, string>};
+    /** A DASH video segment's prft: the wall clock at its presentation start. */
+    prft: {start: number; wallMs: number; type: string};
     /** DASH in-band event (emsg) the UI doesn't otherwise understand. */
-    emsg: {scheme: string; value: string; bytes: number};
+    emsg: {scheme: string; value: string; bytes: number; preview: string};
     /** #EXT-X-DATERANGE, once per id; scte35 is the hex payload if any. */
     daterange: {
         id: string;

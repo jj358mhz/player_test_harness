@@ -6,6 +6,7 @@ import type * as dashjsNS from 'dashjs';
 import pkg from '../../package.json';
 import type {CmcdConfig} from '../lib/cmcd';
 import {videoProfile} from '../lib/codecs';
+import {PrftReader} from '../lib/mp4';
 import {drmHint, mpdInfo, rayFromRepresentation, rayFromSegmentUrl} from './shaka';
 import {
     type AudioTrack,
@@ -52,6 +53,7 @@ interface RequestContext {
     mediaType?: string; // video | audio | text
     representationId?: string;
     duration?: number; // media seconds
+    startTime?: number; // presentation seconds (video.currentTime)
     firstByteDate?: Date;
 }
 
@@ -67,6 +69,7 @@ export class DashJsEngine implements PlayerEngine {
     private renditions: Rendition[] = [];
     private current: Rendition | null = null;
     private manifestText: string | null = null;
+    private prft = new PrftReader();
     private announced = false;
     private keyStatuses: Record<string, string> = {};
     /** KEY_MESSAGE times, oldest first: license requests can overlap. */
@@ -182,7 +185,12 @@ export class DashJsEngine implements PlayerEngine {
         const ray = other
             ? null
             : (rayFromRepresentation(context?.representationId) ?? rayFromSegmentUrl(url));
+        if (kind === 'init' && !other && response.data) this.prft.onInit(response.data);
         if (kind === 'segment' && !other) {
+            const anchor = response.data
+                ? this.prft.onSegment(response.data, context?.startTime)
+                : null;
+            if (anchor) this.events.emit('prft', anchor);
             this.events.emit('segment', {
                 ray,
                 sn: segmentNumber(url),
