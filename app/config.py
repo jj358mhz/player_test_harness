@@ -45,5 +45,9 @@ class Config:
         self.CHANNEL_SYNC_INTERVAL = int(os.getenv("CHANNEL_SYNC_INTERVAL", "60"))
         # csl-slicer-console, for links from a channel to its slicer (empty = no links).
         self.CSL_BASE_URL = os.getenv("CSL_BASE_URL", "").strip().rstrip("/")
+        # Its settings API (slicer wallclock), server to server: the URL this
+        # container reaches it at (default CSL_BASE_URL) and the shared token.
+        self.CSL_API_URL = (os.getenv("CSL_API_URL", "").strip() or self.CSL_BASE_URL).rstrip("/")
+        self.CSL_API_TOKEN = os.getenv("CSL_API_TOKEN", "").strip()
 
         self.WTF_CSRF_ENABLED = os.getenv("WTF_CSRF_ENABLED", "true").lower() == "true"

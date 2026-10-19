@@ -3,6 +3,7 @@
 
 import {
     type EngineVersion,
+    fetchSlicer,
     fetchVersions,
     type PlaybackResponse,
     type Probe,
@@ -51,6 +52,7 @@ import {
     summarize,
 } from './lib/recording';
 import {decodeScte35, describeScte35, hexToBytes, type SpliceInfo} from './lib/scte35';
+import {describeSlicerWallclock, id3Reason, type SlicerSettings} from './lib/slicer';
 import {type Point, RunningStats, Series} from './lib/stats';
 import {fromResourceTiming, requestDetail, requestKey, requestState} from './lib/waterfall';
 import {
@@ -158,6 +160,8 @@ class Session {
     /** ID3 frames by kind (TXXX description or PRIV owner), and how many carried a wallclock. */
     id3Frames = new Map<string, number>();
     id3Wallclocks = 0;
+    /** csl-slicer-console's view of the channel's slicer; null until it answers. */
+    slicer: SlicerSettings | null = null;
     scteCount = 0;
     lastSync = 0;
     breaks: AdBreak[] = [];
@@ -1677,6 +1681,7 @@ export class PlayerApp {
         this.session = new Session();
         this.source = source;
         this.renderSlicerLink(source.channel);
+        void this.loadSlicer(source.channel);
         this.renderAll();
         const {engine: kind, version} = this.engineFor(source);
         const drm = source.drm;
@@ -2632,13 +2637,32 @@ export class PlayerApp {
 
     /**
      * Why there's no ID3 latency: no ID3 at all, or ID3 without a wallclock
-     * (Uplynk slicers add one only with `wallclock: 1` in their config).
+     * (Uplynk slicers add one only with `wallclock: 1` in their config; the
+     * slicer console says which, for its own slicers).
      */
     private id3Status(): string {
         const s = this.session;
-        if (!s.id3Count) return 'no ID3 in the stream yet';
-        if (!s.id3Wallclocks) return 'ID3 has no wallclock (slicer wallclock: 1 off?)';
-        return 'waiting for the playhead to reach a timestamp';
+        return id3Reason(s.id3Count, s.id3Wallclocks, s.slicer);
+    }
+
+    /** Ask the slicer console (through the server) whether the slicer writes the wallclock. */
+    private async loadSlicer(channel: ChannelOption | null): Promise<void> {
+        const endpoint = this.config.endpoints.slicer;
+        if (!endpoint || !channel?.slicerId) return;
+        const session = this.session;
+        try {
+            session.slicer = await fetchSlicer(endpoint.replace('{id}', String(channel.id)));
+        } catch (e) {
+            session.slicer = {
+                slicer_id: channel.slicerId,
+                found: false,
+                wallclock: null,
+                captured_at: null,
+                running: null,
+                error: e instanceof Error ? e.message : String(e),
+            };
+        }
+        if (session === this.session) this.renderMeta();
     }
 
     private renderMeta(): void {
@@ -2660,6 +2684,9 @@ export class PlayerApp {
                       ? 'none: enable wallclock: 1 on the slicer for ID3 latency'
                       : '--',
             ],
+            ...(this.config.endpoints.slicer && this.source?.channel?.slicerId
+                ? [['Slicer wallclock', describeSlicerWallclock(s.slicer)] as [string, string]]
+                : []),
             ['SCTE-35 cues', String(s.scteCount)],
             [
                 'Ad break',
