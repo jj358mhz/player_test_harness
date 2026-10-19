@@ -155,6 +155,9 @@ class Session {
     segments = {count: 0, ms: 0, bytes: 0, last: null as EngineEvents['segment'] | null};
     keys = {count: 0, uris: new Set<string>(), method: null as string | null, ms: [] as number[]};
     id3Count = 0;
+    /** ID3 frames by kind (TXXX description or PRIV owner), and how many carried a wallclock. */
+    id3Frames = new Map<string, number>();
+    id3Wallclocks = 0;
     scteCount = 0;
     lastSync = 0;
     breaks: AdBreak[] = [];
@@ -2045,10 +2048,15 @@ export class PlayerApp {
     private onId3(mediaTime: number, frames: {id: string; data: Uint8Array}[]): void {
         const s = this.session;
         s.id3Count += 1;
+        const tally = (kind: string) => s.id3Frames.set(kind, (s.id3Frames.get(kind) ?? 0) + 1);
         for (const frame of frames) {
             if (frame.id === 'TXXX') {
                 const txxx = parseTxxx(frame.data);
-                if (txxx.wallclock) s.id3.add(mediaTime, txxx.wallclock.getTime());
+                tally(`TXXX ${txxx.description || '(no description)'}`);
+                if (txxx.wallclock) {
+                    s.id3Wallclocks += 1;
+                    s.id3.add(mediaTime, txxx.wallclock.getTime());
+                }
                 this.logEntry(
                     'id3',
                     'ID3 TXXX',
@@ -2057,6 +2065,7 @@ export class PlayerApp {
                 );
             } else if (frame.id === 'PRIV') {
                 const priv = parsePriv(frame.data);
+                tally(`PRIV ${priv.owner || '(no owner)'}`);
                 if (priv.isScte35) {
                     // ID3 arrives when the segment downloads; act when it plays.
                     const delay = Math.max(0, mediaTime - this.video.currentTime) * 1000;
@@ -2070,6 +2079,7 @@ export class PlayerApp {
                     );
                 }
             } else {
+                tally(frame.id);
                 this.logEntry('id3', `ID3 ${frame.id}`, `${frame.data.length} bytes`, 'meta');
             }
         }
@@ -2381,7 +2391,7 @@ export class PlayerApp {
             this.el(`range-${key}`).textContent = st.count
                 ? `${secs(st.min)} / ${secs(st.average)} / ${secs(st.max)} s`
                 : key === 'id3' && this.engine
-                  ? 'no ID3 timestamps yet'
+                  ? this.id3Status()
                   : '--';
         }
         const target = this.engine?.targetLatency();
@@ -2620,11 +2630,36 @@ export class PlayerApp {
         this.el('count-keys').textContent = count ? String(count) : '';
     }
 
+    /**
+     * Why there's no ID3 latency: no ID3 at all, or ID3 without a wallclock
+     * (Uplynk slicers add one only with `wallclock: 1` in their config).
+     */
+    private id3Status(): string {
+        const s = this.session;
+        if (!s.id3Count) return 'no ID3 in the stream yet';
+        if (!s.id3Wallclocks) return 'ID3 has no wallclock (slicer wallclock: 1 off?)';
+        return 'waiting for the playhead to reach a timestamp';
+    }
+
     private renderMeta(): void {
         const s = this.session;
         const open = s.breaks.find((b) => b.end === null);
+        const kinds = [...s.id3Frames]
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 4)
+            .map(([kind, n]) => `${kind} ×${n}`)
+            .join(' · ');
         kv(this.el('metaKv'), [
             ['ID3 samples', String(s.id3Count)],
+            ['ID3 frames', kinds || '--'],
+            [
+                'Wallclock',
+                s.id3Wallclocks
+                    ? `${s.id3Wallclocks} timestamps`
+                    : s.id3Count
+                      ? 'none: enable wallclock: 1 on the slicer for ID3 latency'
+                      : '--',
+            ],
             ['SCTE-35 cues', String(s.scteCount)],
             [
                 'Ad break',

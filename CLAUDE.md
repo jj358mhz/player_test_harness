@@ -199,6 +199,9 @@ after dependency changes.
   synthesised so the newest segment ends ≈ now; it shifts with `delay`,
   is the same for every URL of a channel+delay, and ignores `pdts`. DASH
   `$Number$` = HLS slice number (hex in `#UPLYNK-SEGMENT`) within an asset.
+- **ID3 wallclock** (TXXX with a time/wallclock description) is written
+  only by slicers with `wallclock: 1`; many of the owner's slicers don't
+  have it, so "no wallclock" is normal, not a player bug.
 - **Timing from the browser**: no `Timing-Allow-Origin` on content or CDN
   hosts (Resource Timing has no first byte/connect detail cross-origin);
   segments come from CloudFront (`X-Cache`, `Via`) but `X-Cache`/`Age`

@@ -180,7 +180,11 @@ ray isn't counted as a rotation.
 
 ## Metadata
 
-ID3 frames as they arrive. **SCTE-35** in ID3 PRIV frames (and in
+ID3 frames as they arrive, tallied by kind (TXXX description or PRIV
+owner), and how many carried a **wallclock**. Uplynk slicers write the
+wallclock only with `wallclock: 1` in their config; without it the ID3
+row of the Latency tab says so, and the headline uses the program date
+instead. **SCTE-35** in ID3 PRIV frames (and in
 `#EXT-X-DATERANGE` `SCTE35-OUT/IN/CMD`) is decoded — `splice_insert`,
 `time_signal` and segmentation descriptors (type, duration, UPID) — and
 acted on when the cue reaches the playhead: an out cue opens an ad break on

@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.13.3] - 2026-10-19
+
+### Changed
+- **Why there's no ID3 latency.** The Metadata tab tallies ID3 frames by
+  kind (TXXX description, PRIV owner) and counts wallclock timestamps. The
+  Latency tab's ID3 row now separates "no ID3 in the stream yet" from "ID3
+  has no wallclock (slicer `wallclock: 1` off?)". It used to say "no ID3
+  timestamps yet" either way, which looked like a player fault on channels
+  whose slicer doesn't write the wallclock.
+
 ## [3.13.2] - 2026-10-19
 
 ### Fixed
