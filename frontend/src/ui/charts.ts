@@ -19,6 +19,63 @@ export function drawLatencyChart(
     windowMs: number,
     range?: ChartRange,
 ): void {
+    const {x, y} = latencyAxes(el, Math.max(15, ...points.map((p) => p.v)), windowMs, range);
+    if (points.length < 2) return;
+    const pts = points.map((p) => `${x(p.t).toFixed(1)},${y(p.v).toFixed(1)}`).join(' ');
+    const first = points[0] as Point;
+    const last = points[points.length - 1] as Point;
+    svg(
+        'polygon',
+        {
+            points: `${x(first.t)},${y(0)} ${pts} ${x(last.t)},${y(0)}`,
+            fill: 'var(--accent)',
+            'fill-opacity': 0.15,
+        },
+        el,
+    );
+    svg('polyline', {points: pts, fill: 'none', stroke: 'var(--accent)', 'stroke-width': 1.75}, el);
+    svg(
+        'circle',
+        {
+            cx: x(last.t),
+            cy: y(last.v),
+            r: 3.5,
+            fill: '#fff',
+            stroke: 'var(--accent)',
+            'stroke-width': 2,
+        },
+        el,
+    );
+}
+
+/** Several latency lines on one set of axes (the compare page). */
+export function drawLatencyLines(
+    el: SVGSVGElement,
+    lines: {points: Point[]; color: string}[],
+    windowMs: number,
+): void {
+    const all = lines.flatMap((l) => l.points.map((p) => p.v));
+    const {x, y} = latencyAxes(el, Math.max(15, ...all), windowMs);
+    for (const {points, color} of lines) {
+        if (points.length < 2) continue;
+        const pts = points.map((p) => `${x(p.t).toFixed(1)},${y(p.v).toFixed(1)}`).join(' ');
+        svg('polyline', {points: pts, fill: 'none', stroke: color, 'stroke-width': 1.75}, el);
+        const last = points[points.length - 1] as Point;
+        svg(
+            'circle',
+            {cx: x(last.t), cy: y(last.v), r: 3.5, fill: '#fff', stroke: color, 'stroke-width': 2},
+            el,
+        );
+    }
+}
+
+/** Clear `el`, draw bands, grid and time labels; returns the scales. */
+function latencyAxes(
+    el: SVGSVGElement,
+    peak: number,
+    windowMs: number,
+    range?: ChartRange,
+): {x: (t: number) => number; y: (v: number) => number} {
     el.textContent = '';
     const W = 560;
     const H = 160;
@@ -27,7 +84,7 @@ export function drawLatencyChart(
     const T = 8;
     const B = 20;
     el.setAttribute('viewBox', `0 0 ${W} ${H}`);
-    const maxV = Math.max(15, ...points.map((p) => p.v)) * 1.1;
+    const maxV = peak * 1.1;
     const step = niceStep(maxV / 5); // about five grid lines whatever the range
     const top = Math.ceil(maxV / step) * step;
     const now = range?.end ?? Date.now();
@@ -79,32 +136,7 @@ export function drawLatencyChart(
             el,
         ).textContent = label;
     }
-    if (points.length < 2) return;
-    const pts = points.map((p) => `${x(p.t).toFixed(1)},${y(p.v).toFixed(1)}`).join(' ');
-    const first = points[0] as Point;
-    const last = points[points.length - 1] as Point;
-    svg(
-        'polygon',
-        {
-            points: `${x(first.t)},${y(0)} ${pts} ${x(last.t)},${y(0)}`,
-            fill: 'var(--accent)',
-            'fill-opacity': 0.15,
-        },
-        el,
-    );
-    svg('polyline', {points: pts, fill: 'none', stroke: 'var(--accent)', 'stroke-width': 1.75}, el);
-    svg(
-        'circle',
-        {
-            cx: x(last.t),
-            cy: y(last.v),
-            r: 3.5,
-            fill: '#fff',
-            stroke: 'var(--accent)',
-            'stroke-width': 2,
-        },
-        el,
-    );
+    return {x, y};
 }
 
 export type TimelineKind = 'abr' | 'key' | 'scte' | 'disc' | 'err';

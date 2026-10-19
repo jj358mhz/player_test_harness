@@ -15,6 +15,8 @@ export interface PlayerConfig {
     initialChannel: number | null;
     initialSrc: string | null;
     endpoints: {playback: string; sessions: string; versions: Record<string, string>};
+    /** A pane of the compare page: no compatibility panel or Copy link. */
+    embed?: boolean;
 }
 
 export function readConfig(): PlayerConfig {

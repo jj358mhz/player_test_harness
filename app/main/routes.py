@@ -13,7 +13,7 @@ from app.main import bp
 from app.models import AdminEvent, Channel, PlaybackEvent, PlaybackSession, UplynkAccount, db
 from app.sessions import expires_at
 from app.uplynk.playback import CONTENT_TYPES
-from app.vite import RECORDING_ENTRY, vite_assets
+from app.vite import COMPARE_ENTRY, RECORDING_ENTRY, vite_assets
 
 
 @bp.route("/")
@@ -57,25 +57,11 @@ def play_channel(channel_id: int):
 @bp.route("/player")
 @login_required
 def player() -> str:
-    channels = (
-        db.session.query(Channel)
-        .filter_by(is_active=True)
-        .join(UplynkAccount)
-        .order_by(UplynkAccount.label, Channel.is_favorite.desc(), Channel.description)
-        .all()
-    )
+    # embed=1: a pane of /compare (no site header, compatibility panel or Copy link).
+    embed = request.args.get("embed") == "1"
     config = {
-        "channels": [
-            {
-                "id": c.id,
-                "name": c.display_name,
-                "account": c.uplynk_account.label,
-                "channelId": c.channel_id,
-                "favorite": c.is_favorite,
-                "encryption": c.encryption,
-            }
-            for c in channels
-        ],
+        "channels": _channel_options(),
+        "embed": embed,
         "initialChannel": request.args.get("channel", type=int),
         "initialSrc": request.args.get("src") or None,
         "endpoints": {
@@ -86,7 +72,36 @@ def player() -> str:
             },
         },
     }
-    return render_template("main/player.html", config=config, assets=vite_assets())
+    return render_template("main/player.html", config=config, assets=vite_assets(), embed=embed)
+
+
+@bp.route("/compare")
+@login_required
+def compare() -> str:
+    """Two players side by side; `a` and `b` are player deep-link queries."""
+    config = {"channels": _channel_options(), "player": url_for("main.player")}
+    return render_template("main/compare.html", config=config, assets=vite_assets(COMPARE_ENTRY))
+
+
+def _channel_options() -> list[dict]:
+    channels = (
+        db.session.query(Channel)
+        .filter_by(is_active=True)
+        .join(UplynkAccount)
+        .order_by(UplynkAccount.label, Channel.is_favorite.desc(), Channel.description)
+        .all()
+    )
+    return [
+        {
+            "id": c.id,
+            "name": c.display_name,
+            "account": c.uplynk_account.label,
+            "channelId": c.channel_id,
+            "favorite": c.is_favorite,
+            "encryption": c.encryption,
+        }
+        for c in channels
+    ]
 
 
 @bp.route("/sign")

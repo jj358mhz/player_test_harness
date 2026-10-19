@@ -226,6 +226,16 @@ code {
     padding: 16px 24px 48px;
 }
 
+.site-main.site-main--full {
+    max-width: none;
+    padding: 16px 24px 48px;
+}
+
+.site-main.site-main--embed {
+    max-width: none;
+    padding: 0;
+}
+
 .site-header__inner.site-main--wide {
     max-width: 1480px;
 }

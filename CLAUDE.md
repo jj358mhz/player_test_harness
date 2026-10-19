@@ -88,7 +88,7 @@ after dependency changes.
 - `app/api/service.py` — validates playback requests, signs/Preplays,
   writes `PlaybackEvent`, records `Channel.encryption` from the probe
   (`check_encryption()` backs `flask check-encryption`). Both the JSON API and `/channels/<id>/play` use it.
-- `app/main/` — pages: channels dashboard, `/player`, `/sign`, `/activity`. `/player` renders `main/player.html` with a JSON
+- `app/main/` — pages: channels dashboard, `/player`, `/compare`, `/sign`, `/activity`. `/player` renders `main/player.html` with a JSON
   config (channels, endpoints; never keys) and the Vite assets found by
   `app/vite.py`. `/channels/<id>/play` → `/player?channel=<id>`.
 - `app/engines.py` — engine version menu from npm (latest patch of the last
@@ -115,6 +115,13 @@ after dependency changes.
     `clock.ts` (which clock program dates use; `delay=` parsing),
     `bands.ts`, `stats.ts`, `deeplink.ts` (address bar ⇄ load bar; validates
     engine versions because they end up in a jsDelivr URL).
+  - `compare.ts` — third Vite entry, `/compare`: two `/player?embed=1`
+    iframes (embed = no site header, compat panel or Copy link). Reads
+    each through `window.playerApp.snapshot()` (same origin) once a
+    second; `lib/compare.ts` has presets, `?a=&b=` links (each pane query
+    goes through `parseView`) and B − A. Iframes, not two controllers in
+    one page: Shaka's UMD build is a global, and `PlayerApp` owns
+    `location`/`history`.
   - Feature reference for users: `docs/player.md`.
 - `app/sessions.py` — recorded sessions: validate, redact (`sig=`, `pbs=`,
   percent-encoded forms, `/preplay2/…/<session>` paths, license URL
@@ -220,10 +227,11 @@ in the `player_harness_data` volume.
       recorded sessions (`PlaybackSession`, `POST /api/sessions`,
       `/sessions/<slug>` replay via the `recording.ts` Vite entry,
       `SESSION_RETENTION_DAYS`, `flask prune-sessions`). **Left:**
-      side-by-side compare, LL-HLS part/blocking-reload metrics, CMCD
+      LL-HLS part/blocking-reload metrics, CMCD
       toggle, request waterfall detail, CSL cross-link via slicer_id.
       **v3.8.0:** latency investigation done: `pdts=latency` for synced
-      HLS, DASH clock offset from the server, Delay control, Clock table
+      HLS, DASH clock offset from the server, Delay control, Clock table.
+      **v3.9.0:** side-by-side compare (`/compare`), startup time
 - [ ] Periodic background channel sync (for now: UI, CLI, or host cron)
 
 ### Todo

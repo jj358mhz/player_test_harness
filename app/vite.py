@@ -31,6 +31,7 @@ def _manifest() -> dict[str, Any] | None:
 
 
 RECORDING_ENTRY = "src/recording.ts"
+COMPARE_ENTRY = "src/compare.ts"
 
 
 def _css(manifest: dict[str, Any], key: str, seen: set[str]) -> list[str]:

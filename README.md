@@ -39,7 +39,9 @@ latency, drift, ABR, DRM keys, ID3/SCTE-35, captions and more.
   live-edge drift, measured at the playhead, on the encoder's clock for
   both HLS and DASH; Uplynk `delay=` from the load bar), Uplynk rays, an event
   timeline with ad breaks (SCTE-35 decoded), tracks with an audio meter,
-  and a request waterfall. Four engines to compare: **hls.js**, **Shaka
+  and a request waterfall. **Compare** puts two players side by side
+  (HLS vs DASH, engine vs engine, delay vs delay) with B − A on every
+  number. Four engines to compare: **hls.js**, **Shaka
   Player**, **dash.js** and the browser's **native** HLS (Safari). Each npm
   engine offers the latest patch of its last three minor lines. See [docs/player.md](docs/player.md)
   and the [wiki](https://github.com/jj358mhz/player_test_harness/wiki/Using-the-Player).

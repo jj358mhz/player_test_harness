@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title_suffix %} — Player{% endblock %}
-{% block main_modifier %} site-main--wide{% endblock %}
+{% block main_modifier %} site-main--wide{% if embed %} site-main--embed{% endif %}{% endblock %}
 
 {% block extra_head %}
 {% if assets %}
