@@ -182,9 +182,8 @@ after dependency changes.
   are TS (`FP_<RAY>….ts`): Safari's standard EME never fires `encrypted`
   for TS SAMPLE-AES (seen in Safari: MEDIA_ERR_DECODE, no key request), so
   TS uses legacy `WebKitMediaKeys` (`com.apple.fps.1_0`, `webkitneedkey`,
-  init data + content id (skd host) + certificate). Not yet
-  checked first-hand: certificate format (DER or base64, both handled)
-  and CORS on the certificate and key server hosts.
+  init data + content id (skd host) + certificate). Certificate and key
+  server hosts allow CORS (verified in Safari 2026-10-19).
 - DRM: Widevine/PlayReady need DASH; FairPlay needs HLS. Studio DRM requires
   token-protected playback. License hosts: `content.uplynk.com/{wv,pr}` (use
   the Preplay `prefix` zone to avoid redirects). EME needs HTTPS.
@@ -247,9 +246,9 @@ in the `player_harness_data` volume.
       message. **v3.4.0:** `Channel.encryption` learned from each HLS probe
       (first media playlist's `EXT-X-KEY`; Preplay `drm.required`), 🔒 DRM
       badge, Widevine auto-selected for DRM channels outside Safari,
-      `flask check-encryption`. **v3.13.0:** FairPlay in Safari (Native
-      engine + EME, #21) — built from Uplynk's docs, to verify in real
-      Safari. PlayReady is wired but untested (Chrome has no PlayReady;
+      `flask check-encryption`. **v3.13.0–.1:** FairPlay in Safari (Native
+      engine, WebKit legacy EME for TS, #21), verified 2026-10-19:
+      keys usable, ray f 720p. PlayReady is wired but untested (Chrome has no PlayReady;
       needs Edge).
 - [~] Phase 4 — triage (#24). **Done (v3.6.0):** deep links (source,
       format, engine@version, DRM, rays, tab) + Copy link. **v3.7.0:**

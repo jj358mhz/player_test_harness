@@ -7,6 +7,9 @@ describe('latency clocks', () => {
     it('knows which clock a URL uses', () => {
         expect(clockFor('m3u8', `${HLS}&pdts=latency&sig=x`, null).kind).toBe('encoder');
         expect(clockFor('m3u8', `${HLS}&sig=x`, null).kind).toBe('session');
+        // Preplay session URLs don't carry the signed params.
+        const session = 'https://content.example.com/preplay2/chan0001/abc/def.m3u8?pbs=x';
+        expect(clockFor('m3u8', session, null, null, 'latency').kind).toBe('encoder');
         expect(clockFor('mpd', 'https://content.example.com/x.mpd', null).kind).toBe('mpd');
         expect(clockFor('m3u8', 'not a url', null)).toMatchObject({kind: 'session', delay: null});
     });

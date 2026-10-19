@@ -69,6 +69,8 @@ export function clockFor(
     url: string,
     server: ServerClock | null | undefined,
     delay: number | null = parseDelay(param(url, 'delay')),
+    // Preplay session URLs (/preplay2/…) don't repeat the signed params: pass pdts.
+    pdts: string | null = param(url, 'pdts'),
 ): ClockInfo {
     const base = {offsetS: null, edgeAgeS: null, slice: null, delay};
     if (format === 'mpd') {
@@ -82,7 +84,7 @@ export function clockFor(
               }
             : {...base, kind: 'mpd'};
     }
-    return {...base, kind: param(url, 'pdts') === 'latency' ? 'encoder' : 'session'};
+    return {...base, kind: pdts === 'latency' ? 'encoder' : 'session'};
 }
 
 /** Where the master asks players to start: EXT-X-START, described. */
