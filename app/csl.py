@@ -54,8 +54,18 @@ def _fetch(slicer_id: str) -> dict[str, Any]:
     except requests.RequestException as e:
         return {**unknown, "error": f"slicer console unreachable: {type(e).__name__}"}
     if response.status_code == 404:
-        # Either the slicer isn't one of the console's (on-prem) or its API is off.
-        return {**unknown, "error": None}
+        # The API answers an unknown slicer (e.g. on-prem) with a JSON error;
+        # a plain 404 page means the route is off (PLAYER_API_TOKEN unset) or missing.
+        try:
+            body = response.json()
+        except ValueError:
+            body = None
+        if isinstance(body, dict) and body.get("error"):
+            return {**unknown, "error": None}
+        return {
+            **unknown,
+            "error": "slicer console API is off (PLAYER_API_TOKEN unset, or console < v1.17.0)",
+        }
     if response.status_code == 401:
         return {**unknown, "error": "slicer console rejected CSL_API_TOKEN"}
     if response.status_code >= 400:

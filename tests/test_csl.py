@@ -81,6 +81,7 @@ def test_not_in_the_console(auth_client, channel, console):
     [
         (FakeResponse(401, {"error": "unauthorized"}), "rejected CSL_API_TOKEN"),
         (FakeResponse(500), "answered 500"),
+        (FakeResponse(404, text="<h1>Not Found</h1>"), "API is off"),
         (requests.ConnectionError("down"), "unreachable"),
     ],
 )

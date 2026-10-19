@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.14.1] - 2026-10-19
+
+### Fixed
+- **Slicer wallclock** said "not in the slicer console (on-prem?)" for
+  any 404, including when the console's settings API is off
+  (`PLAYER_API_TOKEN` unset there, or a console older than v1.17.0). It
+  now tells them apart: an unknown slicer (the API's JSON error) is
+  still "not in the slicer console", while a plain 404 page reads
+  "slicer console API is off". Errors aren't cached, so fixing the
+  console's setting shows up on the next load.
+
 ## [3.14.0] - 2026-10-19
 
 ### Added
