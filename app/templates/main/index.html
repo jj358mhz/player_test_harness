@@ -7,7 +7,8 @@
     <div class="page-header__controls">
         {% if total %}
         <input type="search" id="channel-filter" class="input channel-filter"
-               placeholder="Filter by name, ID, external ID, slicer…" autocomplete="off">
+               placeholder="Filter by name, ID, external ID, slicer…" autocomplete="off"
+               value="{{ request.args.get('q', '') }}">
         {% endif %}
         {% if total %}
         <button type="button" class="btn-ghost" id="collapse-all-btn">Collapse all</button>
@@ -92,7 +93,7 @@
             <dl class="channel-card__ids">
                 <dt>ID</dt><dd class="mono" title="{{ ch.channel_id }}">{{ ch.channel_id }}</dd>
                 {% if ch.external_id %}<dt>Ext</dt><dd class="mono" title="{{ ch.external_id }}">{{ ch.external_id }}</dd>{% endif %}
-                {% if ch.slicer_id %}<dt>Slicer</dt><dd class="mono" title="{{ ch.slicer_id }}">{{ ch.slicer_id }}</dd>{% endif %}
+                {% if ch.slicer_id %}<dt>Slicer</dt><dd class="mono" title="{{ ch.slicer_id }}">{% if csl_base_url %}<a href="{{ csl_base_url }}/slicers/by-id/{{ ch.slicer_id|urlencode }}" target="_blank" rel="noopener" title="Open {{ ch.slicer_id }} in the slicer console">{{ ch.slicer_id }} ↗</a>{% else %}{{ ch.slicer_id }}{% endif %}</dd>{% endif %}
             </dl>
             <div class="channel-card__check" data-check hidden></div>
             <div class="channel-card__actions">

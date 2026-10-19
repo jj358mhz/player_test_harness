@@ -199,6 +199,7 @@ a Docker Compose stack on the shared `auth-net` network, fronted by Caddy at
 | `PLAYBACK_TOKEN_TTL`       | Default signed-token lifetime in seconds (default 3600)       |
 | `SESSION_RETENTION_DAYS`   | Days to keep recorded sessions (default 30; 0 = forever)      |
 | `MAX_RECORDING_BYTES`      | Largest recorded session accepted (default 8 MiB)             |
+| `CSL_BASE_URL`             | csl-slicer-console URL for slicer links (optional)            |
 | `LOG_LEVEL`                | `info` / `debug` / `warning`                                  |
 | `GUNICORN_WORKERS`         | Worker count (default 2)                                      |
 

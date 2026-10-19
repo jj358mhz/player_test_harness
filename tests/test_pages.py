@@ -288,3 +288,37 @@ def test_compare_page(auth_client, make_account, make_channel, monkeypatch):
     assert 'src="/static/src/compare.ts.js"' in html
     assert 'id="compare-config"' in html and '"player": "/player"' in html
     assert "Alpha" in html and "api_key" not in html
+
+
+def test_channel_by_slicer_redirects(auth_client, make_account, make_channel):
+    acct = make_account()
+    one = make_channel(acct, "c1", slicer_id="slicer0001")
+    make_channel(acct, "c2", slicer_id="slicer0002")
+    make_channel(acct, "c3", slicer_id="slicer0002")
+    r = auth_client.get("/channels/by-slicer/slicer0001")
+    assert r.status_code == 302 and r.headers["Location"].endswith(f"/player?channel={one.id}")
+    r = auth_client.get("/channels/by-slicer/slicer0002")
+    assert r.headers["Location"].endswith("/?q=slicer0002")
+    r = auth_client.get("/channels/by-slicer/slicer9999", follow_redirects=True)
+    html = r.get_data(as_text=True)
+    assert "No synced channel uses slicer slicer9999" in html
+    assert 'value="slicer9999"' in html  # the filter is pre-filled
+
+
+def test_slicer_links_follow_csl_base_url(
+    app, auth_client, make_account, make_channel, monkeypatch
+):
+    from app.main import routes
+
+    monkeypatch.setattr(
+        routes, "vite_assets", lambda entry="src/main.ts": {"js": "/x.js", "css": []}
+    )
+    make_channel(make_account(), "c1", slicer_id="slicer0001")
+    assert "/slicers/by-id/" not in auth_client.get("/").get_data(as_text=True)
+    assert '"cslBase": null' in auth_client.get("/player").get_data(as_text=True)
+
+    app.config["CSL_BASE_URL"] = "https://csl.example.com"
+    dashboard = auth_client.get("/").get_data(as_text=True)
+    assert 'href="https://csl.example.com/slicers/by-id/slicer0001"' in dashboard
+    player = auth_client.get("/player").get_data(as_text=True)
+    assert '"cslBase": "https://csl.example.com"' in player and '"slicerId": "slicer0001"' in player

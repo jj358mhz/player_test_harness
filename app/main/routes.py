@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from itertools import groupby
 
-from flask import abort, flash, jsonify, redirect, render_template, request, url_for
+from flask import abort, current_app, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import login_required
 
 from app.engines import ENGINES
@@ -62,6 +62,7 @@ def player() -> str:
     config = {
         "channels": _channel_options(),
         "embed": embed,
+        "cslBase": current_app.config["CSL_BASE_URL"] or None,
         "initialChannel": request.args.get("channel", type=int),
         "initialSrc": request.args.get("src") or None,
         "endpoints": {
@@ -99,9 +100,30 @@ def _channel_options() -> list[dict]:
             "channelId": c.channel_id,
             "favorite": c.is_favorite,
             "encryption": c.encryption,
+            "slicerId": c.slicer_id,
         }
         for c in channels
     ]
+
+
+@bp.route("/channels/by-slicer/<slicer_id>")
+@login_required
+def channel_by_slicer(slicer_id: str):
+    """Where the slicer console's "Player" link lands: the slicer's channel.
+
+    One channel → the player on it; several → the dashboard filtered to
+    them; none → the dashboard with a note.
+    """
+    ids = [
+        c.id for c in db.session.query(Channel).filter_by(is_active=True, slicer_id=slicer_id).all()
+    ]
+    if len(ids) == 1:
+        return redirect(url_for("main.player", channel=ids[0]))
+    if not ids:
+        flash(
+            f"No synced channel uses slicer {slicer_id}. Sync its account, then try again.", "info"
+        )
+    return redirect(url_for("main.index", q=slicer_id))
 
 
 @bp.route("/sign")

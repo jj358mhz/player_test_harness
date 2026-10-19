@@ -4,6 +4,7 @@
 
 import type shakaNS from 'shaka-player';
 import {version as pinned} from 'shaka-player/package.json';
+import type {CmcdConfig} from '../lib/cmcd';
 import {videoProfile} from '../lib/codecs';
 import {
     type AudioTrack,
@@ -77,6 +78,7 @@ const ROBUSTNESS: Record<DrmConfig['keySystem'], {video: string; audio: string}>
 };
 
 export class ShakaEngine implements PlayerEngine {
+    cmcd: CmcdConfig | null = null;
     readonly name = 'Shaka';
     /** Exposed for console debugging. */
     player: ShakaPlayer | null = null;
@@ -112,6 +114,14 @@ export class ShakaEngine implements PlayerEngine {
         const config: Record<string, unknown> = {
             streaming: {lowLatencyMode: false},
         };
+        if (this.cmcd) {
+            config.cmcd = {
+                enabled: true,
+                sessionId: this.cmcd.sessionId,
+                contentId: this.cmcd.contentId,
+                useHeaders: false,
+            };
+        }
         if (this.drm) {
             const r = ROBUSTNESS[this.drm.keySystem];
             config.drm = {

@@ -293,6 +293,7 @@ export function renderRecording(root: HTMLElement, r: Recording): void {
                                   ],
                               ]
                             : []),
+                        ...(r.cmcd ? [['CMCD session', r.cmcd.sessionId]] : []),
                         ['Browser', r.userAgent],
                         ...(r.playlist
                             ? Object.entries(r.playlist).map(([k, v]) => [

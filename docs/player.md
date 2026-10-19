@@ -190,6 +190,17 @@ Segment count, average load time, bytes and HTTP errors, plus a
 init and media segments and key fetches. Slow segments (over half the
 target duration) are orange; failures are red.
 
+**CMCD** (load bar checkbox, `cmcd=1` in links): hls.js, Shaka and dash.js
+add a `CMCD=` query param to every request (CTA-5004: object type,
+bitrate, buffer length, measured throughput, session and content ids…), so
+CDN logs can be joined to this load by its session id. Each load gets a
+new session id; the content id is the Uplynk channel id (or the manifest's
+file name for a pasted URL). The Network tab shows both ids, how many
+requests carried CMCD and the last one decoded, read from the browser's
+Resource Timing. Query mode only: Uplynk's content and CDN hosts don't
+allow CMCD headers in CORS preflights, so header mode would stop playback.
+The native engine has no CMCD.
+
 ## Engines and versions
 
 - **hls.js** plays HLS (clear and AES-128).

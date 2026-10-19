@@ -33,6 +33,7 @@ import {
     hlsStart,
     parseDelay,
 } from './lib/clock';
+import {type CmcdConfig, cmcdFromUrl, contentIdFor, describeCmcd, newSessionId} from './lib/cmcd';
 import type {PaneSnapshot} from './lib/compare';
 import {isVersion, parseView, type View, viewQuery} from './lib/deeplink';
 import {parsePriv, parseTxxx, toHex} from './lib/id3';
@@ -159,6 +160,9 @@ class Session {
     /** performance.now() when the engine was given the URL, and load → first frame. */
     loadAt: number | null = null;
     startupMs: number | null = null;
+    cmcd: CmcdConfig | null = null;
+    /** Requests seen carrying CMCD, and the last one's keys (from Resource Timing). */
+    cmcdSent = {count: 0, last: null as {t: number; keys: Record<string, string>} | null};
     licenses: {count: number; failed: number; ms: number[]; last: EngineEvents['license'] | null} =
         {
             count: 0,
@@ -206,6 +210,7 @@ export class PlayerApp {
         this.svgs.timeline.setAttribute('aria-label', 'Events over the last five minutes');
         this.root.append(this.build());
         this.watchVideo();
+        this.watchCmcd();
         setInterval(() => this.tick(), 1000);
         void this.loadVersions();
         this.start();
@@ -229,7 +234,21 @@ export class PlayerApp {
             this.ref('notices', h('div', {class: 'pl-notices', 'aria-live': 'polite'})),
             this.buildLoadBar(),
             ...(this.config.embed ? [] : [this.ref('compat', buildCompatPanel())]),
-            this.ref('status', h('div', {class: 'pl-status', 'aria-label': 'Stream properties'})),
+            h(
+                'div',
+                {class: 'pl-status', 'aria-label': 'Stream properties'},
+                // Chips are redrawn every second; the slicer link stays put so clicks land.
+                this.ref('status', h('span', {class: 'pl-status__chips'})),
+                this.ref(
+                    'slicerLink',
+                    h('a', {
+                        class: 'chip chip--link',
+                        target: '_blank',
+                        rel: 'noopener',
+                        hidden: true,
+                    }),
+                ),
+            ),
             h(
                 'div',
                 {class: 'pl-main'},
@@ -430,6 +449,19 @@ export class PlayerApp {
                         h('option', {value: ''}, 'Default'),
                         ...DELAY_CHOICES.map((d) => h('option', {value: String(d)}, `${d} s`)),
                     ),
+                ),
+            ),
+            h(
+                'div',
+                {class: 'pl-field pl-field--check'},
+                h('label', {for: 'pl-cmcd'}, 'CMCD'),
+                this.ref(
+                    'cmcd',
+                    h('input', {
+                        id: 'pl-cmcd',
+                        type: 'checkbox',
+                        title: 'Send CMCD (CTA-5004) as a CMCD= query param on every request, so CDN logs can be matched by session id. Takes effect on the next load. Not in the native engine',
+                    }),
                 ),
             ),
             h(
@@ -1221,6 +1253,7 @@ export class PlayerApp {
             this.autoDrm = false;
         }
         if (view.delay !== undefined) this.setDelay(view.delay);
+        if (view.cmcd) this.el<HTMLInputElement>('cmcd').checked = true;
     }
 
     /** Select a delay, adding it to the menu if a link asked for an unlisted one. */
@@ -1363,6 +1396,7 @@ export class PlayerApp {
         const {engine, version} = this.chosenEngine();
         const query = viewQuery({
             ...source,
+            cmcd: this.el<HTMLInputElement>('cmcd').checked || undefined,
             format: this.format(),
             engine,
             version: engine === 'native' ? undefined : version,
@@ -1415,6 +1449,7 @@ export class PlayerApp {
             userAgent: navigator.userAgent,
             latencyName: name,
             clock: source.clock,
+            cmcd: s.cmcd,
             stats: {
                 latency: summarize(this.headline().stats),
                 id3: summarize(s.latency.id3),
@@ -1573,6 +1608,7 @@ export class PlayerApp {
         for (const timer of this.session.pending) clearTimeout(timer);
         this.session = new Session();
         this.source = source;
+        this.renderSlicerLink(source.channel);
         this.renderAll();
         const {engine: kind, version} = source.drm ? this.drmEngine() : this.chosenEngine();
         let engine: PlayerEngine;
@@ -1636,6 +1672,19 @@ export class PlayerApp {
             `${source.channel?.name ?? 'URL'} · ${engine.name} ${version}${drmText}`,
         );
         if (engine.limits) this.logEntry('info', 'ENGINE', engine.limits);
+        if (this.el<HTMLInputElement>('cmcd').checked) {
+            if (kind === 'native') {
+                this.logEntry('info', 'CMCD', 'not sent: the native engine has no CMCD support');
+            } else {
+                const cmcd = {
+                    sessionId: newSessionId(),
+                    contentId: contentIdFor(source.channel?.channelId ?? null, source.url),
+                };
+                engine.cmcd = cmcd;
+                this.session.cmcd = cmcd;
+                this.logEntry('info', 'CMCD', `query mode · sid ${cmcd.sessionId}`);
+            }
+        }
         this.session.loadAt = performance.now();
         engine.load(source.url, this.video);
     }
@@ -1934,6 +1983,21 @@ export class PlayerApp {
                 this.logEntry('id3', `ID3 ${frame.id}`, `${frame.data.length} bytes`, 'meta');
             }
         }
+    }
+
+    /** What CMCD actually went out: every engine's requests show up in Resource Timing. */
+    private watchCmcd(): void {
+        if (typeof PerformanceObserver === 'undefined') return;
+        new PerformanceObserver((list) => {
+            const s = this.session;
+            if (!s.cmcd) return;
+            for (const entry of list.getEntries()) {
+                const keys = entry.name.includes('CMCD=') ? cmcdFromUrl(entry.name) : null;
+                if (!keys) continue;
+                s.cmcdSent.count += 1;
+                s.cmcdSent.last = {t: Date.now(), keys};
+            }
+        }).observe({type: 'resource', buffered: false});
     }
 
     private watchVideo(): void {
@@ -2642,6 +2706,21 @@ export class PlayerApp {
               : 'Load a stream to see its master playlist.';
     }
 
+    private cmcdRows(): [string, string][] {
+        const s = this.session;
+        if (!s.cmcd) return [['CMCD', 'off (tick CMCD in the load bar and reload)']];
+        const last = s.cmcdSent.last;
+        return [
+            ['CMCD session', s.cmcd.sessionId],
+            ['CMCD content', s.cmcd.contentId],
+            ['Requests with CMCD', String(s.cmcdSent.count)],
+            [
+                'Last CMCD sent',
+                last ? `${clock(new Date(last.t))} · ${describeCmcd(last.keys)}` : '--',
+            ],
+        ];
+    }
+
     private renderNetwork(): void {
         const n = this.session.segments;
         kv(this.el('netKv'), [
@@ -2649,6 +2728,7 @@ export class PlayerApp {
             ['Avg segment load', n.count ? `${Math.round(n.ms / n.count)} ms` : '--'],
             ['Downloaded', `${(n.bytes / 1e6).toFixed(1)} MB`],
             ['HTTP errors', String(this.session.errorsHttp)],
+            ...this.cmcdRows(),
         ]);
         const dot = this.el('count-network');
         dot.textContent = '';
@@ -2706,6 +2786,18 @@ export class PlayerApp {
         );
     }
 
+    /** Link to the channel's slicer in csl-slicer-console, when CSL_BASE_URL is set. */
+    private renderSlicerLink(channel: ChannelOption | null): void {
+        const link = this.el<HTMLAnchorElement>('slicerLink');
+        const base = this.config.cslBase;
+        const slicer = channel?.slicerId;
+        link.hidden = !base || !slicer;
+        if (!base || !slicer) return;
+        link.href = `${base}/slicers/by-id/${encodeURIComponent(slicer)}`;
+        link.textContent = `${slicer} ↗`;
+        link.title = `Open ${slicer} in the slicer console`;
+    }
+
     private renderStatus(): void {
         const s = this.session;
         const chips: HTMLElement[] = [];
@@ -2741,6 +2833,7 @@ export class PlayerApp {
             if (r?.codecs) chips.push(h('span', {class: 'chip'}, r.codecs));
             const rays = s.renditions.map((x) => x.ray).filter(Boolean) as string[];
             if (rays.length) chips.push(h('span', {class: 'chip'}, `rays ${rayRange(rays)}`));
+            if (s.cmcd) chips.push(h('span', {class: 'chip', title: s.cmcd.sessionId}, 'CMCD'));
             const exp = this.source?.expiresAt;
             if (exp) {
                 const left = Math.max(0, Math.round((exp.getTime() - Date.now()) / 1000));
