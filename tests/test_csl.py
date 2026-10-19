@@ -28,11 +28,19 @@ def console(app, monkeypatch):
 
 
 @pytest.fixture
+def built(monkeypatch):
+    """Render /player as if the frontend were built (CI has no build)."""
+    from app.main import routes
+
+    monkeypatch.setattr(routes, "vite_assets", lambda entry="": {"js": "/x.js", "css": []})
+
+
+@pytest.fixture
 def channel(app, make_account, make_channel):
     return make_channel(make_account(), slicer_id="slicer01")
 
 
-def test_off_without_a_token(auth_client, channel):
+def test_off_without_a_token(auth_client, channel, built):
     assert auth_client.get(f"/api/channels/{channel.id}/slicer").status_code == 404
     page = auth_client.get("/player").get_data(as_text=True)
     assert '"slicer": null' in page
@@ -49,7 +57,7 @@ def test_wallclock_on(auth_client, channel, console):
     assert kwargs["headers"] == {"Authorization": "Bearer csl-test-token-7f3a"}
 
 
-def test_player_gets_the_endpoint(auth_client, channel, console):
+def test_player_gets_the_endpoint(auth_client, channel, console, built):
     page = auth_client.get("/player").get_data(as_text=True)
     assert '"/api/channels/{id}/slicer"' in page
     assert "csl-test-token-7f3a" not in page
