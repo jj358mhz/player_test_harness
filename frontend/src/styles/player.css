@@ -163,9 +163,10 @@
     background: var(--surface);
 }
 .pl .chip--live {
+    /* Green chip; the dot stays red and blinks while live. */
     color: #fff;
-    border-color: rgba(224, 82, 82, 0.6);
-    background: rgba(224, 82, 82, 0.15);
+    border-color: rgba(34, 197, 94, 0.6);
+    background: rgba(34, 197, 94, 0.15);
 }
 .pl .chip--live::before {
     content: "";
@@ -759,6 +760,91 @@
     gap: 8px;
     align-items: center;
     color: var(--text-dim);
+    /* rows are buttons */
+    width: 100%;
+    padding: 1px 4px;
+    border: 0;
+    border-radius: 3px;
+    background: none;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+.pl-wf:hover {
+    background: var(--surface-2);
+    color: var(--text);
+}
+.pl-wf.is-selected {
+    background: var(--accent-bg);
+    color: var(--text);
+    box-shadow: inset 2px 0 0 var(--accent);
+}
+.pl-wf__wait {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    border-radius: 2px 0 0 2px;
+    background: rgba(255, 255, 255, 0.45);
+}
+.pl-wf-hint {
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: 0;
+}
+.pl-wf-detail {
+    margin-top: 8px;
+    padding: 10px 12px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    background: var(--surface-2);
+}
+.pl-wf-detail__head {
+    display: flex;
+    gap: 10px;
+    align-items: baseline;
+    margin-bottom: 6px;
+}
+.pl-wf-detail__head button {
+    margin-left: auto;
+    font-size: 16px;
+    line-height: 1;
+}
+.pl-wf-detail__bar {
+    display: flex;
+    height: 8px;
+    margin: 0 0 8px;
+    border-radius: 2px;
+    overflow: hidden;
+}
+.pl-wf-detail__wait {
+    background: color-mix(in srgb, var(--info) 35%, transparent);
+}
+.pl-wf-detail__dl {
+    flex: 1;
+    background: var(--info);
+}
+.pl-wf-detail__list {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    gap: 3px 14px;
+    margin: 0;
+    font-size: 12.5px;
+}
+.pl-wf-detail__list dt {
+    color: var(--text-faint);
+}
+.pl-wf-detail__list dd {
+    margin: 0;
+    color: var(--text);
+}
+.pl-wf-detail__url {
+    overflow-wrap: anywhere;
+    font: 11.5px var(--font-mono);
+}
+.pl-wf-detail__note {
+    margin: 6px 0 0;
+    font-size: 12px;
 }
 .pl-wf__name {
     white-space: nowrap;

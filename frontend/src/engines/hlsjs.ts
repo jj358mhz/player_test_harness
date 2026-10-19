@@ -71,7 +71,7 @@ export class HlsJsEngine implements PlayerEngine {
             const details = data.networkDetails as XMLHttpRequest | undefined;
             const text = typeof details?.responseText === 'string' ? details.responseText : null;
             if (text) this.media = parseUplynkMedia(text);
-            this.request('manifest', 'master.m3u8', data.stats, 200);
+            this.request('manifest', 'master.m3u8', data.stats, 200, data.url);
             this.renditions = data.levels.map((_l, i) => this.toRendition(hls.levels[i], i));
             this.master = text;
         });
@@ -83,7 +83,7 @@ export class HlsJsEngine implements PlayerEngine {
         hls.on(E.LEVEL_LOADED, (_e, data) => {
             const {details} = data;
             const ray = this.renditions[data.level]?.ray ?? null;
-            this.request('playlist', `${ray ?? data.level}.m3u8`, data.stats, 200);
+            this.request('playlist', `${ray ?? data.level}.m3u8`, data.stats, 200, details.url);
             const xhr = data.networkDetails as XMLHttpRequest | undefined;
             const first = details.fragments[0];
             const container = !first
@@ -173,6 +173,7 @@ export class HlsJsEngine implements PlayerEngine {
                     status: 200,
                     bytes: 16,
                     failed: false,
+                    url: key.uri,
                 });
             }
             this.events.emit('key', {
@@ -190,6 +191,8 @@ export class HlsJsEngine implements PlayerEngine {
                 `${ray ?? frag.level} · ${init ? 'init' : `seg ${frag.sn}`}`,
                 frag.stats,
                 200,
+                frag.url,
+                init ? null : frag.duration,
             );
             if (init) return;
             const s = frag.stats.loading;
@@ -239,8 +242,15 @@ export class HlsJsEngine implements PlayerEngine {
         hls.loadSource(url);
     }
 
-    private request(kind: RequestKind, name: string, stats: LoaderStats, status: number): void {
-        const {start, end} = stats.loading;
+    private request(
+        kind: RequestKind,
+        name: string,
+        stats: LoaderStats,
+        status: number,
+        url?: string,
+        mediaDuration: number | null = null,
+    ): void {
+        const {start, first, end} = stats.loading;
         if (!start || !end) return;
         this.events.emit('request', {
             kind,
@@ -250,6 +260,9 @@ export class HlsJsEngine implements PlayerEngine {
             status,
             bytes: stats.total || stats.loaded,
             failed: false,
+            url,
+            ttfb: first && first >= start && first <= end ? first : null,
+            mediaDuration,
         });
     }
 

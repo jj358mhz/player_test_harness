@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.11.0] - 2026-10-18
+
+### Added
+- **Request detail in the waterfall.** Click a request in the Network tab
+  for its URL (tokens redacted), host, status, size, total time, **first
+  byte vs download** (a split bar), throughput, the segment's media
+  duration and how much of it the load took, protocol and the CMCD it
+  sent. The waterfall holds still while the pointer is over it.
+  - First byte comes from hls.js and dash.js. Shaka and native don't
+    report it, and Uplynk's hosts send no `Timing-Allow-Origin`, so the
+    browser hides it too; the panel says so. If a host ever allows it,
+    Resource Timing fills it in for every engine.
+  - Cache hit/miss isn't shown: the CDN sends `X-Cache`/`Age` but doesn't
+    expose them to pages; the panel says so.
+- Slow segments are judged against their own duration where the engine
+  reports it (was the target duration).
+- Recordings keep first byte, media duration and host/path per request;
+  the replay's request table has a First byte column.
+
+### Changed
+- The **LIVE** chip is green; its dot still blinks red.
+
 ## [3.10.0] - 2026-10-18
 
 ### Added

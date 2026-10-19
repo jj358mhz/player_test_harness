@@ -76,6 +76,10 @@ export interface Recording {
         status: number | null;
         bytes: number;
         failed: boolean;
+        /** Request to first byte, ms (absent before v3.11.0 or when unknown). */
+        ttfbMs?: number | null;
+        mediaDuration?: number | null;
+        url?: string | null;
     }[];
     drm: {
         keySystem: string | null;

@@ -52,6 +52,7 @@ import {
 } from './lib/recording';
 import {decodeScte35, describeScte35, hexToBytes, type SpliceInfo} from './lib/scte35';
 import {type Point, RunningStats, Series} from './lib/stats';
+import {fromResourceTiming, requestDetail, requestKey, requestState} from './lib/waterfall';
 import {
     type AdBreak,
     drawLatencyChart,
@@ -188,6 +189,8 @@ export class PlayerApp {
     };
     private disabledRays = new Set<string>();
     private manifestView: 'master' | 'media' = 'master';
+    /** The waterfall request whose detail is shown (requestKey), kept across redraws. */
+    private wfSelected: {key: string; req: RequestTiming} | null = null;
     private loadToken = 0;
     private readonly video: HTMLVideoElement;
     private readonly refs: Record<string, HTMLElement> = {};
@@ -211,6 +214,11 @@ export class PlayerApp {
         this.root.append(this.build());
         this.watchVideo();
         this.watchCmcd();
+        // Resource Timing keeps 250 entries by default; the waterfall looks up recent ones.
+        performance.setResourceTimingBufferSize?.(1000);
+        performance.addEventListener?.('resourcetimingbufferfull', () =>
+            performance.clearResourceTimings(),
+        );
         setInterval(() => this.tick(), 1000);
         void this.loadVersions();
         this.start();
@@ -1026,8 +1034,20 @@ export class PlayerApp {
             h(
                 'div',
                 {},
-                h('p', {class: 'pl-subhead'}, 'Requests, last 30 seconds'),
-                this.ref('waterfall', h('div', {class: 'pl-waterfall'})),
+                h(
+                    'p',
+                    {class: 'pl-subhead'},
+                    'Requests, last 30 seconds',
+                    this.ref(
+                        'wfHint',
+                        h('span', {class: 'pl-muted pl-wf-hint'}, ' · click one for detail'),
+                    ),
+                ),
+                this.ref(
+                    'waterfall',
+                    h('div', {class: 'pl-waterfall', role: 'list', 'aria-label': 'Requests'}),
+                ),
+                this.ref('wfDetail', h('div', {class: 'pl-wf-detail', hidden: true})),
             ),
             this.ref('netLog', h('div', {class: 'pl-log'})),
         );
@@ -1504,6 +1524,10 @@ export class PlayerApp {
                 status: r.status,
                 bytes: r.bytes,
                 failed: r.failed,
+                ttfbMs: r.ttfb == null ? null : Math.round(r.ttfb - r.start),
+                mediaDuration: r.mediaDuration ?? null,
+                // Host and path only: the query carries tokens (redactDeep covers the rest).
+                url: r.url ? shortUrlFull(r.url) : null,
             })),
             drm: drm
                 ? {
@@ -1790,6 +1814,14 @@ export class PlayerApp {
             this.renderTracks();
         });
         engine.on('request', (req) => {
+            // First byte / protocol from Resource Timing, if the host allows it.
+            if (req.url && typeof performance.getEntriesByType === 'function') {
+                const entry = findResourceEntry(req.url);
+                Object.assign(req, fromResourceTiming(req, entry));
+                // Engines that add CMCD in their loader (hls.js) report the URL without it.
+                if (entry && entry.name !== req.url && entry.name.includes('CMCD='))
+                    req.url = entry.name;
+            }
             const list = s().requests;
             list.push(req);
             const history = s().history;
@@ -2738,34 +2770,59 @@ export class PlayerApp {
     }
 
     private renderWaterfall(): void {
+        const box = this.el('waterfall');
+        // Hold still while the pointer or keyboard is in it, so rows can be clicked.
+        const paused = box.matches(':hover') || !!box.querySelector(':focus-visible');
+        this.el('wfHint').textContent = paused
+            ? ' · paused while you\u2019re here'
+            : ' · click one for detail';
+        if (paused) return;
         const now = performance.now();
         const from = now - WATERFALL_MS;
         const target = (this.session.playlist?.targetDuration ?? 6) * 1000;
         const rows = this.session.requests.filter((r) => r.end >= from).slice(-40);
         const pct = (t: number) => Math.max(0, ((t - from) / WATERFALL_MS) * 100);
-        this.el('waterfall').replaceChildren(
+        const selected = this.wfSelected?.key;
+        box.replaceChildren(
             ...(rows.length
                 ? rows.map((r) => {
                       const ms = Math.round(r.end - r.start);
-                      const state = r.failed
-                          ? 'err'
-                          : r.kind === 'segment' && ms > target * 0.5
-                            ? 'slow'
-                            : r.kind;
+                      const key = requestKey(r);
+                      const left = pct(r.start);
+                      const width = Math.max(0.4, pct(r.end) - left);
+                      const wait =
+                          r.ttfb != null && r.end > r.start
+                              ? ((r.ttfb - r.start) / (r.end - r.start)) * 100
+                              : null;
                       return h(
-                          'div',
+                          'button',
                           {
-                              class: 'pl-wf',
-                              title: `${r.name} · ${r.status ?? ''} · ${ms} ms · ${(r.bytes / 1024).toFixed(0)} KB`,
+                              type: 'button',
+                              role: 'listitem',
+                              class: `pl-wf${key === selected ? ' is-selected' : ''}`,
+                              title: `${r.name} · ${r.status ?? ''} · ${ms} ms${r.ttfb != null ? ` (first byte ${Math.round(r.ttfb - r.start)} ms)` : ''} · ${(r.bytes / 1024).toFixed(0)} KB`,
+                              onclick: () => this.selectRequest(r),
                           },
                           h('span', {class: 'pl-wf__name'}, r.name),
                           h(
                               'span',
                               {class: 'pl-wf__track'},
-                              h('span', {
-                                  class: `pl-wf__bar pl-wf--${state}`,
-                                  style: `left:${pct(r.start).toFixed(2)}%;width:${Math.max(0.4, pct(r.end) - pct(r.start)).toFixed(2)}%`,
-                              }),
+                              h(
+                                  'span',
+                                  {
+                                      class: `pl-wf__bar pl-wf--${requestState(r, target)}`,
+                                      style: `left:${left.toFixed(2)}%;width:${width.toFixed(2)}%`,
+                                  },
+                                  // Waiting for the first byte, drawn lighter.
+                                  ...(wait !== null
+                                      ? [
+                                            h('span', {
+                                                class: 'pl-wf__wait',
+                                                style: `width:${wait.toFixed(1)}%`,
+                                            }),
+                                        ]
+                                      : []),
+                              ),
                           ),
                           h(
                               'span',
@@ -2784,6 +2841,78 @@ export class PlayerApp {
                       ),
                   ]),
         );
+    }
+
+    private selectRequest(r: RequestTiming | null): void {
+        const panel = this.el('wfDetail');
+        const key = r ? requestKey(r) : null;
+        if (!r || key === this.wfSelected?.key) {
+            this.wfSelected = null;
+            panel.hidden = true;
+        } else {
+            this.wfSelected = {key: key as string, req: r};
+            const d = requestDetail(r, this.engine?.name ?? 'the engine');
+            panel.hidden = false;
+            panel.replaceChildren(
+                h(
+                    'div',
+                    {class: 'pl-wf-detail__head'},
+                    h('b', {}, d.title),
+                    h(
+                        'span',
+                        {class: 'pl-muted'},
+                        clock(new Date(performance.timeOrigin + r.start)),
+                    ),
+                    h(
+                        'button',
+                        {
+                            type: 'button',
+                            class: 'link-button',
+                            'aria-label': 'Close request detail',
+                            onclick: () => this.selectRequest(null),
+                        },
+                        '×',
+                    ),
+                ),
+                ...(d.waitShare !== null
+                    ? [
+                          h(
+                              'div',
+                              {
+                                  class: 'pl-wf-detail__bar',
+                                  title: 'Waiting for the first byte (light), then downloading',
+                              },
+                              h('span', {
+                                  class: 'pl-wf-detail__wait',
+                                  style: `width:${(d.waitShare * 100).toFixed(1)}%`,
+                              }),
+                              h('span', {class: 'pl-wf-detail__dl'}),
+                          ),
+                      ]
+                    : []),
+                h(
+                    'dl',
+                    {class: 'pl-wf-detail__list'},
+                    ...d.rows.flatMap(([k, v]) => [
+                        h('dt', {}, k),
+                        h('dd', {class: k === 'URL' ? 'mono pl-wf-detail__url' : ''}, v),
+                    ]),
+                ),
+                ...d.notes.map((n) => h('p', {class: 'pl-muted pl-wf-detail__note'}, n)),
+            );
+        }
+        if (this.wfSelected) panel.scrollIntoView({block: 'nearest', behavior: 'smooth'});
+        for (const row of this.el('waterfall').querySelectorAll<HTMLElement>('.pl-wf'))
+            row.classList.toggle('is-selected', false);
+        if (this.wfSelected) {
+            const i = this.session.requests
+                .filter((x) => x.end >= performance.now() - WATERFALL_MS)
+                .slice(-40)
+                .findIndex((x) => requestKey(x) === this.wfSelected?.key);
+            this.el('waterfall')
+                .querySelectorAll<HTMLElement>('.pl-wf')
+                [i]?.classList.add('is-selected');
+        }
     }
 
     /** Link to the channel's slicer in csl-slicer-console, when CSL_BASE_URL is set. */
@@ -3010,6 +3139,18 @@ function pastedHost(url: string): string {
     } catch {
         return 'unknown host';
     }
+}
+
+/** The newest Resource Timing entry for a URL, allowing for a CMCD= param added after it. */
+function findResourceEntry(url: string): PerformanceResourceTiming | undefined {
+    const entries = performance.getEntriesByType('resource') as PerformanceResourceTiming[];
+    for (let i = entries.length - 1; i >= Math.max(0, entries.length - 200); i--) {
+        const entry = entries[i] as PerformanceResourceTiming;
+        const name = entry.name;
+        if (name === url || name.startsWith(`${url}&CMCD=`) || name.startsWith(`${url}?CMCD=`))
+            return entry;
+    }
+    return undefined;
 }
 
 function shortUrlFull(url: string): string {
