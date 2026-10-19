@@ -66,10 +66,19 @@ export interface MediaPlaylistInfo {
     };
 }
 
-export interface DrmConfig {
+/** Widevine/PlayReady over DASH (Shaka, dash.js). */
+export interface CencDrmConfig {
     keySystem: 'com.widevine.alpha' | 'com.microsoft.playready';
     licenseUrl: string;
 }
+
+/** FairPlay over HLS (Native, Safari). The license URL comes from each skd:// key URI. */
+export interface FairPlayConfig {
+    keySystem: 'com.apple.fps';
+    certificateUrl: string;
+}
+
+export type DrmConfig = CencDrmConfig | FairPlayConfig;
 
 export interface DrmState {
     keySystem: string | null;

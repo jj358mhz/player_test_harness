@@ -149,11 +149,27 @@ engine), signs a Preplay v2 session with
 
 Plain signed HLS of a Studio DRM channel is **FairPlay**, which only Safari
 can decrypt. Channels known to be DRM show 🔒 in the channel picker (and a
-🔒 DRM badge on the dashboard); outside Safari the player selects
-**Widevine** for them automatically. A channel not yet known to be DRM is
-detected on first play (its media playlist carries FairPlay keys) and
-replayed as Widevine; for a pasted URL the player offers **Play with
-Widevine (DASH)** instead. FairPlay playback in Safari is still to come.
+🔒 DRM badge on the dashboard); the player selects **FairPlay** for them in
+Safari and **Widevine** everywhere else. A channel not yet known to be DRM
+is detected on first play (its media playlist carries FairPlay keys) and
+replayed with DRM; for a pasted URL the player offers **Play with Widevine
+(DASH)** instead.
+
+### FairPlay (Safari)
+
+**DRM → FairPlay** plays HLS in the **Native** engine (Safari's own player)
+with EME. The player signs a Preplay v2 session with `rmt=fps` (and
+`pdts=latency`, so latency is real), fetches the application certificate
+from Preplay's `fairplayCertificateURL`, and opens one key session per
+`skd://` key URI. Each license request goes to that URI with `https://`
+in front: `POST {"spc": "<base64>"}`, answered with `{"ckc": "<base64>"}`.
+
+The tab shows the certificate and license requests (count, time, failures,
+also in the waterfall), key status per key id and license expiry.
+Robustness doesn't apply to FairPlay. Segment and key timing stay inside
+Safari, as with any Native playback. FairPlay needs a synced channel: a
+pasted URL has no Preplay response, so no certificate URL. Outside Safari
+the option is shown as unavailable.
 
 For AES-128 HLS the tab shows the encryption method, keys seen and key load
 time. Uplynk key URIs include the ray (`r=`), so the same key on another

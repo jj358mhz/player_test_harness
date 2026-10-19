@@ -8,7 +8,7 @@ import type {CmcdConfig} from '../lib/cmcd';
 import {videoProfile} from '../lib/codecs';
 import {
     type AudioTrack,
-    type DrmConfig,
+    type CencDrmConfig,
     type DrmState,
     Emitter,
     type Listener,
@@ -72,7 +72,7 @@ export function drmHint(code: number): string | null {
     return hints[code] ?? null;
 }
 
-const ROBUSTNESS: Record<DrmConfig['keySystem'], {video: string; audio: string}> = {
+const ROBUSTNESS: Record<CencDrmConfig['keySystem'], {video: string; audio: string}> = {
     'com.widevine.alpha': {video: 'SW_SECURE_DECODE', audio: 'SW_SECURE_CRYPTO'},
     'com.microsoft.playready': {video: '', audio: ''},
 };
@@ -92,7 +92,7 @@ export class ShakaEngine implements PlayerEngine {
     constructor(
         private shaka: Shaka,
         readonly version: string,
-        private drm: DrmConfig | null,
+        private drm: CencDrmConfig | null,
     ) {}
 
     on<K extends Parameters<PlayerEngine['on']>[0]>(event: K, listener: Listener<K>): void {

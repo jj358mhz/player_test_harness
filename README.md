@@ -26,8 +26,8 @@ latency, drift, ABR, DRM keys, ID3/SCTE-35, captions and more.
 - 🔐 **DRM playback** — Widevine (and PlayReady) over DASH via Preplay v2 and
   Shaka Player, with a DRM panel: license timing and status, key status per
   key (HDCP problems included), robustness and expiry. Studio DRM channels
-  get a 🔒 DRM badge and play as Widevine in Chrome automatically. FairPlay
-  (Safari) next.
+  get a 🔒 DRM badge and play as Widevine in Chrome, or FairPlay (Native
+  engine, EME) in Safari, automatically.
 - 📼 **Recorded sessions** — **Save session** in the player keeps what a
   load measured (latency and drift over the whole session, events, log,
   rays, request stats, DRM) at `/sessions/<id>`, redacted of signatures
@@ -56,7 +56,7 @@ latency, drift, ABR, DRM keys, ID3/SCTE-35, captions and more.
 | 1     | Flask backend: accounts, channel sync, signing + Preplay API, Pi deploy  | ✅ done |
 | 2a    | Player rewrite: TypeScript + Vite, video-first layout, rays, versions    | ✅ done |
 | 2     | Multi-player: player adapter interface; hls.js, Shaka, dash.js, native   | ✅ done |
-| 3     | DRM playback driven by Preplay; DRM diagnostics panel                    | 🟡 Widevine/PlayReady done; FairPlay next |
+| 3     | DRM playback driven by Preplay; DRM diagnostics panel                    | 🟡 Widevine/PlayReady/FairPlay; PlayReady untested |
 | 4     | Triage: recorded sessions, side-by-side compare, LL-HLS metrics, links   | 🟡 links, sessions done |
 
 ## 🏗️ Architecture

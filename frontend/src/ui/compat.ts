@@ -290,7 +290,7 @@ export function buildCompatPanel(): HTMLDetailsElement {
                         'li',
                         {},
                         h('b', {}, 'Studio DRM over HLS is FairPlay'),
-                        ' (SAMPLE-AES, skd:// keys). Only Safari can decrypt it; Chrome, Edge and Firefox fail at the key.',
+                        ' (SAMPLE-AES, skd:// keys). Only Safari can decrypt it (DRM → FairPlay, Native engine); Chrome, Edge and Firefox fail at the key.',
                     ),
                     h(
                         'li',
@@ -320,7 +320,7 @@ export function buildCompatPanel(): HTMLDetailsElement {
                         'li',
                         {},
                         h('b', {}, 'Engines in this harness:'),
-                        ' hls.js for HLS (clear, AES-128); Shaka Player or dash.js for DASH and Widevine / PlayReady; Native hands HLS to the browser itself (Safari), with fewer metrics. FairPlay playback in Safari is not built yet.',
+                        ' hls.js for HLS (clear, AES-128); Shaka Player or dash.js for DASH and Widevine / PlayReady; Native hands HLS to the browser itself (Safari), with fewer metrics. In Safari, Native also plays FairPlay (EME, certificate from Preplay).',
                     ),
                 ),
             ),

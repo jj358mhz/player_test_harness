@@ -26,10 +26,14 @@ describe('deep links', () => {
     it('drops anything that is not a plain value', () => {
         expect(
             parseView(
-                '?channel=-3&engine=hlsjs@1.0.0/../../gh/x/y@1&format=flv&drm=fps&rays=a1&src=javascript:alert(1)',
+                '?channel=-3&engine=hlsjs@1.0.0/../../gh/x/y@1&format=flv&drm=clearkey&rays=a1&src=javascript:alert(1)',
             ),
         ).toEqual({engine: 'hls.js'});
         expect(parseView('?engine=vlc@3.0.0')).toEqual({});
+        expect(parseView('?channel=7&engine=native@browser&drm=fps')).toMatchObject({
+            channel: 7,
+            drm: 'fps',
+        });
         expect(isVersion('1.6.15')).toBe(true);
         expect(isVersion('5.0.0-beta.2')).toBe(true);
         expect(isVersion('1.6')).toBe(false);
