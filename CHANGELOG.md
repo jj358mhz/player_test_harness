@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.13.2] - 2026-10-19
+
+### Fixed
+- The Clock table said **Session clock** for HLS played through Preplay
+  (FairPlay), whose session URL doesn't repeat the signed `pdts=latency`.
+  The latency was already on the encoder clock; only the label was wrong.
+
 ## [3.13.1] - 2026-10-19
 
 ### Fixed

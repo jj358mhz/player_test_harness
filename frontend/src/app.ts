@@ -1417,7 +1417,7 @@ export class PlayerApp {
             url: response.url,
             expiresAt: new Date(response.expires_at),
             drm: drmConfig,
-            clock: clockFor(manifest, response.url, response.clock, delay),
+            clock: clockFor(manifest, response.url, response.clock, delay, signed.pdts ?? null),
         };
         if (response.probe && !response.probe.ok) {
             this.probeFailed(response.probe, source);
