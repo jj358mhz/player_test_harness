@@ -178,7 +178,11 @@ after dependency changes.
   fetches like the probe don't count). Re-sign rather than replaying.
 - FairPlay (docs "Apple FairPlay DRM (HLS)"): Preplay `rmt=fps` →
   `drm.fairplayCertificateURL`; license URL = the `skd://` key URI with
-  `https://`; POST JSON `{"spc": base64}` → `{"ckc": base64}`. Not yet
+  `https://`; POST JSON `{"spc": base64}` → `{"ckc": base64}`. Segments
+  are TS (`FP_<RAY>….ts`): Safari's standard EME never fires `encrypted`
+  for TS SAMPLE-AES (seen in Safari: MEDIA_ERR_DECODE, no key request), so
+  TS uses legacy `WebKitMediaKeys` (`com.apple.fps.1_0`, `webkitneedkey`,
+  init data + content id (skd host) + certificate). Not yet
   checked first-hand: certificate format (DER or base64, both handled)
   and CORS on the certificate and key server hosts.
 - DRM: Widevine/PlayReady need DASH; FairPlay needs HLS. Studio DRM requires

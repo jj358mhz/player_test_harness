@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.13.1] - 2026-10-19
+
+### Fixed
+- **FairPlay in Safari** stopped at "waiting for license" with
+  `MEDIA_ERR_DECODE`: Safari never asked for a key. Uplynk's FairPlay
+  segments are MPEG-TS, and Safari's standard EME only handles FairPlay for
+  fMP4. TS now uses Safari's older WebKit EME (`WebKitMediaKeys`,
+  `com.apple.fps.1_0`, `webkitneedkey`), as in Apple's FPS sample and
+  Shaka; standard EME is kept for fMP4. The DRM tab names which one is in
+  use, and a decode error with no key request now says so.
+
 ## [3.13.0] - 2026-10-19
 
 ### Added

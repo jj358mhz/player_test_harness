@@ -8,6 +8,12 @@
 //    response is `{"ckc": "<base64 CKC>"}`, whose bytes go to session.update().
 
 export const FAIRPLAY_KEY_SYSTEM = 'com.apple.fps';
+/**
+ * Apple's older, WebKit-prefixed EME. Safari's standard EME only handles
+ * FairPlay for fMP4; MPEG-TS with SAMPLE-AES (Uplynk's FP_….ts segments)
+ * still needs this one (Shaka says the same).
+ */
+export const FAIRPLAY_LEGACY_KEY_SYSTEM = 'com.apple.fps.1_0';
 
 export function bytesToBase64(bytes: Uint8Array): string {
     let binary = '';
@@ -78,8 +84,8 @@ export function certificateBytes(body: ArrayBuffer): Uint8Array {
 }
 
 /** JSON body for the key server, from the CDM's SPC message. */
-export function spcRequestBody(message: ArrayBuffer): string {
-    return JSON.stringify({spc: bytesToBase64(new Uint8Array(message))});
+export function spcRequestBody(message: ArrayBuffer | ArrayBufferView): string {
+    return JSON.stringify({spc: bytesToBase64(toBytes(message))});
 }
 
 /** CKC bytes from the key server's answer: `{"ckc": …}`, `<ckc>…</ckc>` or bare base64. */
@@ -100,4 +106,39 @@ export function ckcFromResponse(text: string): Uint8Array {
 /** A MediaKeyStatusMap's key ids as hex. */
 export function keyIdHex(id: ArrayBuffer | ArrayBufferView): string {
     return Array.from(toBytes(id), (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/** The content id the legacy API wants: the skd:// URI's host (Apple's sample, Shaka). */
+export function contentIdFromSkd(skd: string): string {
+    return /^skd:\/\/([^/?#]+)/.exec(skd)?.[1] ?? skd.replace(/^skd:\/\//, '');
+}
+
+/**
+ * Legacy init data: the needkey init data, then the content id (UTF-16LE)
+ * and the certificate, each after a little-endian 32-bit length.
+ */
+export function legacyInitData(
+    initData: Uint8Array,
+    contentId: string,
+    certificate: Uint8Array,
+): Uint8Array {
+    const id = new Uint8Array(contentId.length * 2);
+    for (let i = 0; i < contentId.length; i++) {
+        const code = contentId.charCodeAt(i);
+        id[i * 2] = code & 0xff;
+        id[i * 2 + 1] = code >> 8;
+    }
+    const out = new Uint8Array(initData.length + 4 + id.length + 4 + certificate.length);
+    const view = new DataView(out.buffer);
+    let offset = 0;
+    out.set(initData, offset);
+    offset += initData.length;
+    view.setUint32(offset, id.length, true);
+    offset += 4;
+    out.set(id, offset);
+    offset += id.length;
+    view.setUint32(offset, certificate.length, true);
+    offset += 4;
+    out.set(certificate, offset);
+    return out;
 }

@@ -122,6 +122,7 @@ const KEY_SYSTEM_NAMES: Record<string, string> = {
     'com.widevine.alpha': 'Widevine',
     'com.microsoft.playready': 'PlayReady',
     'com.apple.fps': 'FairPlay',
+    'com.apple.fps.1_0': 'FairPlay (WebKit legacy EME)',
 };
 
 /** Everything measured for one loaded stream; replaced on each load. */
