@@ -4,8 +4,10 @@ import {
     bytesToBase64,
     certificateBytes,
     ckcFromResponse,
+    contentIdFromSkd,
     fairplayKeyUri,
     keyIdHex,
+    legacyInitData,
     licenseUrlFromSkd,
     skdFromInitData,
     spcRequestBody,
@@ -66,5 +68,14 @@ describe('FairPlay', () => {
     it('round-trips base64 (url-safe and unpadded too) and hexes key ids', () => {
         expect([...base64ToBytes('-_8')]).toEqual([251, 255]);
         expect(keyIdHex(new Uint8Array([0, 15, 255]))).toBe('000fff');
+    });
+
+    it('builds the legacy WebKit init data', () => {
+        expect(contentIdFromSkd(SKD)).toBe('content.example.com');
+        const init = new Uint8Array([7, 7]);
+        const cert = new Uint8Array([0x30, 1]);
+        expect([...legacyInitData(init, 'ab', cert)]).toEqual([
+            7, 7, 4, 0, 0, 0, 97, 0, 98, 0, 2, 0, 0, 0, 0x30, 1,
+        ]);
     });
 });

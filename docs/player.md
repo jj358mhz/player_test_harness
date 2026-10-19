@@ -163,6 +163,9 @@ with EME. The player signs a Preplay v2 session with `rmt=fps` (and
 from Preplay's `fairplayCertificateURL`, and opens one key session per
 `skd://` key URI. Each license request goes to that URI with `https://`
 in front: `POST {"spc": "<base64>"}`, answered with `{"ckc": "<base64>"}`.
+Uplynk's FairPlay segments are MPEG-TS, which Safari decrypts only through
+its older WebKit EME (`com.apple.fps.1_0`); the player uses that for TS and
+standard EME for fMP4. The DRM tab's key system says which.
 
 The tab shows the certificate and license requests (count, time, failures,
 also in the waterfall), key status per key id and license expiry.
