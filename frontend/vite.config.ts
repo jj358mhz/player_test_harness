@@ -10,7 +10,7 @@ export default defineConfig({
         emptyOutDir: true,
         manifest: true,
         sourcemap: true,
-        rollupOptions: {input: ['src/main.ts', 'src/recording.ts']},
+        rollupOptions: {input: ['src/main.ts', 'src/recording.ts', 'src/compare.ts']},
     },
     test: {
         environment: 'jsdom',

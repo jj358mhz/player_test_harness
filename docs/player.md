@@ -47,6 +47,32 @@ do (HTTPS, MSE, native HLS, Widevine L1/L3, PlayReady, FairPlay, ClearKey),
 shows which browser plays which format and DRM, and explains how Uplynk's
 Studio DRM maps onto them. It remembers whether you left it open.
 
+## Compare
+
+`/compare` puts two players side by side. Pick a **Channel** and a
+**Compare** preset and press **Load both**:
+
+| Preset | A | B |
+|---|---|---|
+| HLS vs DASH | hls.js | Shaka, DASH |
+| hls.js vs Shaka | hls.js | Shaka, HLS |
+| Shaka vs dash.js | Shaka, DASH | dash.js, DASH |
+| Default vs 20 s delay | hls.js | hls.js, `delay=20` |
+
+Each pane is the full player with its own load bar, so anything (engine
+version, DRM, rays, delay, even a pasted URL) can differ. The table at the
+top reads both panes once a second: latency now/avg/min/max, which clock,
+live-edge drift, buffer, ray and bitrate, bandwidth estimate, startup
+(engine load to first frame), rebuffers, errors, ray switches and segment
+time, with a **B − A** column. The chart draws both latencies on one axis.
+For synced channels both are on the encoder clock (see Which clock), so
+HLS and DASH numbers compare directly.
+
+**Copy link** gives `/compare?a=<player query>&b=<player query>` (each is
+a player deep link). **Save both** saves each pane as a recorded session
+and copies both links. Each pane signs its own URL: a DASH URL can only be
+fetched once per browser.
+
 ## Latency
 
 All three are measured at the playhead, once a second:

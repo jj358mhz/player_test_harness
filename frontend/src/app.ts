@@ -7,6 +7,7 @@ import {
     type PlaybackResponse,
     type Probe,
     requestPlayback,
+    type SavedSession,
     saveRecording,
 } from './api';
 import type {ChannelOption, PlayerConfig} from './config';
@@ -32,6 +33,7 @@ import {
     hlsStart,
     parseDelay,
 } from './lib/clock';
+import type {PaneSnapshot} from './lib/compare';
 import {isVersion, parseView, type View, viewQuery} from './lib/deeplink';
 import {parsePriv, parseTxxx, toHex} from './lib/id3';
 import {Id3Clock} from './lib/latency';
@@ -154,6 +156,9 @@ class Session {
     audio: {tracks: AudioTrack[]; current: number} = {tracks: [], current: -1};
     asset: {assetId: string; kind: string} | null = null;
     pending: number[] = []; // timers to cancel on reload
+    /** performance.now() when the engine was given the URL, and load → first frame. */
+    loadAt: number | null = null;
+    startupMs: number | null = null;
     licenses: {count: number; failed: number; ms: number[]; last: EngineEvents['license'] | null} =
         {
             count: 0,
@@ -223,7 +228,7 @@ export class PlayerApp {
             {class: 'pl'},
             this.ref('notices', h('div', {class: 'pl-notices', 'aria-live': 'polite'})),
             this.buildLoadBar(),
-            this.ref('compat', buildCompatPanel()),
+            ...(this.config.embed ? [] : [this.ref('compat', buildCompatPanel())]),
             this.ref('status', h('div', {class: 'pl-status', 'aria-label': 'Stream properties'})),
             h(
                 'div',
@@ -431,17 +436,22 @@ export class PlayerApp {
                 'div',
                 {class: 'pl-field pl-field--actions'},
                 h('button', {class: 'pl-btn-primary', type: 'submit'}, 'Load'),
-                h(
-                    'button',
-                    {
-                        class: 'pl-btn-ghost',
-                        type: 'button',
-                        title: 'Copy a link to this view: source, format, engine and version, DRM, rays and tab',
-                        onclick: (e: Event) =>
-                            void this.copyLink(e.currentTarget as HTMLButtonElement),
-                    },
-                    'Copy link',
-                ),
+                // In a compare pane the compare page's own link covers both views.
+                ...(this.config.embed
+                    ? []
+                    : [
+                          h(
+                              'button',
+                              {
+                                  class: 'pl-btn-ghost',
+                                  type: 'button',
+                                  title: 'Copy a link to this view: source, format, engine and version, DRM, rays and tab',
+                                  onclick: (e: Event) =>
+                                      void this.copyLink(e.currentTarget as HTMLButtonElement),
+                              },
+                              'Copy link',
+                          ),
+                      ]),
                 h(
                     'button',
                     {
@@ -1413,6 +1423,7 @@ export class PlayerApp {
             },
             counters: {
                 switches: s.switches,
+                startupMs: s.startupMs,
                 rebuffers: s.rebuffers,
                 stalledSeconds: Math.round(stalledSeconds(s) * 10) / 10,
                 errors: s.errors,
@@ -1472,6 +1483,56 @@ export class PlayerApp {
                 : null,
         };
         return redactDeep(recording);
+    }
+
+    // ------------------------------------------------- compare page (iframes)
+
+    /** This pane's numbers for the compare page. */
+    snapshot(): PaneSnapshot {
+        const s = this.session;
+        const engine = this.engine;
+        const source = this.source;
+        const {stats, name} = this.headline();
+        const rendition = engine?.currentRendition() ?? null;
+        const chosen = source?.drm ? this.drmEngine() : this.chosenEngine();
+        return {
+            title: source ? (source.channel?.name ?? pastedHost(source.url)) : null,
+            engine: engine?.name ?? ENGINE_LABELS[chosen.engine],
+            version: engine?.version ?? chosen.version,
+            format: this.format(),
+            drm: source?.drm ? (KEY_SYSTEM_NAMES[source.drm.keySystem] ?? null) : null,
+            clock: source ? CLOCK_LABELS[source.clock.kind].name : null,
+            delay: source?.clock.delay ?? null,
+            live: s.live,
+            playing: !!engine && !this.video.paused && this.video.readyState > 2,
+            latencyName: name,
+            latency: {
+                last: stats.last,
+                avg: stats.count ? stats.average : null,
+                min: stats.count ? stats.min : null,
+                max: stats.count ? stats.max : null,
+                count: stats.count,
+            },
+            drift: s.latency.drift.last,
+            buffer: engine ? bufferAhead(this.video) : null,
+            ray: rendition?.ray ?? null,
+            height: rendition?.height ?? null,
+            bitrate: rendition?.bitrate ?? null,
+            bandwidth: engine?.bandwidthEstimate() ?? null,
+            startupMs: s.startupMs,
+            rebuffers: s.rebuffers,
+            stalledS: s.stalledMs / 1000,
+            errors: s.errors,
+            switches: s.switches,
+            segmentAvgMs: s.segments.count ? Math.round(s.segments.ms / s.segments.count) : null,
+            series: s.series.points,
+        };
+    }
+
+    /** Save this load as a recording; null if nothing is loaded. */
+    async save(): Promise<SavedSession | null> {
+        const recording = this.buildRecording();
+        return recording ? saveRecording(this.config.endpoints.sessions, recording) : null;
     }
 
     private async saveSession(button: HTMLButtonElement): Promise<void> {
@@ -1575,6 +1636,7 @@ export class PlayerApp {
             `${source.channel?.name ?? 'URL'} · ${engine.name} ${version}${drmText}`,
         );
         if (engine.limits) this.logEntry('info', 'ENGINE', engine.limits);
+        this.session.loadAt = performance.now();
         engine.load(source.url, this.video);
     }
 
@@ -1879,6 +1941,10 @@ export class PlayerApp {
         this.video.addEventListener('playing', () => {
             started = true;
             const s = this.session;
+            if (s.startupMs === null && s.loadAt !== null && this.engine) {
+                s.startupMs = Math.round(performance.now() - s.loadAt);
+                this.logEntry('info', 'STARTUP', `first frame ${s.startupMs} ms after load`);
+            }
             if (s.stallStart !== null) {
                 s.stalledMs += performance.now() - s.stallStart;
                 s.stallStart = null;
@@ -2739,6 +2805,7 @@ export class PlayerApp {
     /** Open the compatibility panel and bring it into view. */
     private showCompat(): void {
         const panel = this.el<HTMLDetailsElement>('compat');
+        if (!panel) return; // not shown in compare panes
         panel.open = true;
         panel.scrollIntoView({behavior: 'smooth', block: 'start'});
     }

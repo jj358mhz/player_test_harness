@@ -13,7 +13,16 @@ from app.uplynk.sync import SyncResult
 
 @pytest.mark.parametrize(
     "path",
-    ["/", "/player", "/sign", "/activity", "/sessions", "/admin/uplynk-accounts", "/api/channels"],
+    [
+        "/",
+        "/player",
+        "/compare",
+        "/sign",
+        "/activity",
+        "/sessions",
+        "/admin/uplynk-accounts",
+        "/api/channels",
+    ],
 )
 def test_pages_require_login(client, path):
     response = client.get(path)
@@ -22,7 +31,8 @@ def test_pages_require_login(client, path):
 
 
 @pytest.mark.parametrize(
-    "path", ["/", "/player", "/sign", "/activity", "/sessions", "/admin/uplynk-accounts"]
+    "path",
+    ["/", "/player", "/compare", "/sign", "/activity", "/sessions", "/admin/uplynk-accounts"],
 )
 def test_pages_render(auth_client, path):
     assert auth_client.get(path).status_code == 200
@@ -250,3 +260,31 @@ def test_dashboard_marks_drm_channels(auth_client, make_account, make_channel):
     assert sum("hidden" in b for b in badges) == 1  # only the DRM card shows it
     assert html.count("▶ Play DRM") == 1 and html.count("▶ Play HLS") == 1
     assert "aes-128" not in html.lower()  # Uplynk's default; not worth a badge
+
+
+def test_player_embed_mode_drops_site_chrome(auth_client, monkeypatch):
+    from app.main import routes
+
+    monkeypatch.setattr(
+        routes, "vite_assets", lambda entry="src/main.ts": {"js": "/x.js", "css": []}
+    )
+    full = auth_client.get("/player").get_data(as_text=True)
+    pane = auth_client.get("/player?embed=1&channel=3").get_data(as_text=True)
+    assert 'class="site-header"' in full and 'href="/compare"' in full
+    assert 'class="site-header"' not in pane and "site-main--embed" in pane
+    assert '"embed": true' in pane
+
+
+def test_compare_page(auth_client, make_account, make_channel, monkeypatch):
+    from app.main import routes
+
+    monkeypatch.setattr(
+        routes, "vite_assets", lambda entry="src/main.ts": {"js": f"/static/{entry}.js", "css": []}
+    )
+    make_channel(make_account(), "abc", description="Alpha")
+    html = auth_client.get("/compare?a=channel%3D1&b=channel%3D1%26format%3Ddash").get_data(
+        as_text=True
+    )
+    assert 'src="/static/src/compare.ts.js"' in html
+    assert 'id="compare-config"' in html and '"player": "/player"' in html
+    assert "Alpha" in html and "api_key" not in html

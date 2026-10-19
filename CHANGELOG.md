@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.9.0] - 2026-10-18
+
+### Added
+- **Compare** (`/compare`, in the nav): two players side by side, each
+  with its own format, engine and version, DRM and delay. Pick a channel
+  and a preset (HLS vs DASH, hls.js vs Shaka, Shaka vs dash.js, default vs
+  20 s delay) and **Load both**, or change either pane's load bar. A table
+  lines up latency (now, avg, min/max), clock, drift, buffer, ray,
+  bandwidth estimate, startup, rebuffers, errors, ray switches and segment
+  time, with **B − A**; one chart draws both latencies. **Copy link**
+  (`/compare?a=<player query>&b=<player query>`) and **Save both** (two
+  recorded sessions; both links copied).
+- **Startup** (engine load to first frame) in the log, recordings and
+  compare.
+
+### Changed
+- Each compare pane is the full player in an iframe (`/player?embed=1`:
+  no site header, compatibility panel or Copy link), so two engines and
+  versions never share a page (Shaka's build is a global).
+
 ## [3.8.0] - 2026-10-18
 
 ### Added
