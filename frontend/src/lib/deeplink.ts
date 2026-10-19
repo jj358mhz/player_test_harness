@@ -1,5 +1,5 @@
 // The player's address bar is a shareable view: what to play and how.
-//   ?channel=12&format=dash&engine=shaka@5.3.0&drm=wv&rays=fed&delay=20#latency
+//   ?channel=12&format=dash&engine=shaka@5.3.0&drm=wv&rays=fed&delay=20&cmcd=1#latency
 // `src=` replaces `channel=` for a pasted URL; the tab stays in the hash.
 // Links come from other people, so every value is checked before use:
 // the engine version ends up in a jsDelivr URL.
@@ -20,6 +20,8 @@ export interface View {
     rays?: string;
     /** Uplynk `delay=` seconds to sign in (synced channels only). */
     delay?: number;
+    /** Send CMCD with every request. */
+    cmcd?: boolean;
 }
 
 /** Short names in links; the long npm names are accepted too. */
@@ -68,6 +70,7 @@ export function parseView(search: string): View {
     if (/^[a-z]{1,26}$/.test(rays)) view.rays = [...new Set(rays)].sort().reverse().join('');
     const delay = parseDelay(q.get('delay'));
     if (delay !== null) view.delay = delay;
+    if (q.get('cmcd') === '1') view.cmcd = true;
     return view;
 }
 
@@ -87,6 +90,7 @@ export function viewQuery(view: View): string {
     if (view.drm) q.set('drm', view.drm);
     if (view.rays && !view.src) q.set('rays', view.rays);
     if (view.delay !== undefined && !view.src) q.set('delay', String(view.delay));
+    if (view.cmcd) q.set('cmcd', '1');
     // Keep @ and : readable; URLSearchParams escapes them.
     return q.toString().replace(/%40/g, '@').replace(/%3A/gi, ':').replace(/%2F/gi, '/');
 }

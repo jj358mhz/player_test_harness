@@ -43,7 +43,7 @@
 /* Load bar */
 .pl-loadbar {
     display: grid;
-    grid-template-columns: minmax(0, 2.2fr) auto minmax(0, 1fr) minmax(0, 0.7fr) minmax(0, 0.55fr) auto;
+    grid-template-columns: minmax(0, 2.2fr) auto minmax(0, 1fr) minmax(0, 0.7fr) minmax(0, 0.55fr) auto auto;
     gap: 10px;
     align-items: end;
     background: var(--surface);
@@ -56,6 +56,15 @@
     display: grid;
     gap: 4px;
     min-width: 0;
+}
+.pl-field--check {
+    justify-items: center;
+}
+.pl-field--check input {
+    width: 18px;
+    height: 18px;
+    margin: 9px 0;
+    accent-color: var(--accent);
 }
 .pl-field label,
 .pl-label {
@@ -165,6 +174,20 @@
     border-radius: 50%;
     background: var(--error);
     animation: pl-blink 1.6s infinite;
+}
+.pl-status__chips {
+    display: contents;
+}
+.pl a.chip--link {
+    color: var(--text);
+    text-decoration: none;
+    border-color: var(--border-focus);
+}
+.pl a.chip--link[hidden] {
+    display: none;
+}
+.pl a.chip--link:hover {
+    color: var(--accent-hover);
 }
 .pl .chip--warn {
     color: var(--warn);

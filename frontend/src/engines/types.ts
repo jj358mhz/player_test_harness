@@ -1,6 +1,7 @@
 // What the UI needs from a player engine: hls.js, Shaka, dash.js and native
 // (<video src>) each implement it.
 
+import type {CmcdConfig} from '../lib/cmcd';
 import type {Id3Frame} from '../lib/id3';
 
 export interface Rendition {
@@ -118,6 +119,8 @@ export interface PlayerEngine {
     readonly version: string;
     /** What this engine can't report, said once in the log and empty panels. */
     readonly limits?: string;
+    /** Send CMCD (query mode) with every request; set before load(). Native ignores it. */
+    cmcd?: CmcdConfig | null;
     load(url: string, video: HTMLVideoElement): void;
     /** Resolves once the video element is free for the next engine. */
     destroy(): Promise<void>;

@@ -5,6 +5,7 @@
 import type HlsType from 'hls.js';
 import type {Fragment, Level, LoaderStats} from 'hls.js';
 import {version as pinned} from 'hls.js/package.json';
+import type {CmcdConfig} from '../lib/cmcd';
 import {videoProfile} from '../lib/codecs';
 import {parseId3} from '../lib/id3';
 import {ptsToSeconds} from '../lib/latency';
@@ -28,6 +29,7 @@ export function loadHlsJs(version: string): Promise<HlsClass> {
 }
 
 export class HlsJsEngine implements PlayerEngine {
+    cmcd: CmcdConfig | null = null;
     readonly name = 'hls.js';
     private hls: HlsType | null = null;
     private events = new Emitter();
@@ -49,7 +51,19 @@ export class HlsJsEngine implements PlayerEngine {
 
     load(url: string, video: HTMLVideoElement): void {
         const {Hls} = this;
-        const hls = new Hls({enableWorker: true, lowLatencyMode: true});
+        const hls = new Hls({
+            enableWorker: true,
+            lowLatencyMode: true,
+            ...(this.cmcd
+                ? {
+                      cmcd: {
+                          sessionId: this.cmcd.sessionId,
+                          contentId: this.cmcd.contentId,
+                          useHeaders: false,
+                      },
+                  }
+                : {}),
+        });
         this.hls = hls;
         const E = Hls.Events;
 

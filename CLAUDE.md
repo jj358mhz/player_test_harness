@@ -88,7 +88,10 @@ after dependency changes.
 - `app/api/service.py` — validates playback requests, signs/Preplays,
   writes `PlaybackEvent`, records `Channel.encryption` from the probe
   (`check_encryption()` backs `flask check-encryption`). Both the JSON API and `/channels/<id>/play` use it.
-- `app/main/` — pages: channels dashboard, `/player`, `/compare`, `/sign`, `/activity`. `/player` renders `main/player.html` with a JSON
+- `app/main/` — pages: channels dashboard, `/player`, `/compare`, `/sign`, `/activity`.
+  `/channels/by-slicer/<slicer>` is csl-slicer-console's way in; we link
+  to its `/slicers/by-id/<slicer>` when `CSL_BASE_URL` is set (console
+  side: `PLAYER_BASE_URL`, v1.16.0). `/player` renders `main/player.html` with a JSON
   config (channels, endpoints; never keys) and the Vite assets found by
   `app/vite.py`. `/channels/<id>/play` → `/player?channel=<id>`.
 - `app/engines.py` — engine version menu from npm (latest patch of the last
@@ -113,7 +116,8 @@ after dependency changes.
     `id3.ts`, `rays.ts` (ray from URI, `#UPLYNK-MEDIA0`, `rays=`),
     `scte35.ts` (splice_insert, time_signal, segmentation descriptors),
     `clock.ts` (which clock program dates use; `delay=` parsing),
-    `bands.ts`, `stats.ts`, `deeplink.ts` (address bar ⇄ load bar; validates
+    `bands.ts`, `stats.ts`, `cmcd.ts` (CMCD param parsing, ids),
+    `deeplink.ts` (address bar ⇄ load bar; validates
     engine versions because they end up in a jsDelivr URL).
   - `compare.ts` — third Vite entry, `/compare`: two `/player?embed=1`
     iframes (embed = no site header, compat panel or Copy link). Reads
@@ -180,6 +184,9 @@ after dependency changes.
   synthesised so the newest segment ends ≈ now; it shifts with `delay`,
   is the same for every URL of a channel+delay, and ignores `pdts`. DASH
   `$Number$` = HLS slice number (hex in `#UPLYNK-SEGMENT`) within an asset.
+- **CMCD**: a `CMCD=` query param is fine on signed playlists, MPDs and
+  segments (after `sig`). Headers aren't: content.uplynk.com's preflight
+  has no `Access-Control-Allow-Headers` and the CDN answers 403.
 - Docs index: https://docs.uplynk.com/llms.txt
 
 ## Deployment
@@ -227,11 +234,11 @@ in the `player_harness_data` volume.
       recorded sessions (`PlaybackSession`, `POST /api/sessions`,
       `/sessions/<slug>` replay via the `recording.ts` Vite entry,
       `SESSION_RETENTION_DAYS`, `flask prune-sessions`). **Left:**
-      LL-HLS part/blocking-reload metrics, CMCD
-      toggle, request waterfall detail, CSL cross-link via slicer_id.
+      LL-HLS part/blocking-reload metrics, request waterfall detail.
       **v3.8.0:** latency investigation done: `pdts=latency` for synced
       HLS, DASH clock offset from the server, Delay control, Clock table.
-      **v3.9.0:** side-by-side compare (`/compare`), startup time
+      **v3.9.0:** side-by-side compare (`/compare`), startup time.
+      **v3.10.0:** CMCD toggle (query mode), slicer-console links both ways
 - [ ] Periodic background channel sync (for now: UI, CLI, or host cron)
 
 ### Todo

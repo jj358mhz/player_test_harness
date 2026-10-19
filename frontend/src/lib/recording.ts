@@ -4,6 +4,7 @@
 // tokens, no license URL queries.
 
 import type {ClockInfo} from './clock';
+import type {CmcdConfig} from './cmcd';
 import type {Point} from './stats';
 
 export const RECORDING_VERSION = 1;
@@ -48,6 +49,8 @@ export interface Recording {
     latencyName: string;
     /** What program dates meant (absent before v3.8.0). */
     clock?: ClockInfo;
+    /** CMCD ids sent with every request, to find this session in CDN logs. */
+    cmcd?: CmcdConfig | null;
     stats: {latency: StatsSummary; id3: StatsSummary; pdt: StatsSummary; drift: StatsSummary};
     counters: Record<string, number | null>;
     series: {latency: Point[]; drift: Point[]};

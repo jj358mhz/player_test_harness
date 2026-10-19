@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.10.0] - 2026-10-18
+
+### Added
+- **CMCD toggle** in the load bar (and `cmcd=1` in deep links): hls.js,
+  Shaka and dash.js send CMCD (CTA-5004) as a `CMCD=` query param on every
+  request, with a fresh session id per load and the Uplynk channel id as
+  content id, so CDN logs can be matched to a session. The Network tab
+  shows the ids, how many requests carried CMCD and the last one decoded
+  (object, bitrate, buffer, throughput…); a **CMCD** chip shows it's on;
+  recordings keep the session id. Query mode only: Uplynk's hosts don't
+  allow CMCD headers in CORS preflights. Not in the native engine.
+- **Links to csl-slicer-console.** With `CSL_BASE_URL` set, a channel's
+  slicer on the dashboard and a chip in the player link to the slicer's
+  card (`/slicers/by-id/<slicer>`, console v1.16.0).
+  `/channels/by-slicer/<slicer>` is the way back: one channel opens the
+  player, several open the dashboard filtered to them.
+- The dashboard filter takes `?q=`.
+
 ## [3.9.0] - 2026-10-18
 
 ### Added

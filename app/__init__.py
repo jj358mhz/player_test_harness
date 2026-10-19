@@ -52,7 +52,7 @@ def create_app(config: Config | None = None) -> Flask:
 
     @app.context_processor
     def inject_version() -> dict:
-        return {"app_version": APP_VERSION}
+        return {"app_version": APP_VERSION, "csl_base_url": app.config["CSL_BASE_URL"]}
 
     _register_cli(app)
 

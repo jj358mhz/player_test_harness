@@ -4,6 +4,7 @@
 
 import type * as dashjsNS from 'dashjs';
 import pkg from '../../package.json';
+import type {CmcdConfig} from '../lib/cmcd';
 import {videoProfile} from '../lib/codecs';
 import {drmHint, mpdInfo, rayFromRepresentation, rayFromSegmentUrl} from './shaka';
 import {
@@ -53,6 +54,7 @@ interface RequestContext {
 }
 
 export class DashJsEngine implements PlayerEngine {
+    cmcd: CmcdConfig | null = null;
     readonly name = 'dash.js';
     /** Exposed for console debugging. */
     player: MediaPlayer | null = null;
@@ -128,7 +130,21 @@ export class DashJsEngine implements PlayerEngine {
             });
         });
 
-        player.updateSettings({streaming: {buffer: {fastSwitchEnabled: true}}});
+        player.updateSettings({
+            streaming: {
+                buffer: {fastSwitchEnabled: true},
+                ...(this.cmcd
+                    ? {
+                          cmcd: {
+                              enabled: true,
+                              sid: this.cmcd.sessionId,
+                              cid: this.cmcd.contentId,
+                              mode: 'query' as const,
+                          },
+                      }
+                    : {}),
+            },
+        });
         if (this.drm) {
             const robustness =
                 this.drm.keySystem === 'com.widevine.alpha' ? WIDEVINE_ROBUSTNESS : {};

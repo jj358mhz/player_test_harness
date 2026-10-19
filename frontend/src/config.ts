@@ -8,6 +8,8 @@ export interface ChannelOption {
     favorite: boolean;
     /** Last HLS probe: 'drm' (Studio DRM), 'aes-128', 'sample-aes', 'none'; null = unchecked. */
     encryption?: string | null;
+    /** Uplynk slicer feeding the channel (links to csl-slicer-console). */
+    slicerId?: string | null;
 }
 
 export interface PlayerConfig {
@@ -17,6 +19,8 @@ export interface PlayerConfig {
     endpoints: {playback: string; sessions: string; versions: Record<string, string>};
     /** A pane of the compare page: no compatibility panel or Copy link. */
     embed?: boolean;
+    /** csl-slicer-console base URL (CSL_BASE_URL); null = no slicer links. */
+    cslBase?: string | null;
 }
 
 export function readConfig(): PlayerConfig {

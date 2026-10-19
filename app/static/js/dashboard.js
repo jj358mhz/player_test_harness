@@ -28,6 +28,8 @@
         });
         syncSelection();
     });
+    // ?q= (e.g. from the slicer console's link) pre-fills the filter.
+    if (filter?.value) filter.dispatchEvent(new Event('input'));
 
     // ---- Selection --------------------------------------------------------
     const bar = document.getElementById('batch-bar');
