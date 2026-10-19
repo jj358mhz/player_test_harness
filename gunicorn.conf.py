@@ -14,6 +14,14 @@ keepalive = 5
 # user can't write to. We don't use gunicornc, so turn it off.
 control_socket_disable = True
 
+
+def post_worker_init(worker):
+    """Background channel sync (app/autosync.py); one worker runs it, by file lock."""
+    from app.autosync import start
+
+    start(worker.wsgi)
+
+
 accesslog = "-"
 errorlog = "-"
 loglevel = os.getenv("LOG_LEVEL", "info")
