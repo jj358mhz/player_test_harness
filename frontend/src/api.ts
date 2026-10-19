@@ -3,6 +3,8 @@
 
 import type {ServerClock} from './lib/clock';
 
+import type {SlicerSettings} from './lib/slicer';
+
 export interface Probe {
     ok: boolean;
     status: number | null;
@@ -83,4 +85,11 @@ export async function fetchVersions(endpoint: string): Promise<EngineVersion[]> 
     const response = await fetch(endpoint);
     const data = await response.json().catch(() => ({versions: []}));
     return (data.versions ?? []) as EngineVersion[];
+}
+
+/** The channel's slicer settings, via the server's csl-slicer-console lookup. */
+export async function fetchSlicer(endpoint: string): Promise<SlicerSettings> {
+    const response = await fetch(endpoint);
+    if (!response.ok) throw new Error(`slicer lookup answered ${response.status}`);
+    return (await response.json()) as SlicerSettings;
 }

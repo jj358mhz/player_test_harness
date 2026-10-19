@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.14.0] - 2026-10-19
+
+### Added
+- **Slicer wallclock from csl-slicer-console.** For channels whose slicer
+  is in the console, the player asks it (server to server, through the
+  new `GET /api/channels/<id>/slicer`) whether the slicer's config has
+  `wallclock: 1`. The Metadata tab shows **Slicer wallclock** (on / off,
+  with the config's capture time, or why it's unknown: not in the
+  console, i.e. on-prem, or no config captured yet), and the Latency
+  tab's ID3 row says "the slicer has it off" instead of guessing. Needs
+  console v1.17.0 and `CSL_API_TOKEN` (the console's `PLAYER_API_TOKEN`);
+  `CSL_API_URL` is where this container reaches the console (default
+  `CSL_BASE_URL`). Answers are cached 5 minutes; the token never reaches
+  the browser.
+
 ## [3.13.3] - 2026-10-19
 
 ### Changed

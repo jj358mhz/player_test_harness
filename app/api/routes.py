@@ -5,6 +5,7 @@ from __future__ import annotations
 from flask import Blueprint, abort, current_app, jsonify, request, url_for
 from flask_login import current_user, login_required
 
+from app import csl
 from app.api.service import create_playback, parse_request
 from app.engines import EngineVersionsError
 from app.engines import engine_versions as list_engine_versions
@@ -53,6 +54,20 @@ def channels():
             for c in rows
         ]
     )
+
+
+@bp.route("/channels/<int:channel_id>/slicer")
+@login_required
+def channel_slicer(channel_id: int):
+    """What csl-slicer-console knows about the channel's slicer (wallclock)."""
+    if not csl.enabled():
+        abort(404)
+    channel = db.session.get(Channel, channel_id) or abort(404)
+    if not channel.slicer_id:
+        return jsonify(
+            slicer_id=None, found=False, wallclock=None, captured_at=None, running=None, error=None
+        )
+    return jsonify(slicer_id=channel.slicer_id, **csl.slicer_settings(channel.slicer_id))
 
 
 @bp.route("/engines/<path:package>/versions")

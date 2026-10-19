@@ -16,7 +16,13 @@ export interface PlayerConfig {
     channels: ChannelOption[];
     initialChannel: number | null;
     initialSrc: string | null;
-    endpoints: {playback: string; sessions: string; versions: Record<string, string>};
+    endpoints: {
+        playback: string;
+        sessions: string;
+        versions: Record<string, string>;
+        /** Channel slicer settings from csl-slicer-console, "{id}" = channel; null = off. */
+        slicer?: string | null;
+    };
     /** A pane of the compare page: no compatibility panel or Copy link. */
     embed?: boolean;
     /** csl-slicer-console base URL (CSL_BASE_URL); null = no slicer links. */

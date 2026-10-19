@@ -8,6 +8,7 @@ from itertools import groupby
 from flask import abort, current_app, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import login_required
 
+from app import csl
 from app.engines import ENGINES
 from app.main import bp
 from app.models import AdminEvent, Channel, PlaybackEvent, PlaybackSession, UplynkAccount, db
@@ -68,6 +69,10 @@ def player() -> str:
         "endpoints": {
             "playback": url_for("api.playback"),
             "sessions": url_for("api.save_session"),
+            # "{id}" → channel id; absent when the console API isn't configured.
+            "slicer": url_for("api.channel_slicer", channel_id=0).replace("/0/", "/{id}/")
+            if csl.enabled()
+            else None,
             "versions": {
                 package: url_for("api.engine_versions", package=package) for package in ENGINES
             },

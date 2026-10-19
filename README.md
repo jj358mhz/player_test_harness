@@ -201,6 +201,8 @@ a Docker Compose stack on the shared `auth-net` network, fronted by Caddy at
 | `CHANNEL_SYNC_INTERVAL`    | Background channel sync, minutes (default 60; 0 = off)        |
 | `MAX_RECORDING_BYTES`      | Largest recorded session accepted (default 8 MiB)             |
 | `CSL_BASE_URL`             | csl-slicer-console URL for slicer links (optional)            |
+| `CSL_API_TOKEN`            | The console's `PLAYER_API_TOKEN`: show slicer wallclock (optional) |
+| `CSL_API_URL`              | Where this container reaches the console (default `CSL_BASE_URL`) |
 | `LOG_LEVEL`                | `info` / `debug` / `warning`                                  |
 | `GUNICORN_WORKERS`         | Worker count (default 2)                                      |
 

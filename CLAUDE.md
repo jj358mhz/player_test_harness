@@ -137,6 +137,7 @@ after dependency changes.
   `|tojson` and draws it with `frontend/src/recording.ts` (second Vite
   entry; `app/vite.py` collects CSS from imported chunks).
 - `app/admin/` — Uplynk account CRUD + sync (admin-only).
+- `app/csl.py` — csl-slicer-console settings lookup (slicer `wallclock`), cached 5 min.
 - `app/autosync.py` — background channel sync, started per worker by
   gunicorn's `post_worker_init`; one worker syncs (flock on a temp file).
   Never started by the CLI or tests. **Env vars reach the container only
@@ -201,7 +202,12 @@ after dependency changes.
   `$Number$` = HLS slice number (hex in `#UPLYNK-SEGMENT`) within an asset.
 - **ID3 wallclock** (TXXX with a time/wallclock description) is written
   only by slicers with `wallclock: 1`; many of the owner's slicers don't
-  have it, so "no wallclock" is normal, not a player bug.
+  have it, so "no wallclock" is normal, not a player bug. For cloud
+  slicers the console knows: `app/csl.py` asks its
+  `/api/slicers/<id>/settings` (bearer `CSL_API_TOKEN` = console
+  `PLAYER_API_TOKEN`, v1.17.0; allowlisted keys only), served to the
+  player as `/api/channels/<id>/slicer`. On the Pi, `CSL_API_URL=
+  http://csl-slicer-console:5000` (both containers are on `auth-net`).
 - **Timing from the browser**: no `Timing-Allow-Origin` on content or CDN
   hosts (Resource Timing has no first byte/connect detail cross-origin);
   segments come from CloudFront (`X-Cache`, `Via`) but `X-Cache`/`Age`
