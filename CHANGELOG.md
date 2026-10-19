@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.13.0] - 2026-10-19
+
+### Added
+- **FairPlay in Safari** (#21): **DRM → FairPlay** plays Studio DRM HLS
+  in the Native engine with EME. Preplay v2 with `rmt=fps` gives the
+  application certificate (`fairplayCertificateURL`); each `skd://` key URI
+  gets its own key session, and its license request goes to the same URI
+  over https (`{"spc": …}` → `{"ckc": …}`). The DRM tab shows certificate
+  and license timing and failures, key status per key and license expiry;
+  both requests appear in the waterfall. In Safari, DRM channels pick
+  FairPlay automatically (Widevine elsewhere, as before), and links can
+  carry `drm=fps`.
+
+### Changed
+- Outside Safari the FairPlay option reads "Safari only" (it said
+  "coming"); a `drm=fps` link opened there falls back to the channel's
+  default. Leaving the Native engine turns FairPlay off.
+
 ## [3.12.0] - 2026-10-18
 
 ### Added

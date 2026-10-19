@@ -131,6 +131,40 @@ def test_preplay_with_drm(auth_client, make_account, make_channel, monkeypatch):
     assert ch.encryption == "drm" and ch.encryption_checked_at is not None
 
 
+def test_preplay_with_fairplay(auth_client, make_account, make_channel, monkeypatch):
+    ch = make_channel(make_account(), "abc")
+    seen = {}
+
+    def fake_fetch(url):
+        seen["url"] = url
+        return PreplayResult(
+            play_url="https://content-ause3.uplynk.com/preplay2/x.m3u8",
+            prefix="https://content-ause3.uplynk.com",
+            sid="sid1",
+            drm={"required": True, "fairplayCertificateURL": "https://example.com/fp.cer"},
+            raw={},
+        )
+
+    monkeypatch.setattr(service, "fetch_preplay", fake_fetch)
+    response = _post(
+        auth_client,
+        {
+            "channel_id": ch.id,
+            "mode": "preplay",
+            "drm": "fps",
+            "manifest": "m3u8",
+            "params": {"pdts": "latency"},
+        },
+    )
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data["manifest"] == "m3u8" and data["drm"] == "fps"
+    assert data["drm_config"]["fairplayCertificateURL"] == "https://example.com/fp.cer"
+    params = dict(parse_qsl(urlsplit(seen["url"]).query))
+    assert params["manifest"] == "m3u8" and params["rmt"] == "fps"
+    assert params["pdts"] == "latency"
+
+
 def test_preplay_failure_is_audited(auth_client, make_account, make_channel, monkeypatch):
     ch = make_channel(make_account(), "abc")
 

@@ -15,7 +15,7 @@ export interface View {
     engine?: LinkEngine;
     /** Exact npm version; absent = the default for the engine. */
     version?: string;
-    drm?: 'wv' | 'pr';
+    drm?: 'wv' | 'pr' | 'fps';
     /** Ray letters to sign into `rays=`, highest first (synced channels only). */
     rays?: string;
     /** Uplynk `delay=` seconds to sign in (synced channels only). */
@@ -65,7 +65,7 @@ export function parseView(search: string): View {
         if (engine !== 'native' && isVersion(version)) view.version = version;
     }
     const drm = q.get('drm');
-    if (drm === 'wv' || drm === 'pr') view.drm = drm;
+    if (drm === 'wv' || drm === 'pr' || drm === 'fps') view.drm = drm;
     const rays = q.get('rays')?.toLowerCase() ?? '';
     if (/^[a-z]{1,26}$/.test(rays)) view.rays = [...new Set(rays)].sort().reverse().join('');
     const delay = parseDelay(q.get('delay'));

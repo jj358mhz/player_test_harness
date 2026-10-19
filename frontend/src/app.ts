@@ -112,7 +112,12 @@ const ENGINE_FORMATS: Record<EngineName, Format[]> = {
     dashjs: ['mpd'],
     native: ['m3u8'],
 };
-const KEY_SYSTEMS = {wv: 'com.widevine.alpha', pr: 'com.microsoft.playready'} as const;
+const KEY_SYSTEMS = {
+    wv: 'com.widevine.alpha',
+    pr: 'com.microsoft.playready',
+    fps: 'com.apple.fps',
+} as const;
+type DrmChoice = keyof typeof KEY_SYSTEMS;
 const KEY_SYSTEM_NAMES: Record<string, string> = {
     'com.widevine.alpha': 'Widevine',
     'com.microsoft.playready': 'PlayReady',
@@ -437,7 +442,9 @@ export class PlayerApp {
                         h('option', {value: ''}, 'None'),
                         h('option', {value: 'wv'}, 'Widevine (DASH)'),
                         h('option', {value: 'pr'}, 'PlayReady (DASH)'),
-                        h('option', {value: 'fps', disabled: true}, 'FairPlay (Safari, coming)'),
+                        fairplaySupported()
+                            ? h('option', {value: 'fps'}, 'FairPlay (HLS, Native)')
+                            : h('option', {value: 'fps', disabled: true}, 'FairPlay (Safari only)'),
                     ),
                 ),
             ),
@@ -1075,15 +1082,14 @@ export class PlayerApp {
     }
 
     /**
-     * Studio DRM channels play as DASH + Widevine outside Safari (their HLS is
-     * FairPlay). Set that for DRM channels and undo it when moving to a clear
-     * one, unless the user picked the DRM setting themselves.
+     * Studio DRM channels play as FairPlay (HLS, Native) in Safari and as
+     * DASH + Widevine elsewhere. Set that for DRM channels and undo it when
+     * moving to a clear one, unless the user picked the DRM setting themselves.
      */
     private applyChannelDrm(channel: ChannelOption | null): void {
-        if (isSafari()) return;
         if (channel?.encryption === 'drm') {
             if (this.drm()) return;
-            this.el<HTMLSelectElement>('drm').value = 'wv';
+            this.el<HTMLSelectElement>('drm').value = fairplaySupported() ? 'fps' : 'wv';
             this.syncDrm();
             this.autoDrm = true;
         } else if (this.autoDrm) {
@@ -1108,6 +1114,9 @@ export class PlayerApp {
         const input = this.el<HTMLInputElement>('engineCustom');
         input.hidden = !custom;
         if (custom) input.focus();
+        // FairPlay plays in the Native engine only.
+        if (this.drm() === 'fps' && this.chosenEngine().engine !== 'native')
+            this.el<HTMLSelectElement>('drm').value = '';
         // Keep the format to one the engine plays: hls.js/native → HLS, dash.js → DASH.
         const formats = ENGINE_FORMATS[this.chosenEngine().engine];
         if (!formats.includes(this.format())) this.setFormat(formats[0] as Format);
@@ -1213,16 +1222,26 @@ export class PlayerApp {
         const engine = this.chosenEngine().engine;
         if (!ENGINE_FORMATS[engine].includes(value))
             this.selectEngine(value === 'mpd' ? 'shaka-player' : 'hls.js');
-        if (value === 'm3u8' && this.drm()) this.el<HTMLSelectElement>('drm').value = '';
+        // Widevine/PlayReady are DASH only, FairPlay HLS only.
+        const drm = this.drm();
+        if (drm && (value === 'm3u8') !== (drm === 'fps'))
+            this.el<HTMLSelectElement>('drm').value = '';
     }
 
-    private drm(): 'wv' | 'pr' | null {
+    private drm(): DrmChoice | null {
         const value = this.el<HTMLSelectElement>('drm').value;
-        return value === 'wv' || value === 'pr' ? value : null;
+        return value in KEY_SYSTEMS ? (value as DrmChoice) : null;
     }
 
     private syncDrm(): void {
-        if (this.drm()) this.setFormat('mpd'); // Widevine/PlayReady need DASH and Shaka
+        const drm = this.drm();
+        if (drm === 'fps') {
+            // FairPlay: HLS in the browser's own player (EME).
+            this.selectEngine('native');
+            this.setFormat('m3u8');
+        } else if (drm) {
+            this.setFormat('mpd'); // Widevine/PlayReady need DASH and Shaka or dash.js
+        }
     }
 
     private start(): void {
@@ -1267,7 +1286,8 @@ export class PlayerApp {
         }
         if (view.format && ENGINE_FORMATS[this.chosenEngine().engine].includes(view.format))
             this.setFormat(view.format);
-        if (view.drm) {
+        // A FairPlay link opened outside Safari falls back to the channel's default.
+        if (view.drm && (view.drm !== 'fps' || fairplaySupported())) {
             this.el<HTMLSelectElement>('drm').value = view.drm;
             this.syncDrm();
             this.autoDrm = false;
@@ -1302,12 +1322,20 @@ export class PlayerApp {
             this.updateQuery({src: url});
             // Pasted URLs have no Preplay response; use Uplynk's default license host.
             const drm = this.drm();
-            const license = drm ? defaultLicenseUrl(url, drm) : null;
+            if (drm === 'fps') {
+                this.notice(
+                    'error',
+                    'FairPlay needs a synced channel: its certificate URL comes from Preplay. Pick the channel instead of pasting a URL.',
+                );
+                return;
+            }
             await this.play({
                 channel: null,
                 url,
                 expiresAt: expiryFromUrl(url),
-                drm: drm && license ? {keySystem: KEY_SYSTEMS[drm], licenseUrl: license} : null,
+                drm: drm
+                    ? {keySystem: KEY_SYSTEMS[drm], licenseUrl: defaultLicenseUrl(url, drm)}
+                    : null,
                 clock: clockFor(this.format(), url, null),
             });
             return;
@@ -1345,19 +1373,31 @@ export class PlayerApp {
         if (encryption) {
             const learned = encryption === 'drm' && channel.encryption !== 'drm';
             this.noteEncryption(channel, encryption);
-            if (learned && !drm && !isSafari()) {
-                // First time we've seen this channel's FairPlay keys: replay as Widevine.
+            if (learned && !drm) {
+                // First time we've seen this channel's FairPlay keys: replay with DRM.
                 this.applyChannelDrm(channel);
                 await this.loadFromForm(params);
                 this.notice(
                     'info',
-                    `${channel.name} uses Studio DRM (FairPlay over HLS, Safari only), so it is playing as DASH with Widevine.`,
+                    fairplaySupported()
+                        ? `${channel.name} uses Studio DRM, so it is playing with FairPlay in the Native engine.`
+                        : `${channel.name} uses Studio DRM (FairPlay over HLS, Safari only), so it is playing as DASH with Widevine.`,
                 );
                 return;
             }
         }
         let drmConfig: DrmConfig | null = null;
-        if (drm) {
+        if (drm === 'fps') {
+            const certificateUrl = response.drm_config?.fairplayCertificateURL;
+            if (!certificateUrl) {
+                this.notice(
+                    'error',
+                    `Preplay returned no FairPlay certificate URL for ${channel.name}. Is Studio DRM with FairPlay enabled on this channel?`,
+                );
+                return;
+            }
+            drmConfig = {keySystem: KEY_SYSTEMS.fps, certificateUrl};
+        } else if (drm) {
             const licenseUrl =
                 drm === 'wv'
                     ? response.drm_config?.widevineLicenseURL
@@ -1553,7 +1593,7 @@ export class PlayerApp {
         const source = this.source;
         const {stats, name} = this.headline();
         const rendition = engine?.currentRendition() ?? null;
-        const chosen = source?.drm ? this.drmEngine() : this.chosenEngine();
+        const chosen = this.engineFor(source);
         return {
             title: source ? (source.channel?.name ?? pastedHost(source.url)) : null,
             engine: engine?.name ?? ENGINE_LABELS[chosen.engine],
@@ -1634,7 +1674,9 @@ export class PlayerApp {
         this.source = source;
         this.renderSlicerLink(source.channel);
         this.renderAll();
-        const {engine: kind, version} = source.drm ? this.drmEngine() : this.chosenEngine();
+        const {engine: kind, version} = this.engineFor(source);
+        const drm = source.drm;
+        const cenc = drm && drm.keySystem !== 'com.apple.fps' ? drm : null;
         let engine: PlayerEngine;
         try {
             if (kind === 'shaka-player') {
@@ -1646,7 +1688,7 @@ export class PlayerApp {
                     );
                     return;
                 }
-                engine = new ShakaEngine(shaka, version, source.drm);
+                engine = new ShakaEngine(shaka, version, cenc);
             } else if (kind === 'dashjs') {
                 const dashjs = await loadDashJs(version);
                 if (!dashjs.supportsMediaSource()) {
@@ -1656,13 +1698,13 @@ export class PlayerApp {
                     );
                     return;
                 }
-                engine = new DashJsEngine(dashjs, version, source.drm);
+                engine = new DashJsEngine(dashjs, version, cenc);
             } else if (kind === 'native') {
                 if (!nativeHlsSupported()) {
                     this.notice('error', 'This browser cannot play HLS natively; use hls.js.');
                     return;
                 }
-                engine = new NativeEngine();
+                engine = new NativeEngine(drm?.keySystem === 'com.apple.fps' ? drm : null);
             } else {
                 const Hls = await loadHlsJs(version);
                 if (!Hls.isSupported()) {
@@ -1711,6 +1753,13 @@ export class PlayerApp {
         }
         this.session.loadAt = performance.now();
         engine.load(source.url, this.video);
+    }
+
+    /** The engine a source plays in: DRM can override the picker. */
+    private engineFor(source: Source | null): {engine: EngineName; version: string} {
+        if (source?.drm?.keySystem === 'com.apple.fps')
+            return {engine: 'native', version: NATIVE_VERSION};
+        return source?.drm ? this.drmEngine() : this.chosenEngine();
     }
 
     /** Widevine/PlayReady play in dash.js when it's chosen, otherwise Shaka. */
@@ -1834,7 +1883,7 @@ export class PlayerApp {
             s().playlist = info;
             if (info.text?.includes('com.apple.streamingkeydelivery') && !s().fairplay) {
                 s().fairplay = true;
-                if (!isSafari()) this.warnFairPlay();
+                if (!this.playingFairPlay()) this.warnFairPlay();
             }
             if (this.manifestView === 'media' || info.format === 'dash') this.renderManifest();
         });
@@ -1880,7 +1929,7 @@ export class PlayerApp {
             const label = http ? `HTTP ${err.status}` : 'FATAL';
             this.logEntry('err', label, text);
             this.mark('err', `${label} · ${err.details}`);
-            if (s().fairplay && !isSafari()) {
+            if (s().fairplay && !this.playingFairPlay()) {
                 this.warnFairPlay();
                 return;
             }
@@ -1892,14 +1941,22 @@ export class PlayerApp {
         });
     }
 
-    /** Studio DRM over HLS is FairPlay, which only Safari can decrypt. */
+    /** True when this load decrypts FairPlay itself (Native engine + EME). */
+    private playingFairPlay(): boolean {
+        return this.source?.drm?.keySystem === 'com.apple.fps';
+    }
+
+    /** Studio DRM over HLS is FairPlay: Safari plays it with DRM → FairPlay, others need DASH. */
     private warnFairPlay(): void {
         if (this.session.fairplayWarned) return;
         this.session.fairplayWarned = true;
         const channel = this.source?.channel;
+        const safari = fairplaySupported();
         this.notice(
             'error',
-            'This stream uses FairPlay DRM (Studio DRM over HLS), which only Safari can play. In Chrome, play it as DASH with Widevine.',
+            safari
+                ? 'This stream uses FairPlay DRM (Studio DRM over HLS). Play it with DRM → FairPlay, which uses the Native engine.'
+                : 'This stream uses FairPlay DRM (Studio DRM over HLS), which only Safari can play. In Chrome, play it as DASH with Widevine.',
             h(
                 'button',
                 {type: 'button', class: 'pl-btn-ghost', onclick: () => this.showCompat()},
@@ -1912,12 +1969,12 @@ export class PlayerApp {
                           type: 'button',
                           class: 'pl-btn-ghost',
                           onclick: () => {
-                              this.el<HTMLSelectElement>('drm').value = 'wv';
+                              this.el<HTMLSelectElement>('drm').value = safari ? 'fps' : 'wv';
                               this.syncDrm();
                               void this.loadFromForm();
                           },
                       },
-                      'Play with Widevine (DASH)',
+                      safari ? 'Play with FairPlay' : 'Play with Widevine (DASH)',
                   )
                 : undefined,
         );
@@ -2501,7 +2558,7 @@ export class PlayerApp {
                 ['Key system', keySystem ? (KEY_SYSTEM_NAMES[keySystem] ?? keySystem) : '--'],
                 [
                     'License server',
-                    shortUrlFull(drm?.licenseServer ?? this.source?.drm?.licenseUrl ?? ''),
+                    shortUrlFull(drm?.licenseServer ?? sourceLicenseUrl(this.source?.drm) ?? ''),
                 ],
                 ['Licenses', `${l.count} ok${l.failed ? ` · ${l.failed} failed` : ''}`],
                 [
@@ -3171,6 +3228,16 @@ export function channelLabel(c: ChannelOption): string {
 function isSafari(): boolean {
     const ua = navigator.userAgent;
     return /Safari\//.test(ua) && !/Chrome|Chromium|Edg\//.test(ua);
+}
+
+/** FairPlay needs Safari's own HLS player and EME. */
+function fairplaySupported(): boolean {
+    return isSafari() && nativeHlsSupported() && 'requestMediaKeySystemAccess' in navigator;
+}
+
+/** The license URL a source was given (FairPlay's comes from each key URI). */
+function sourceLicenseUrl(drm: DrmConfig | null | undefined): string | null {
+    return drm && 'licenseUrl' in drm ? drm.licenseUrl : null;
 }
 
 /** Uplynk license endpoint for a pasted URL: same content zone, /wv or /pr. */

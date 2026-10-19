@@ -9,7 +9,7 @@ import {videoProfile} from '../lib/codecs';
 import {drmHint, mpdInfo, rayFromRepresentation, rayFromSegmentUrl} from './shaka';
 import {
     type AudioTrack,
-    type DrmConfig,
+    type CencDrmConfig,
     type DrmState,
     Emitter,
     type Listener,
@@ -77,7 +77,7 @@ export class DashJsEngine implements PlayerEngine {
     constructor(
         private dashjs: DashJs,
         readonly version: string,
-        private drm: DrmConfig | null,
+        private drm: CencDrmConfig | null,
     ) {}
 
     on<K extends Parameters<PlayerEngine['on']>[0]>(event: K, listener: Listener<K>): void {

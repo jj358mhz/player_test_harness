@@ -5,13 +5,29 @@
 // from getStartDate(), the seekable window, and Resource Timing entries
 // where the browser exposes them. It shows where hls.js and the browser
 // disagree.
+//
+// With a FairPlayConfig it also plays Studio DRM (FairPlay over HLS) through
+// EME: certificate from Preplay, one MediaKeySession per skd:// key URI, and
+// the SPC/CKC exchange with Uplynk's key server (lib/fairplay.ts).
 
 import {videoProfile} from '../lib/codecs';
+import {
+    certificateBytes,
+    ckcFromResponse,
+    FAIRPLAY_KEY_SYSTEM,
+    fairplayKeyUri,
+    keyIdHex,
+    licenseUrlFromSkd,
+    skdFromInitData,
+    spcRequestBody,
+} from '../lib/fairplay';
 import type {Id3Frame} from '../lib/id3';
 import {parseUplynkMedia, rayFromUri} from '../lib/rays';
 import {rayFromSegmentUrl} from './shaka';
 import {
+    type DrmState,
     Emitter,
+    type FairPlayConfig,
     type Listener,
     type MediaPlaylistInfo,
     type PlayerEngine,
@@ -36,9 +52,7 @@ interface DataCueValue {
 export class NativeEngine implements PlayerEngine {
     readonly name = 'Native';
     readonly version = NATIVE_VERSION;
-    readonly limits =
-        'The browser plays HLS itself, so requests, bandwidth estimate and ABR decisions are mostly hidden. ' +
-        'Rays come from our own copy of the master playlist and the decoded frame size.';
+    readonly limits: string;
     private video: HTMLVideoElement | null = null;
     private events = new Emitter();
     private renditions: Rendition[] = [];
@@ -48,6 +62,23 @@ export class NativeEngine implements PlayerEngine {
     private abort = new AbortController();
     private observer: PerformanceObserver | null = null;
     private seenCues = new WeakSet<TextTrackCue>();
+    // FairPlay
+    private mediaKeys: MediaKeys | null = null;
+    /** skd:// URI (or init data hex) → its session. */
+    private keySessions = new Map<string, MediaKeySession>();
+    /** From our copy of the first media playlist, if init data doesn't carry it. */
+    private keyUri: string | null = null;
+    private licenseUrl: string | null = null;
+    private licenseMs = 0;
+
+    constructor(private fairplay: FairPlayConfig | null = null) {
+        this.limits =
+            'The browser plays HLS itself, so requests, bandwidth estimate and ABR decisions are mostly hidden. ' +
+            'Rays come from our own copy of the master playlist and the decoded frame size.' +
+            (fairplay
+                ? ' FairPlay: license requests are timed here; segment and key timing stay inside Safari.'
+                : '');
+    }
 
     on<K extends Parameters<PlayerEngine['on']>[0]>(event: K, listener: Listener<K>): void {
         this.events.on(event, listener);
@@ -74,6 +105,7 @@ export class NativeEngine implements PlayerEngine {
             const media = first ? await fetchText(first, signal) : null;
             if (signal.aborted) return;
             const info = media ? mediaPlaylistInfo(media, first ?? '') : null;
+            this.keyUri = media ? fairplayKeyUri(media) : null;
             if (info) this.events.emit('playlist', info);
             // Show the ladder now, even if the browser then refuses the stream.
             this.live = info?.live ?? true;
@@ -113,8 +145,189 @@ export class NativeEngine implements PlayerEngine {
         const audio = (video as unknown as {audioTracks?: EventTarget}).audioTracks;
         if (audio) listen(audio, 'change', () => this.emitAudio());
 
+        if (this.fairplay && !(await this.setUpFairPlay(this.fairplay, video, signal))) return;
+        if (signal.aborted) return;
         video.src = url;
         void video.play().catch(() => {}); // autoplay may need a click
+    }
+
+    // ------------------------------------------------------------ FairPlay
+
+    private fail(details: string, status: number | null = null, url: string | null = null): false {
+        this.events.emit('error', {fatal: true, details, status, url});
+        return false;
+    }
+
+    /** MediaKeys with the application certificate, attached before video.src is set. */
+    private async setUpFairPlay(
+        config: FairPlayConfig,
+        video: HTMLVideoElement,
+        signal: AbortSignal,
+    ): Promise<boolean> {
+        if (!navigator.requestMediaKeySystemAccess)
+            return this.fail(
+                'No Encrypted Media Extensions here: FairPlay needs Safari 14 or later.',
+            );
+        let keys: MediaKeys;
+        try {
+            // Apple's samples ask for video/mp4; some Safari builds want the HLS type.
+            const config = (contentType: string): MediaKeySystemConfiguration => ({
+                initDataTypes: ['skd', 'sinf'],
+                videoCapabilities: [{contentType, robustness: ''}],
+                distinctiveIdentifier: 'not-allowed',
+                persistentState: 'not-allowed',
+                sessionTypes: ['temporary'],
+            });
+            const access = await navigator.requestMediaKeySystemAccess(FAIRPLAY_KEY_SYSTEM, [
+                config('video/mp4'),
+                config('application/vnd.apple.mpegurl'),
+            ]);
+            keys = await access.createMediaKeys();
+        } catch (err) {
+            return this.fail(
+                `FairPlay (${FAIRPLAY_KEY_SYSTEM}) is not available in this browser: ${(err as Error).message}`,
+            );
+        }
+        const start = performance.now();
+        let response: Response;
+        let body: ArrayBuffer;
+        try {
+            response = await fetch(config.certificateUrl, {signal, credentials: 'omit'});
+            body = await response.arrayBuffer();
+        } catch (err) {
+            if (signal.aborted) return false;
+            return this.fail(
+                `FairPlay certificate request failed: ${(err as Error).message} (blocked by CORS?)`,
+                null,
+                config.certificateUrl,
+            );
+        }
+        this.events.emit('request', {
+            kind: 'license',
+            name: 'certificate',
+            start,
+            end: performance.now(),
+            status: response.status,
+            bytes: body.byteLength,
+            failed: !response.ok,
+            url: config.certificateUrl,
+        });
+        if (!response.ok)
+            return this.fail(
+                `FairPlay certificate request failed (HTTP ${response.status})`,
+                response.status,
+                config.certificateUrl,
+            );
+        try {
+            await keys.setServerCertificate(certificateBytes(body) as Uint8Array<ArrayBuffer>);
+            await video.setMediaKeys(keys);
+        } catch (err) {
+            return this.fail(`FairPlay rejected the certificate: ${(err as Error).message}`);
+        }
+        if (signal.aborted) return false;
+        this.mediaKeys = keys;
+        video.addEventListener(
+            'encrypted',
+            (e) => void this.onEncrypted(e as MediaEncryptedEvent),
+            {
+                signal,
+            },
+        );
+        return true;
+    }
+
+    /** One session per key: Uplynk may rotate keys or use one per ray. */
+    private async onEncrypted(event: MediaEncryptedEvent): Promise<void> {
+        const keys = this.mediaKeys;
+        if (!keys || !event.initData) return;
+        const skd = skdFromInitData(event.initData) ?? this.keyUri;
+        const id = skd ?? keyIdHex(event.initData);
+        if (this.keySessions.has(id)) return;
+        const licenseUrl = skd ? licenseUrlFromSkd(skd) : null;
+        if (!licenseUrl) {
+            this.fail('FairPlay: no skd:// key URI in the init data or the media playlist.');
+            return;
+        }
+        const session = keys.createSession('temporary');
+        this.keySessions.set(id, session);
+        session.addEventListener('message', (e) => {
+            void this.requestLicense(session, licenseUrl, (e as MediaKeyMessageEvent).message);
+        });
+        session.addEventListener('keystatuseschange', () => {
+            this.events.emit('keystatus', {statuses: this.keyStatuses()});
+        });
+        try {
+            await session.generateRequest(event.initDataType, event.initData);
+        } catch (err) {
+            this.licenseFailed(`FairPlay could not start a key request: ${(err as Error).message}`);
+        }
+    }
+
+    /** SPC → Uplynk's key server → CKC → the CDM. */
+    private async requestLicense(
+        session: MediaKeySession,
+        url: string,
+        spc: ArrayBuffer,
+    ): Promise<void> {
+        this.licenseUrl = url;
+        const start = performance.now();
+        let status: number | null = null;
+        let bytes = 0;
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: spcRequestBody(spc),
+                credentials: 'omit',
+                signal: this.abort.signal,
+            });
+            status = response.status;
+            const text = await response.text();
+            bytes = text.length;
+            const end = performance.now();
+            this.licenseMs += end - start;
+            this.events.emit('request', {
+                kind: 'license',
+                name: 'license',
+                start,
+                end,
+                status,
+                bytes,
+                failed: !response.ok,
+                url,
+            });
+            if (!response.ok)
+                throw new Error(`HTTP ${status}${text ? ` · ${text.slice(0, 120)}` : ''}`);
+            await session.update(ckcFromResponse(text) as Uint8Array<ArrayBuffer>);
+            this.events.emit('license', {
+                ms: Math.round(end - start),
+                status,
+                bytes,
+                failed: false,
+                error: null,
+            });
+        } catch (err) {
+            if (this.abort.signal.aborted) return;
+            this.licenseFailed(
+                `FairPlay license request failed: ${(err as Error).message}`,
+                status,
+            );
+        }
+    }
+
+    private licenseFailed(error: string, status: number | null = null): void {
+        this.events.emit('license', {ms: 0, status, bytes: 0, failed: true, error});
+        this.fail(error, status, this.licenseUrl);
+    }
+
+    private keyStatuses(): Record<string, string> {
+        const out: Record<string, string> = {};
+        for (const session of this.keySessions.values()) {
+            session.keyStatuses.forEach((status, id) => {
+                out[keyIdHex(id)] = status;
+            });
+        }
+        return out;
     }
 
     /** Resource Timing for the stream's host, where the browser reports it. */
@@ -237,18 +450,35 @@ export class NativeEngine implements PlayerEngine {
         });
     }
 
-    drmState(): null {
-        return null; // FairPlay over native HLS arrives with #21
+    drmState(): DrmState | null {
+        if (!this.fairplay) return null;
+        const expiries = [...this.keySessions.values()]
+            .map((s) => s.expiration)
+            .filter((t) => Number.isFinite(t));
+        return {
+            keySystem: FAIRPLAY_KEY_SYSTEM,
+            licenseServer: this.licenseUrl,
+            videoRobustness: null,
+            audioRobustness: null,
+            encryptionScheme: 'SAMPLE-AES (cbcs)',
+            keyStatuses: this.keyStatuses(),
+            licenseSeconds: this.licenseMs ? this.licenseMs / 1000 : null,
+            expiration: expiries.length ? Math.min(...expiries) : null,
+        };
     }
 
     async destroy(): Promise<void> {
         this.abort.abort();
         this.observer?.disconnect();
         this.events.clear();
+        for (const session of this.keySessions.values()) void session.close().catch(() => {});
+        this.keySessions.clear();
         if (this.video) {
             this.video.removeAttribute('src');
             this.video.load();
+            if (this.mediaKeys) await this.video.setMediaKeys(null).catch(() => {});
         }
+        this.mediaKeys = null;
     }
 }
 

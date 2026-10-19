@@ -107,7 +107,9 @@ after dependency changes.
     LICENSE_REQUEST_COMPLETE (protection events by name, e.g.
     `public_keyMessage`); `engines/native.ts` is `video.src` (Safari),
     with its own master fetch for the ladder and an optional `limits`
-    note. dash.js `reset()` clears `video.autoplay`/`muted`; the adapter
+    note; given a `FairPlayConfig` it also does FairPlay with EME
+    (`lib/fairplay.ts`: skd:// → license URL, SPC/CKC bodies). DRM
+    configs are `CencDrmConfig` (Shaka, dash.js) or `FairPlayConfig`. dash.js `reset()` clears `video.autoplay`/`muted`; the adapter
     restores them. npm dependencies give types and defaults (dash.js's
     version is read from `frontend/package.json`, it doesn't export its own).
     `destroy()` is async: await it before attaching the next engine.
@@ -174,6 +176,11 @@ after dependency changes.
   it). A browser may use a signed DASH URL only once: a second fetch with
   a browser User-Agent gets `403 DRM sig reuse rejected` (server-side
   fetches like the probe don't count). Re-sign rather than replaying.
+- FairPlay (docs "Apple FairPlay DRM (HLS)"): Preplay `rmt=fps` →
+  `drm.fairplayCertificateURL`; license URL = the `skd://` key URI with
+  `https://`; POST JSON `{"spc": base64}` → `{"ckc": base64}`. Not yet
+  checked first-hand: certificate format (DER or base64, both handled)
+  and CORS on the certificate and key server hosts.
 - DRM: Widevine/PlayReady need DASH; FairPlay needs HLS. Studio DRM requires
   token-protected playback. License hosts: `content.uplynk.com/{wv,pr}` (use
   the Preplay `prefix` zone to avoid redirects). EME needs HTTPS.
@@ -236,9 +243,10 @@ in the `player_harness_data` volume.
       message. **v3.4.0:** `Channel.encryption` learned from each HLS probe
       (first media playlist's `EXT-X-KEY`; Preplay `drm.required`), 🔒 DRM
       badge, Widevine auto-selected for DRM channels outside Safari,
-      `flask check-encryption`. **Next:** FairPlay in Safari (SPC/CKC
-      exchange with `fairplayCertificateURL`). PlayReady is
-      wired but untested (Chrome has no PlayReady; needs Edge).
+      `flask check-encryption`. **v3.13.0:** FairPlay in Safari (Native
+      engine + EME, #21) — built from Uplynk's docs, to verify in real
+      Safari. PlayReady is wired but untested (Chrome has no PlayReady;
+      needs Edge).
 - [~] Phase 4 — triage (#24). **Done (v3.6.0):** deep links (source,
       format, engine@version, DRM, rays, tab) + Copy link. **v3.7.0:**
       recorded sessions (`PlaybackSession`, `POST /api/sessions`,
