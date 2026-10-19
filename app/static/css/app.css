@@ -84,6 +84,12 @@
     box-sizing: border-box;
 }
 
+/* The hidden attribute always wins: components set display (e.g. a flex
+   .channel-card), which otherwise beats the browser's own [hidden] rule. */
+[hidden] {
+    display: none !important;
+}
+
 html, body {
     margin: 0;
     padding: 0;

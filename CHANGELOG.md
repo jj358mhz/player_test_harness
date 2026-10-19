@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.11.1] - 2026-10-18
+
+### Fixed
+- **The Channels filter didn't hide anything.** It marked non-matching
+  cards `hidden` and updated the section counts, but `.channel-card` sets
+  `display: flex`, which beats the browser's own `[hidden]` rule, so every
+  card stayed on screen. A global `[hidden] { display: none !important }`
+  makes the attribute win everywhere (also for `?q=` links from the
+  slicer console and the DRM filter).
+
 ## [3.11.0] - 2026-10-18
 
 ### Added

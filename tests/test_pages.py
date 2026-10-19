@@ -322,3 +322,11 @@ def test_slicer_links_follow_csl_base_url(
     assert 'href="https://csl.example.com/slicers/by-id/slicer0001"' in dashboard
     player = auth_client.get("/player").get_data(as_text=True)
     assert '"cslBase": "https://csl.example.com"' in player and '"slicerId": "slicer0001"' in player
+
+
+def test_hidden_attribute_beats_component_display():
+    """The dashboard filter hides cards with `hidden`; .channel-card sets display:flex."""
+    from pathlib import Path
+
+    css = (Path(__file__).parent.parent / "app/static/css/app.css").read_text()
+    assert "\n[hidden] {\n    display: none !important;" in css  # global, not .x[hidden]
