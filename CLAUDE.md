@@ -182,9 +182,8 @@ after dependency changes.
   are TS (`FP_<RAY>….ts`): Safari's standard EME never fires `encrypted`
   for TS SAMPLE-AES (seen in Safari: MEDIA_ERR_DECODE, no key request), so
   TS uses legacy `WebKitMediaKeys` (`com.apple.fps.1_0`, `webkitneedkey`,
-  init data + content id (skd host) + certificate). Not yet
-  checked first-hand: certificate format (DER or base64, both handled)
-  and CORS on the certificate and key server hosts.
+  init data + content id (skd host) + certificate). Certificate and key
+  server hosts allow CORS (verified in Safari 2026-10-19).
 - DRM: Widevine/PlayReady need DASH; FairPlay needs HLS. Studio DRM requires
   token-protected playback. License hosts: `content.uplynk.com/{wv,pr}` (use
   the Preplay `prefix` zone to avoid redirects). EME needs HTTPS.
