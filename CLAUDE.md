@@ -207,6 +207,10 @@ after dependency changes.
   synthesised so the newest segment ends ≈ now; it shifts with `delay`,
   is the same for every URL of a channel+delay, and ignores `pdts`. DASH
   `$Number$` = HLS slice number (hex in `#UPLYNK-SEGMENT`) within an asset.
+- **ID3 wallclock vs `pdts=latency`** (2026-10-19, one `wallclock: 1`
+  channel): the wallclock reads ~one slice (≈ 4 s) more latency than the
+  program date, on HLS (72.6 vs 68.2 s, no MPD involved) and DASH (50.4
+  vs 46.4 s). Not a player bug: they stamp different points of a slice.
 - **ID3 wallclock** (TXXX with a time/wallclock description) is written
   only by slicers with `wallclock: 1`; many of the owner's slicers don't
   have it, so "no wallclock" is normal, not a player bug. For cloud
@@ -256,8 +260,7 @@ in the `player_harness_data` volume.
       adapters behind `PlayerEngine`. **v3.15.0–3.16.0:** DASH encoder latency
       from in-segment `prft` (`lib/mp4.ts`; Uplynk writes none) and from
       ID3 in emsg (Shaka and dash.js); v3.16.1 asset/ray/slice from that
-      ID3. **Open:** on one channel DASH ID3 latency read ~4 s (≈ one
-      slice) above MPD clock + offset (51.8 vs 47.8 s); find which is off. **Left:** presets in the DB, native
+      ID3. **Left:** presets in the DB, native
       verified in real Safari.
 - [~] Phase 3 — DRM. **Done (v3.2.0):** Shaka engine, Widevine/PlayReady
       over DASH from Preplay, DRM panel (key system, license timing/status,

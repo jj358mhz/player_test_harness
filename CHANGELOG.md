@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.16.2] - 2026-10-19
+
+### Documentation
+- Why the encoder wallclock reads about one slice (≈ 4 s) more than the
+  `pdts=latency` program date: measured on HLS (Safari, FairPlay) and
+  DASH on the same `wallclock: 1` channel, so it's how Uplynk stamps the
+  two, not DASH anchoring. `docs/player.md` "Which clock" and CLAUDE.md.
+
 ## [3.16.1] - 2026-10-19
 
 ### Added
