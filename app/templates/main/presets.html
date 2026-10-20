@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title_suffix %} — Presets{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Presets <span class="page-header__meta">{{ rows|length }}</span></h1>
+</div>
+<p class="muted">Saved player setups: format, engine and version, DRM, delay, ads and CMCD. Pick one from
+    <strong>Preset</strong> in the <a href="{{ url_for('main.player') }}">player</a>; it applies to whichever
+    channel you load. Shared by everyone who signs in.</p>
+
+{% if rows %}
+<table class="data-table presets-table">
+    <thead><tr><th>Name</th><th>Settings</th><th></th></tr></thead>
+    <tbody>
+    {% for row, parts in rows %}
+    <tr{% if editing and editing.id == row.id %} class="is-editing"{% endif %}>
+        <td><strong>{{ row.name }}</strong></td>
+        <td>{% for part in parts %}<span class="preset-part">{{ part }}</span>{% endfor %}</td>
+        <td class="presets-table__actions">
+            <a class="btn-ghost" href="{{ url_for('main.player', preset=row.id) }}">▶ Open in player</a>
+            <a class="btn-ghost" href="{{ url_for('main.presets', edit=row.id) }}#preset-form">Edit</a>
+            <form method="post" action="{{ url_for('main.delete_preset_form', preset_id=row.id) }}" class="inline"
+                  onsubmit="return confirm('Delete preset {{ row.name|e }}?');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="link-button link-button--danger">Delete</button>
+            </form>
+        </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<div class="card"><p class="muted">No presets yet. Add one below, or set up the
+    <a href="{{ url_for('main.player') }}">player</a>'s load bar and press <strong>Save as preset…</strong></p></div>
+{% endif %}
+
+<div class="card preset-form" id="preset-form">
+    <h2>{% if editing %}Edit “{{ editing.name }}”{% else %}Add a preset{% endif %}</h2>
+    {% if error %}<p class="field__error" role="alert">Not saved: {{ error }}</p>{% endif %}
+    <form method="post" action="{{ url_for('main.save_preset_form') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {% if editing %}<input type="hidden" name="preset_id" value="{{ editing.id }}">{% endif %}
+        <div class="field">
+            <label for="pf-name">Name</label>
+            <input id="pf-name" class="input" name="name" required maxlength="60" value="{{ form.name or '' }}"
+                   placeholder="Shaka DASH Widevine">
+            <p class="field__help">Saving under an existing name replaces that preset.</p>
+        </div>
+        <div class="field-row">
+            <div class="field">
+                <label for="pf-format">Format</label>
+                <select id="pf-format" class="input" name="format">
+                    <option value="hls"{% if form.format != 'dash' %} selected{% endif %}>HLS</option>
+                    <option value="dash"{% if form.format == 'dash' %} selected{% endif %}>DASH</option>
+                </select>
+            </div>
+            <div class="field">
+                <label for="pf-engine">Player engine</label>
+                <select id="pf-engine" class="input" name="engine">
+                    {% for value, label in engines.items() %}
+                    <option value="{{ value }}"{% if form.engine == value %} selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="field">
+                <label for="pf-version">Engine version</label>
+                <input id="pf-version" class="input" name="version" value="{{ form.version or '' }}"
+                       placeholder="default" pattern="\d+\.\d+\.\d+(-[\w.]+)?">
+                <p class="field__help">Blank: the player's default. Not for Native.</p>
+            </div>
+        </div>
+        <div class="field-row">
+            <div class="field">
+                <label for="pf-drm">DRM</label>
+                <select id="pf-drm" class="input" name="drm">
+                    <option value="">Channel's default</option>
+                    {% for value, label in drms.items() %}
+                    <option value="{{ value }}"{% if form.drm == value %} selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="field">
+                <label for="pf-delay">Delay</label>
+                <select id="pf-delay" class="input" name="delay">
+                    <option value="">Default</option>
+                    {% for d in delays %}
+                    <option value="{{ d }}"{% if form.delay|string == d|string %} selected{% endif %}>{{ d }} s</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="field field--inline preset-form__cmcd">
+                <input id="pf-cmcd" type="checkbox" name="cmcd" value="1"{% if form.cmcd %} checked{% endif %}>
+                <label for="pf-cmcd">CMCD</label>
+            </div>
+        </div>
+        <div class="field-row">
+            <div class="field">
+                <label for="pf-ad">Ads (ad server)</label>
+                <input id="pf-ad" class="input" name="ad" list="pf-ad-names" value="{{ form.ad or '' }}"
+                       placeholder="none" pattern="[A-Za-z0-9_.\-]{1,100}">
+                <datalist id="pf-ad-names">
+                    {% for name in ad_names %}<option value="{{ name }}">{% endfor %}
+                </datalist>
+                <p class="field__help">An ad configuration name from an account's Ad servers. Applied only
+                    on channels whose account lists it.</p>
+            </div>
+            <div class="field">
+                <label for="pf-ad-params">Ad params</label>
+                <input id="pf-ad-params" class="input" name="ad_params" value="{{ form.ad_params or '' }}"
+                       placeholder="ad.lib=KOR">
+                <p class="field__help">ad.* params joined with &amp;, e.g. <code>ad.lib=KOR&amp;ad.flex=10</code>.
+                    Needs an ad server.</p>
+            </div>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="button button--primary">{% if editing %}Save changes{% else %}Add preset{% endif %}</button>
+            {% if editing %}<a class="btn-ghost" href="{{ url_for('main.presets') }}">Cancel</a>{% endif %}
+        </div>
+    </form>
+</div>
+{% endblock %}

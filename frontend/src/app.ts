@@ -2,7 +2,6 @@
 // Engine-agnostic: everything here talks to a PlayerEngine.
 
 import {
-    deletePreset,
     type EngineVersion,
     fetchPresets,
     fetchSlicer,
@@ -408,6 +407,26 @@ export class PlayerApp {
                     void this.loadFromForm();
                 },
             },
+            ...(this.config.endpoints.presets
+                ? [
+                      h(
+                          'div',
+                          {class: 'pl-field pl-field--preset'},
+                          h('label', {for: 'pl-preset'}, 'Preset'),
+                          this.ref(
+                              'preset',
+                              h('select', {
+                                  id: 'pl-preset',
+                                  class: 'pl-control',
+                                  title: 'Saved setups: format, engine and version, DRM, delay, ads and CMCD, for whichever channel you load. Press Load after choosing. Listed and edited on the Presets page',
+                                  onchange: () => this.onPresetChosen(),
+                                  // Another tab may have saved or deleted some.
+                                  onfocus: () => void this.refreshPresets(),
+                              }),
+                          ),
+                      ),
+                  ]
+                : []),
             h(
                 'div',
                 {class: 'pl-field pl-field--source'},
@@ -425,26 +444,6 @@ export class PlayerApp {
                     }),
                 ),
             ),
-            ...(this.config.endpoints.presets
-                ? [
-                      h(
-                          'div',
-                          {class: 'pl-field'},
-                          h('label', {for: 'pl-preset'}, 'Preset'),
-                          this.ref(
-                              'preset',
-                              h('select', {
-                                  id: 'pl-preset',
-                                  class: 'pl-control',
-                                  title: 'Saved setups: format, engine and version, DRM, delay and CMCD. Applies to the selected channel; press Load',
-                                  onchange: () => this.onPresetChosen(),
-                                  // Another tab may have saved or deleted some.
-                                  onfocus: () => void this.refreshPresets(),
-                              }),
-                          ),
-                      ),
-                  ]
-                : []),
             h(
                 'div',
                 {class: 'pl-field'},
@@ -459,22 +458,7 @@ export class PlayerApp {
                     ),
                 ),
             ),
-            h(
-                'div',
-                {class: 'pl-field'},
-                h('label', {for: 'pl-engine'}, 'Player engine'),
-                engine,
-                this.ref(
-                    'engineCustom',
-                    h('input', {
-                        class: 'pl-control mono',
-                        placeholder: 'exact version, e.g. 1.6.15',
-                        hidden: true,
-                        'aria-label': 'Engine version',
-                        pattern: '\\d+\\.\\d+\\.\\d+(-[\\w.]+)?',
-                    }),
-                ),
-            ),
+            h('div', {class: 'pl-field'}, h('label', {for: 'pl-engine'}, 'Player engine'), engine),
             h(
                 'div',
                 {class: 'pl-field'},
@@ -534,16 +518,6 @@ export class PlayerApp {
                         },
                     }),
                 ),
-                this.ref(
-                    'adParams',
-                    h('input', {
-                        class: 'pl-control mono',
-                        placeholder: 'ad.lib=KOR',
-                        hidden: true,
-                        'aria-label': 'Ad params for this load',
-                        title: "This load's ad.* params, e.g. ad.lib=KOR or ad.lib=JPN&ad.kv=…; signed on top of the ad server's own params",
-                    }),
-                ),
             ),
             h(
                 'div',
@@ -565,52 +539,94 @@ export class PlayerApp {
             ),
             h(
                 'div',
-                {
-                    class: 'pl-loadbar__tools',
-                    role: 'group',
-                    'aria-label': 'Link, session and presets',
-                },
-                // In a compare pane the compare page's own link covers both views.
-                ...(this.config.embed
-                    ? []
-                    : [
-                          h(
-                              'button',
-                              {
-                                  class: 'pl-btn-ghost',
-                                  type: 'button',
-                                  title: 'Copy a link to this view: source, format, engine and version, DRM, rays and tab',
-                                  onclick: (e: Event) =>
-                                      void this.copyLink(e.currentTarget as HTMLButtonElement),
-                              },
-                              'Copy link',
-                          ),
-                      ]),
+                {class: 'pl-loadbar__foot'},
                 h(
-                    'button',
-                    {
-                        class: 'pl-btn-ghost',
-                        type: 'button',
-                        title: 'Keep what this load measured on the server, with a link to replay it',
-                        onclick: (e: Event) =>
-                            void this.saveSession(e.currentTarget as HTMLButtonElement),
-                    },
-                    'Save session',
+                    'div',
+                    {class: 'pl-loadbar__extras'},
+                    this.ref(
+                        'engineCustomWrap',
+                        h(
+                            'label',
+                            {class: 'pl-extra', hidden: true},
+                            h('span', {class: 'pl-label'}, 'Engine version'),
+                            this.ref(
+                                'engineCustom',
+                                h('input', {
+                                    class: 'pl-control mono',
+                                    placeholder: 'exact version, e.g. 1.6.15',
+                                    'aria-label': 'Engine version',
+                                    pattern: '\\d+\\.\\d+\\.\\d+(-[\\w.]+)?',
+                                }),
+                            ),
+                        ),
+                    ),
+                    this.ref(
+                        'adParamsWrap',
+                        h(
+                            'label',
+                            {class: 'pl-extra', hidden: true},
+                            h('span', {class: 'pl-label'}, 'Ad params'),
+                            this.ref(
+                                'adParams',
+                                h('input', {
+                                    class: 'pl-control mono',
+                                    placeholder: 'ad.lib=KOR',
+                                    'aria-label': 'Ad params for this load',
+                                    title: "This load's ad.* params, e.g. ad.lib=KOR or ad.lib=JPN&ad.kv=…; signed on top of the ad server's own params",
+                                }),
+                            ),
+                        ),
+                    ),
                 ),
-                ...(this.config.endpoints.presets
-                    ? [
-                          h(
-                              'button',
-                              {
-                                  class: 'pl-btn-ghost',
-                                  type: 'button',
-                                  title: 'Save these settings (format, engine and version, DRM, delay, CMCD) under a name',
-                                  onclick: () => this.togglePresetForm(),
-                              },
-                              'Presets…',
-                          ),
-                      ]
-                    : []),
+                h(
+                    'div',
+                    {
+                        class: 'pl-loadbar__tools',
+                        role: 'group',
+                        'aria-label': 'Link, session and presets',
+                    },
+                    // In a compare pane the compare page's own link covers both views.
+                    ...(this.config.embed
+                        ? []
+                        : [
+                              h(
+                                  'button',
+                                  {
+                                      class: 'pl-btn-ghost',
+                                      type: 'button',
+                                      title: 'Copy a link to this view: source, format, engine and version, DRM, rays and tab',
+                                      onclick: (e: Event) =>
+                                          void this.copyLink(e.currentTarget as HTMLButtonElement),
+                                  },
+                                  'Copy link',
+                              ),
+                          ]),
+                    h(
+                        'button',
+                        {
+                            class: 'pl-btn-ghost',
+                            type: 'button',
+                            title: 'Keep what this load measured on the server, with a link to replay it',
+                            onclick: (e: Event) =>
+                                void this.saveSession(e.currentTarget as HTMLButtonElement),
+                        },
+                        'Save session',
+                    ),
+                    ...(this.config.endpoints.presets
+                        ? [
+                              h(
+                                  'button',
+                                  {
+                                      class: 'pl-btn-ghost',
+                                      type: 'button',
+                                      title: 'Save these settings (format, engine and version, DRM, delay, ads, CMCD) under a name',
+                                      onclick: () => this.togglePresetForm(),
+                                  },
+                                  'Save as preset…',
+                              ),
+                          ]
+                        : []),
+                ),
             ),
             ...(this.config.endpoints.presets ? [this.buildPresetForm()] : []),
         );
@@ -644,19 +660,7 @@ export class PlayerApp {
                         type: 'button',
                         onclick: () => void this.savePresetFromForm(),
                     },
-                    'Save preset',
-                ),
-                this.ref(
-                    'presetDelete',
-                    h(
-                        'button',
-                        {
-                            class: 'pl-btn-ghost',
-                            type: 'button',
-                            onclick: () => void this.deleteChosenPreset(),
-                        },
-                        'Delete',
-                    ),
+                    'Save',
                 ),
                 h(
                     'button',
@@ -665,9 +669,18 @@ export class PlayerApp {
                         type: 'button',
                         onclick: () => this.togglePresetForm(false),
                     },
-                    'Close',
+                    'Cancel',
                 ),
-                this.ref('presetWhat', h('span', {class: 'pl-preset-what mono'})),
+                this.ref('presetWhat', h('span', {class: 'pl-preset-what', role: 'status'})),
+                ...(this.config.endpoints.presetsPage
+                    ? [
+                          h(
+                              'a',
+                              {class: 'pl-preset-manage', href: this.config.endpoints.presetsPage},
+                              'Manage presets →',
+                          ),
+                      ]
+                    : []),
             ),
         );
     }
@@ -710,10 +723,7 @@ export class PlayerApp {
 
     private renderPresetForm(): void {
         const chosen = this.chosenPreset();
-        const del = this.el<HTMLButtonElement>('presetDelete');
-        del.hidden = !chosen;
-        del.textContent = chosen ? `Delete “${chosen.name}”` : 'Delete';
-        this.el('presetWhat').textContent = this.settingsQuery();
+        this.el('presetWhat').textContent = chosen ? `Same name replaces “${chosen.name}”.` : '';
     }
 
     private togglePresetForm(open?: boolean): void {
@@ -791,23 +801,9 @@ export class PlayerApp {
             const {items, preset} = await savePreset(endpoint, name, this.settingsQuery());
             this.presets = items;
             this.renderPresets(preset?.id ?? null);
-            what.textContent = `Saved “${name}”: ${preset?.query ?? ''}`;
+            what.textContent = `Saved “${name}”.`;
         } catch (e) {
             what.textContent = `Not saved: ${e instanceof Error ? e.message : String(e)}`;
-        }
-    }
-
-    private async deleteChosenPreset(): Promise<void> {
-        const endpoint = this.config.endpoints.presets;
-        const preset = this.chosenPreset();
-        if (!endpoint || !preset) return;
-        try {
-            this.presets = (await deletePreset(endpoint, preset.id)).items;
-            this.renderPresets(null);
-            this.el('presetWhat').textContent = `Deleted “${preset.name}”.`;
-        } catch (e) {
-            this.el('presetWhat').textContent =
-                `Not deleted: ${e instanceof Error ? e.message : String(e)}`;
         }
     }
 
@@ -1406,7 +1402,7 @@ export class PlayerApp {
 
     /** The ad params box shows only while an ad server is chosen. */
     private syncAdParams(): void {
-        this.el<HTMLInputElement>('adParams').hidden = !this.el<HTMLSelectElement>('ad').value;
+        this.el('adParamsWrap').hidden = !this.el<HTMLSelectElement>('ad').value;
     }
 
     /** The typed ad params, normalized; '' when none or no ad server is chosen. */
@@ -1457,7 +1453,7 @@ export class PlayerApp {
     private syncEngineInput(): void {
         const custom = this.el<HTMLSelectElement>('engine').value.endsWith(`@${CUSTOM}`);
         const input = this.el<HTMLInputElement>('engineCustom');
-        input.hidden = !custom;
+        this.el('engineCustomWrap').hidden = !custom;
         if (custom) input.focus();
         // FairPlay plays in the Native engine only.
         if (this.drm() === 'fps' && this.chosenEngine().engine !== 'native')
@@ -1534,7 +1530,7 @@ export class PlayerApp {
                 : has(selected)
                   ? selected
                   : `hls.js@${DEFAULT_HLS_VERSION}`;
-        this.el<HTMLInputElement>('engineCustom').hidden = !select.value.endsWith(`@${CUSTOM}`);
+        this.el('engineCustomWrap').hidden = !select.value.endsWith(`@${CUSTOM}`);
     }
 
     private chosenEngine(): {engine: EngineName; version: string} {
@@ -1594,7 +1590,12 @@ export class PlayerApp {
         const source = this.el<HTMLSelectElement>('source');
         const view = parseView(location.search);
         this.applyView(view);
-        if (this.config.endpoints.presets) this.renderPresets(null);
+        if (this.config.endpoints.presets) {
+            const {initialPreset} = this.config;
+            const chosen = this.presets.some((p) => p.id === initialPreset) ? initialPreset : null;
+            this.renderPresets(chosen ?? null);
+            if (chosen !== null) this.onPresetChosen();
+        }
         if (initialSrc) {
             source.value = PASTE;
             this.el<HTMLInputElement>('url').value = initialSrc;

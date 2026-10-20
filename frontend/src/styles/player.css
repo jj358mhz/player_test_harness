@@ -43,9 +43,9 @@
 /* Load bar */
 .pl-loadbar {
     display: grid;
-    /* source, preset, format, engine, DRM, delay, ads, CMCD, Load */
+    /* preset, source, format, engine, DRM, delay, ads, CMCD, Load */
     grid-template-columns:
-        minmax(0, 2.2fr) minmax(0, 0.8fr) auto minmax(0, 1fr) minmax(0, 0.7fr)
+        minmax(0, 0.8fr) minmax(0, 2.2fr) auto minmax(0, 1fr) minmax(0, 0.7fr)
         minmax(0, 0.55fr) minmax(0, 0.6fr) auto auto;
     gap: 10px;
     align-items: end;
@@ -74,6 +74,10 @@
 .pl-preset-form .pl-preset-what {
     color: var(--text-faint);
     font-size: 12px;
+}
+.pl-preset-manage {
+    margin-left: auto;
+    font-size: 13px;
 }
 .pl-field {
     display: grid;
@@ -710,13 +714,44 @@
     white-space: pre;
 }
 
-.pl-loadbar__tools {
+/* Second row: inputs a choice above asks for (left), secondary buttons (right). */
+.pl-loadbar__foot {
     grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 16px;
+    margin-top: -2px;
+}
+.pl-loadbar__extras {
+    flex: 1 1 320px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    min-width: 0;
+}
+.pl-extra {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 0 1 300px;
+    min-width: 0;
+}
+.pl-extra[hidden] {
+    display: none;
+}
+.pl-extra .pl-label {
+    white-space: nowrap;
+}
+.pl-extra .pl-control {
+    height: 30px;
+}
+.pl-loadbar__tools {
     display: flex;
     flex-wrap: wrap;
     justify-content: flex-end;
     gap: 8px;
-    margin-top: -2px;
+    margin-left: auto;
 }
 .pl-loadbar__tools .pl-btn-ghost {
     height: 30px;
@@ -736,17 +771,13 @@
     .pl-loadbar {
         grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     }
+    /* The channel gets its own full row on top; the preset starts the pairs below. */
     .pl-field--source {
         grid-column: 1 / -1;
+        order: -1;
     }
     .pl-field--check {
         justify-items: start;
-    }
-    /* Load and the secondary buttons share the last row. */
-    .pl-loadbar__tools {
-        grid-column: auto;
-        align-self: end;
-        margin-top: 0;
     }
 }
 @media (max-width: 720px) {
@@ -761,6 +792,7 @@
     }
     .pl-loadbar__tools {
         justify-content: flex-start;
+        margin-left: 0;
     }
 }
 @media (prefers-reduced-motion: reduce) {

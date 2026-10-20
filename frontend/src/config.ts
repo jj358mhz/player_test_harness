@@ -33,6 +33,8 @@ export interface PlayerConfig {
     channels: ChannelOption[];
     initialChannel: number | null;
     initialSrc: string | null;
+    /** A preset to apply at start (the Presets page's "Open in player"). */
+    initialPreset?: number | null;
     /** Saved engine presets, by name. */
     presets?: Preset[];
     /** Ad servers per account id. */
@@ -41,6 +43,8 @@ export interface PlayerConfig {
         playback: string;
         sessions: string;
         presets?: string;
+        /** The Presets page, where presets are listed, edited and deleted. */
+        presetsPage?: string;
         versions: Record<string, string>;
         /** Channel slicer settings from csl-slicer-console, "{id}" = channel; null = off. */
         slicer?: string | null;

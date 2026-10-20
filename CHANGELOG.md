@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.23.0] - 2026-10-20
+
+### Added
+- **Presets page** (site menu → **Presets**, `/presets`). Every saved
+  preset in one table, its settings in plain words (`DASH · Shaka 5.3.0 ·
+  Widevine · delay 30 s · ad=fw2 ad.lib=KOR · CMCD`), with **Open in
+  player**, **Edit** and **Delete**. A form adds a preset from fields
+  (format, engine and version, DRM, delay, ad server, ad params, CMCD) or
+  edits one, including renaming it; the same checks as the player's.
+  **Open in player** lands on `/player?preset=<id>` with it applied.
+
+### Changed
+- **Tidier load bar.** **Preset** comes first, ahead of the channel, since
+  it sets everything to its right. **Presets…** and its save/delete row are
+  now **Save as preset…**: a name, Save, and a **Manage presets** link
+  (deleting moved to the Presets page). The boxes a choice asks for, the
+  custom **Engine version** and **Ad params**, moved from under their
+  menus to the left of the second row, so the first row keeps one height.
+
 ## [3.22.2] - 2026-10-19
 
 ### Changed
