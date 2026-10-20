@@ -175,6 +175,20 @@ def test_fetch_preplay_errors(response, match):
         fetch_preplay("https://signed/url", session=FakeSession(response))
 
 
+def test_fetch_preplay_server_error_is_readable_and_names_ad_params():
+    response = FakeResponse(500, text="<html><body>Server error, sorry</body></html>")
+    url = "https://x.example.com/preplay/channel/chan0001.json?tc=1&ad=fw2&ad.lib=KOR&ad.preroll=1&sig=ab"
+    with pytest.raises(PlaybackError) as e:
+        fetch_preplay(url, session=FakeSession(response))
+    message = str(e.value)
+    assert message.startswith("Preplay returned HTTP 500: Server error, sorry. Ad params")
+    assert "(ad.lib, ad.preroll)" in message and "<html>" not in message
+    # No ad params, or a 4xx: just Uplynk's answer.
+    with pytest.raises(PlaybackError) as e:
+        fetch_preplay("https://x.example.com/p.json?tc=1&ad=fw2", session=FakeSession(response))
+    assert str(e.value) == "Preplay returned HTTP 500: Server error, sorry"
+
+
 @pytest.mark.parametrize(
     "body", ["#EXTM3U\n#EXT-X-VERSION:5\n", '<?xml version="1.0"?><MPD/>', "<MPD xmlns='x'/>"]
 )

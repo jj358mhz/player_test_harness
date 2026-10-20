@@ -19,7 +19,7 @@ import re
 import time
 from dataclasses import dataclass, field
 from typing import Any
-from urllib.parse import quote, urlencode, urljoin
+from urllib.parse import parse_qsl, quote, urlencode, urljoin, urlsplit
 
 import requests
 
@@ -160,7 +160,10 @@ def fetch_preplay(
     except requests.RequestException as e:
         raise PlaybackError(f"Preplay request failed: {e}") from e
     if response.status_code != 200:
-        raise PlaybackError(f"Preplay returned HTTP {response.status_code}: {response.text[:200]}")
+        message = f"Preplay returned HTTP {response.status_code}: {_strip_html(response.text, 200)}"
+        if response.status_code >= 500:
+            message += _preplay_ad_hint(signed_url)
+        raise PlaybackError(message)
     try:
         payload = response.json()
     except ValueError as e:
@@ -299,6 +302,18 @@ def _media_playlist(body: str, url: str, timeout: int, http: Any) -> str | None:
 
 def _ms_since(start: float) -> int:
     return int((time.monotonic() - start) * 1000)
+
+
+def _preplay_ad_hint(signed_url: str) -> str:
+    """Why a Preplay 5xx may be an ad param's fault (seen with ad.preroll=1, 2026-10-20)."""
+    keys = [k for k, _ in parse_qsl(urlsplit(signed_url).query) if k.startswith("ad.")]
+    if not keys:
+        return ""
+    return (
+        f". Ad params were signed ({', '.join(keys)}): Preplay may not accept one of them"
+        " (ad.preroll=1 makes it fail while a signed manifest URL plays it). Without"
+        " DRM, a signed URL skips Preplay; DRM channels need Preplay"
+    )
 
 
 def _strip_html(text: str, limit: int = 300) -> str:

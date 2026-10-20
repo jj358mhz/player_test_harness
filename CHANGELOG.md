@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.23.3] - 2026-10-20
+
+### Fixed
+- **Readable Preplay errors.** A Preplay failure no longer shows Uplynk's
+  raw HTML (`<html><body>Server error, sorry</body></html>`), just the
+  text. When Preplay fails with a server error (5xx) and `ad.*` params
+  were signed, the message names them and explains: Uplynk's Preplay
+  returns HTTP 500 with `ad.preroll=1` (undocumented), while a signed
+  manifest URL with the same params plays the preroll. Without DRM a
+  signed URL skips Preplay; DRM channels need it, so they can't use it.
+
 ## [3.23.2] - 2026-10-20
 
 ### Changed
