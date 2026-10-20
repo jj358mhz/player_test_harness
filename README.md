@@ -128,6 +128,11 @@ show up immediately instead of as a silent failed download.
 
 `GET /api/channels` lists active synced channels.
 
+`GET /api/health/slicers` (for csl-slicer-console; `Authorization: Bearer
+$CSL_API_TOKEN` instead of a login, 404 when unset) returns the latest
+health of every channel that has a slicer: `slicer_id`, `channel`, `name`,
+`status`, `edge_s`, `detail`, `checked_at`, `health_url`.
+
 ## 🧑‍💻 Developing on this repo
 
 Prerequisites: Docker Desktop, [uv](https://docs.astral.sh/uv/), Python 3.12.

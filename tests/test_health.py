@@ -163,3 +163,26 @@ def test_cli(app, channel, probe_calls, monkeypatch):
     result = app.test_cli_runner().invoke(args=["check-health"])
     assert result.exit_code == 0, result.output
     assert "stale" in result.output and "1 stale" in result.output
+
+
+def test_health_by_slicer_api(app, client, make_account, make_channel, probe_calls):
+    from app.api.service import check_health
+
+    assert client.get("/api/health/slicers").status_code == 404  # no token: off
+    app.config["CSL_API_TOKEN"] = "shared-test-token"
+    assert client.get("/api/health/slicers").status_code == 401
+    bad = {"Authorization": "Bearer nope"}
+    assert client.get("/api/health/slicers", headers=bad).status_code == 401
+
+    account = make_account()
+    with_slicer = make_channel(account, "chan0001", slicer_id="slicer01")
+    make_channel(account, "chan0002")  # no slicer: left out
+    check_health([with_slicer], now=fresh(probe_calls, age=40))
+    ok = {"Authorization": "Bearer shared-test-token"}
+    items = client.get("/api/health/slicers", headers=ok).get_json()["items"]
+    assert len(items) == 1
+    item = items[0]
+    assert item["slicer_id"] == "slicer01"
+    assert item["status"] == "ok" and item["edge_s"] == pytest.approx(40, abs=0.1)
+    assert item["health_url"] == f"/channels/{with_slicer.id}/health"
+    assert item["checked_at"].endswith("Z")
