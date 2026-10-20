@@ -112,28 +112,32 @@
                             title="{{ 'Unpin' if ch.is_favorite else 'Pin to top' }}">{{ '★' if ch.is_favorite else '☆' }}</button>
                 </form>
             </div>
-            <dl class="channel-card__ids">
-                <dt>ID</dt><dd class="mono" title="{{ ch.channel_id }}">{{ ch.channel_id }}</dd>
-                {% if ch.external_id %}<dt>Ext</dt><dd class="mono" title="{{ ch.external_id }}">{{ ch.external_id }}</dd>{% endif %}
-                {% if ch.slicer_id %}<dt>Slicer</dt><dd class="mono" title="{{ ch.slicer_id }}">{% if csl_base_url %}<a href="{{ csl_base_url }}/slicers/by-id/{{ ch.slicer_id|urlencode }}" target="_blank" rel="noopener" title="Open {{ ch.slicer_id }} in the slicer console">{{ ch.slicer_id }} ↗</a>{% else %}{{ ch.slicer_id }}{% endif %}</dd>{% endif %}
-            </dl>
-            {% if sparks.get(ch.id) %}
-            <a class="channel-card__health" href="{{ url_for('main.channel_health', channel_id=ch.id) }}"
-               title="Live-edge age over the last 24 h; open the history">
-                {{ sparks[ch.id] }}
-                {% if ch.needs_attention and since.get(ch.id) %}<span class="channel-card__since">since <time datetime="{{ since[ch.id].strftime('%Y-%m-%dT%H:%M:%SZ') }}" data-local>{{ since[ch.id].strftime('%H:%M') }} UTC</time></span>{% endif %}
-            </a>
-            {% endif %}
-            <div class="channel-card__check" data-check hidden></div>
-            <div class="channel-card__actions">
-                <a class="button button--primary" href="{{ url_for('main.play_channel', channel_id=ch.id) }}"
-                   data-play-label>{{ '▶ Play DRM' if ch.is_drm else '▶ Play HLS' }}</a>
-                <button type="button" class="btn-ghost" data-copy-url
-                        data-body='{{ {"channel_id": ch.id, "manifest": "m3u8"}|tojson }}'>Copy HLS</button>
-                <button type="button" class="btn-ghost" data-copy-url
-                        data-body='{{ {"channel_id": ch.id, "manifest": "mpd"}|tojson }}'>Copy DASH</button>
-                <a class="btn-ghost" href="{{ url_for('main.sign_tool', channel=ch.id) }}">Advanced…</a>
+            <div class="channel-card__body">
+                <div class="channel-card__info">
+                    <dl class="channel-card__ids">
+                        <dt>ID</dt><dd class="mono" title="{{ ch.channel_id }}">{{ ch.channel_id }}</dd>
+                        {% if ch.external_id %}<dt>Ext</dt><dd class="mono" title="{{ ch.external_id }}">{{ ch.external_id }}</dd>{% endif %}
+                        {% if ch.slicer_id %}<dt>Slicer</dt><dd class="mono" title="{{ ch.slicer_id }}">{% if csl_base_url %}<a href="{{ csl_base_url }}/slicers/by-id/{{ ch.slicer_id|urlencode }}" target="_blank" rel="noopener" title="Open {{ ch.slicer_id }} in the slicer console">{{ ch.slicer_id }} ↗</a>{% else %}{{ ch.slicer_id }}{% endif %}</dd>{% endif %}
+                    </dl>
+                    {% if sparks.get(ch.id) %}
+                    <a class="channel-card__health" href="{{ url_for('main.channel_health', channel_id=ch.id) }}"
+                       title="Live-edge age over the last 24 h; open the history">
+                        {{ sparks[ch.id] }}
+                        {% if ch.needs_attention and since.get(ch.id) %}<span class="channel-card__since">since <time datetime="{{ since[ch.id].strftime('%Y-%m-%dT%H:%M:%SZ') }}" data-local>{{ since[ch.id].strftime('%H:%M') }} UTC</time></span>{% endif %}
+                    </a>
+                    {% endif %}
+                </div>
+                <div class="channel-card__actions">
+                    <a class="button button--primary" href="{{ url_for('main.play_channel', channel_id=ch.id) }}"
+                       data-play-label>{{ '▶ Play DRM' if ch.is_drm else '▶ Play HLS' }}</a>
+                    <button type="button" class="btn-ghost" data-copy-url
+                            data-body='{{ {"channel_id": ch.id, "manifest": "m3u8"}|tojson }}'>Copy HLS</button>
+                    <button type="button" class="btn-ghost" data-copy-url
+                            data-body='{{ {"channel_id": ch.id, "manifest": "mpd"}|tojson }}'>Copy DASH</button>
+                    <a class="btn-ghost" href="{{ url_for('main.sign_tool', channel=ch.id) }}">Advanced…</a>
+                </div>
             </div>
+            <div class="channel-card__check" data-check hidden></div>
         </article>
         {% endfor %}
     </div>

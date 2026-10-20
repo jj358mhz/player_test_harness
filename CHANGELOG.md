@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.23.2] - 2026-10-20
+
+### Changed
+- **Shorter channel cards.** **Play**, **Copy HLS**, **Copy DASH** and
+  **Advanced…** sit in a 2×2 block on the right of each card, beside the
+  IDs and the health sparkline, instead of a row of their own underneath.
+  A card too narrow for both puts them back underneath.
+
 ## [3.23.1] - 2026-10-20
 
 ### Fixed

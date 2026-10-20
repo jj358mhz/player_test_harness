@@ -1564,10 +1564,41 @@ form.inline {
     color: var(--accent);
 }
 
-.channel-card__actions {
+/* IDs and sparkline on the left, the buttons in a 2×2 block on the right;
+   a card too narrow for both puts the buttons back in a row underneath. */
+.channel-card {
+    container-type: inline-size;
+}
+
+.channel-card__body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.75rem 1rem;
+    align-items: start;
+}
+
+.channel-card__info {
+    min-width: 0;
     display: flex;
-    flex-wrap: wrap;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.channel-card__actions {
+    display: grid;
+    grid-template-columns: repeat(2, auto);
     gap: 0.5rem;
+}
+
+@container (max-width: 400px) {
+    .channel-card__body {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .channel-card__actions {
+        display: flex;
+        flex-wrap: wrap;
+    }
 }
 
 .channel-card__actions .button,
@@ -1575,6 +1606,8 @@ form.inline {
     font-size: 12.5px;
     padding: 6px 10px;
     text-decoration: none;
+    text-align: center;
+    white-space: nowrap;
 }
 
 .sign-result {
