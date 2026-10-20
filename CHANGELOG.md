@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.16.0] - 2026-10-19
+
+### Added
+- **ID3 from DASH emsg.** v3.15.0's payload preview showed that Uplynk's
+  `com.uplynk.asset.metadata` emsg is an ID3v2.4 tag, the same ID3 HLS
+  carries (and its segments have no `prft`). Shaka and dash.js now pass
+  it to the ID3 handling at the emsg's presentation time, so on DASH the
+  Metadata tab counts ID3 samples and frames, the log shows the TXXX
+  values, and on slicers with `wallclock: 1` the **Encoder wallclock**
+  row gives real DASH encoder latency (and drives the headline) instead
+  of the MPD clock + offset. dash.js subscribes to that scheme (and AOM's
+  `https://aomedia.org/emsg/ID3`). The Latency tab's DASH status now
+  reads "no prft or ID3 emsg in N DASH segments" only when neither shows up.
+
 ## [3.15.0] - 2026-10-19
 
 ### Added

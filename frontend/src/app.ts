@@ -2661,9 +2661,12 @@ export class PlayerApp {
         const s = this.session;
         if (this.source?.clock.kind.startsWith('mpd')) {
             if (s.prftCount) return 'waiting for the playhead to reach a prft segment';
-            return s.segments.count >= 3
-                ? `no prft in ${s.segments.count} DASH segments`
-                : 'waiting for a DASH segment';
+            // Uplynk DASH has no prft; its emsg carries the HLS ID3 instead.
+            if (!s.id3Count) {
+                return s.segments.count >= 3
+                    ? `no prft or ID3 emsg in ${s.segments.count} DASH segments`
+                    : 'waiting for a DASH segment';
+            }
         }
         return id3Reason(s.id3Count, s.id3Wallclocks, s.slicer);
     }

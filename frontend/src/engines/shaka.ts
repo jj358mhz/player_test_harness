@@ -6,6 +6,7 @@ import type shakaNS from 'shaka-player';
 import {version as pinned} from 'shaka-player/package.json';
 import type {CmcdConfig} from '../lib/cmcd';
 import {videoProfile} from '../lib/codecs';
+import {isId3Tag, parseId3} from '../lib/id3';
 import {PrftReader, payloadPreview} from '../lib/mp4';
 import {
     type AudioTrack,
@@ -198,10 +199,23 @@ export class ShakaEngine implements PlayerEngine {
         player.addEventListener('emsg', (event) => {
             const detail = (
                 event as unknown as {
-                    detail?: {schemeIdUri?: string; value?: string; messageData?: Uint8Array};
+                    detail?: {
+                        schemeIdUri?: string;
+                        value?: string;
+                        messageData?: Uint8Array;
+                        startTime?: number;
+                    };
                 }
             ).detail;
             if (!detail) return;
+            // Uplynk's com.uplynk.asset.metadata is the same ID3 that HLS carries.
+            if (isId3Tag(detail.messageData) && detail.startTime !== undefined) {
+                this.events.emit('id3', {
+                    mediaTime: detail.startTime,
+                    frames: parseId3(detail.messageData),
+                });
+                return;
+            }
             this.events.emit('emsg', {
                 scheme: detail.schemeIdUri ?? '',
                 value: detail.value ?? '',

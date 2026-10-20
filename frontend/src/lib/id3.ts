@@ -6,6 +6,11 @@ export interface Id3Frame {
     data: Uint8Array;
 }
 
+/** An ID3v2 tag, as Uplynk puts in DASH emsg (com.uplynk.asset.metadata). */
+export function isId3Tag(data: Uint8Array | null | undefined): data is Uint8Array {
+    return !!data && data.length > 10 && data[0] === 0x49 && data[1] === 0x44 && data[2] === 0x33;
+}
+
 export function parseId3(data: Uint8Array): Id3Frame[] {
     const frames: Id3Frame[] = [];
     const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
