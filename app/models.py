@@ -270,3 +270,29 @@ class AdminEvent(Base):
 
     def __repr__(self) -> str:
         return f"<AdminEvent {self.category}.{self.action} by {self.actor_id}>"
+
+
+class EnginePreset(Base):
+    """A named player setup: format, engine@version, DRM, delay, CMCD.
+
+    `query` is the player's deep-link query without a source (channel/src),
+    normalized by `app.presets`. Shared by every user of the harness.
+    """
+
+    __tablename__ = "engine_presets"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(60), unique=True, nullable=False)
+    query: Mapped[str] = mapped_column(String(300), nullable=False)
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
+    )
+
+    def as_dict(self) -> dict[str, object]:
+        return {"id": self.id, "name": self.name, "query": self.query}

@@ -12,13 +12,23 @@ export interface ChannelOption {
     slicerId?: string | null;
 }
 
+/** A saved load-bar setup (deep-link query without a source). */
+export interface Preset {
+    id: number;
+    name: string;
+    query: string;
+}
+
 export interface PlayerConfig {
     channels: ChannelOption[];
     initialChannel: number | null;
     initialSrc: string | null;
+    /** Saved engine presets, by name. */
+    presets?: Preset[];
     endpoints: {
         playback: string;
         sessions: string;
+        presets?: string;
         versions: Record<string, string>;
         /** Channel slicer settings from csl-slicer-console, "{id}" = channel; null = off. */
         slicer?: string | null;

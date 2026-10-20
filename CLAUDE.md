@@ -139,6 +139,10 @@ after dependency changes.
   `|tojson` and draws it with `frontend/src/recording.ts` (second Vite
   entry; `app/vite.py` collects CSS from imported chunks).
 - `app/admin/` — Uplynk account CRUD + sync (admin-only).
+- `app/presets.py` — saved engine presets (`EnginePreset`): a deep-link
+  query without source/rays, re-validated server-side with the
+  deeplink.ts rules (versions go into jsDelivr URLs); `/api/presets`
+  GET/POST (same name replaces)/DELETE; listed in the player's config.
 - `app/csl.py` — csl-slicer-console settings lookup (slicer `wallclock`), cached 5 min.
 - `app/autosync.py` — background channel sync, started per worker by
   gunicorn's `post_worker_init`; one worker syncs (flock on a temp file).
@@ -260,7 +264,8 @@ in the `player_harness_data` volume.
       adapters behind `PlayerEngine`. **v3.15.0–3.16.0:** DASH encoder latency
       from in-segment `prft` (`lib/mp4.ts`; Uplynk writes none) and from
       ID3 in emsg (Shaka and dash.js); v3.16.1 asset/ray/slice from that
-      ID3. **Left:** presets in the DB, native
+      ID3. **v3.17.0:** saved engine presets
+      in the DB (load bar **Preset** + **Presets…**). **Left:** native
       verified in real Safari.
 - [~] Phase 3 — DRM. **Done (v3.2.0):** Shaka engine, Widevine/PlayReady
       over DASH from Preplay, DRM panel (key system, license timing/status,

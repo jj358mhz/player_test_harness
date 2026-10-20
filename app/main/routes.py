@@ -12,6 +12,7 @@ from app import csl
 from app.engines import ENGINES
 from app.main import bp
 from app.models import AdminEvent, Channel, PlaybackEvent, PlaybackSession, UplynkAccount, db
+from app.presets import list_presets
 from app.sessions import expires_at
 from app.uplynk.playback import CONTENT_TYPES
 from app.vite import COMPARE_ENTRY, RECORDING_ENTRY, vite_assets
@@ -66,9 +67,11 @@ def player() -> str:
         "cslBase": current_app.config["CSL_BASE_URL"] or None,
         "initialChannel": request.args.get("channel", type=int),
         "initialSrc": request.args.get("src") or None,
+        "presets": list_presets(),
         "endpoints": {
             "playback": url_for("api.playback"),
             "sessions": url_for("api.save_session"),
+            "presets": url_for("api.presets"),
             # "{id}" → channel id; absent when the console API isn't configured.
             "slicer": url_for("api.channel_slicer", channel_id=0).replace("/0/", "/{id}/")
             if csl.enabled()

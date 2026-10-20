@@ -9,7 +9,8 @@ from app import csl
 from app.api.service import create_playback, parse_request
 from app.engines import EngineVersionsError
 from app.engines import engine_versions as list_engine_versions
-from app.models import Channel, PlaybackSession, UplynkAccount, db
+from app.models import Channel, EnginePreset, PlaybackSession, UplynkAccount, db
+from app.presets import PresetError, list_presets, save_preset
 from app.sessions import RecordingError, save_recording
 from app.uplynk.playback import PlaybackError
 
@@ -129,3 +130,29 @@ def session_json(slug: str):
     response = current_app.response_class(row.data, mimetype="application/json")
     response.headers["Content-Disposition"] = f'attachment; filename="session-{row.slug}.json"'
     return response
+
+
+@bp.route("/presets")
+@login_required
+def presets():
+    return jsonify(items=list_presets())
+
+
+@bp.route("/presets", methods=["POST"])
+@login_required
+def create_preset():
+    """Save {"name", "query"}; the same name replaces the earlier preset."""
+    try:
+        row, created = save_preset(request.get_json(silent=True), current_user)
+    except PresetError as e:
+        return jsonify(error=str(e)), 400
+    return jsonify(preset=row.as_dict(), items=list_presets()), 201 if created else 200
+
+
+@bp.route("/presets/<int:preset_id>", methods=["DELETE"])
+@login_required
+def delete_preset(preset_id: int):
+    row = db.session.get(EnginePreset, preset_id) or abort(404)
+    db.session.delete(row)
+    db.session.commit()
+    return jsonify(items=list_presets())

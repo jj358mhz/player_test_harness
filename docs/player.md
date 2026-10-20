@@ -6,8 +6,19 @@ Uplynk stream is doing while it plays.
 
 ## Layout
 
-- **Load bar:** channel or pasted URL, format (HLS or DASH), player engine
-  and version, DRM, Load, **Copy link**, **Save session**.
+- **Load bar:** channel or pasted URL, preset, format (HLS or DASH), player
+  engine and version, DRM, delay, CMCD, Load, **Copy link**, **Save
+  session**, **Presets…**.
+- **Presets:** a named setup of format, engine and version, DRM, delay and
+  CMCD, saved on the server for everyone using the harness. Picking one in
+  **Preset** sets the load bar (anything it doesn't name goes back to the
+  default; no DRM means the channel's default) for the selected channel;
+  press **Load**. **Presets…** opens a row to save the current settings
+  under a name (the same name replaces it) or delete the chosen preset.
+  The default version of an engine isn't pinned, so a preset follows the
+  default when Dependabot bumps it; pick an exact version to pin it.
+  Changing a setting by hand clears the Preset menu. Rays and the source
+  aren't part of a preset.
 - **Recorded sessions:** **Save session** sends what this load measured to
   the server and copies a link to `/sessions/<id>`: summary tiles, latency
   and drift over the whole session with events and ad breaks, latency

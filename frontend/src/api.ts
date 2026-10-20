@@ -1,8 +1,8 @@
 // Calls to the harness backend. Signing happens server-side; the browser
 // never sees an Uplynk API key.
 
+import type {Preset} from './config';
 import type {ServerClock} from './lib/clock';
-
 import type {SlicerSettings} from './lib/slicer';
 
 export interface Probe {
@@ -92,4 +92,32 @@ export async function fetchSlicer(endpoint: string): Promise<SlicerSettings> {
     const response = await fetch(endpoint);
     if (!response.ok) throw new Error(`slicer lookup answered ${response.status}`);
     return (await response.json()) as SlicerSettings;
+}
+
+async function presetCall(
+    url: string,
+    init: RequestInit,
+): Promise<{items: Preset[]; preset?: Preset}> {
+    const response = await fetch(url, {
+        ...init,
+        headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf()},
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error ?? `preset request answered ${response.status}`);
+    return data;
+}
+
+/** Save a preset; the same name replaces the earlier one. */
+export function savePreset(endpoint: string, name: string, query: string) {
+    return presetCall(endpoint, {method: 'POST', body: JSON.stringify({name, query})});
+}
+
+export function deletePreset(endpoint: string, id: number) {
+    return presetCall(`${endpoint}/${id}`, {method: 'DELETE'});
+}
+
+export async function fetchPresets(endpoint: string): Promise<Preset[]> {
+    const response = await fetch(endpoint);
+    if (!response.ok) throw new Error(`presets answered ${response.status}`);
+    return ((await response.json()) as {items: Preset[]}).items;
 }
