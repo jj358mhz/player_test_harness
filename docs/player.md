@@ -7,8 +7,16 @@ Uplynk stream is doing while it plays.
 ## Layout
 
 - **Load bar:** channel or pasted URL, preset, format (HLS or DASH), player
-  engine and version, DRM, delay, CMCD, Load, **Copy link**, **Save
+  engine and version, DRM, delay, ads, CMCD, Load, **Copy link**, **Save
   session**, **Presets…**.
+- **Ads (SSAI):** Uplynk inserts ads only when the playback URL names an ad
+  configuration (`ad=<name>`); without it there are no ads, and a name the
+  workspace doesn't have stops playback. Uplynk has no API that lists them,
+  so an admin adds each account's names (and any default `ad.*` params) under
+  **Uplynk Accounts → Edit → Ad servers**. **Ads** in the load bar then offers
+  the selected channel's account's names and signs `ad=<name>` with its
+  params. Deep links and presets carry it (`ad=fw2`); a preset's ad server
+  applies only on channels whose account has that name.
 - **Presets:** a named setup of format, engine and version, DRM, delay and
   CMCD, saved on the server for everyone using the harness. Picking one in
   **Preset** sets the load bar (anything it doesn't name goes back to the

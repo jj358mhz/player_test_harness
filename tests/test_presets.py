@@ -22,6 +22,7 @@ from app.presets import PresetError, normalize_query
             "engine=native",
         ),
         ("?engine=dashjs&cmcd=0", "engine=dashjs"),
+        ("cmcd=1&ad=fw2&engine=shaka&delay=20", "engine=shaka&delay=20&ad=fw2&cmcd=1"),
     ],
 )
 def test_normalize(query, expected):
@@ -41,6 +42,7 @@ def test_normalize(query, expected):
         "engine=hlsjs&delay=-5",
         "engine=hlsjs&format=smooth",
         "engine=hlsjs&debug=1",
+        "engine=hlsjs&ad=../../x",
         "engine=hlsjs&" + "x" * 300,
     ],
 )

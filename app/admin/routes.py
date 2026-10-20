@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from flask import Blueprint, abort, current_app, flash, redirect, render_template, url_for
+from flask import Blueprint, abort, current_app, flash, redirect, render_template, request, url_for
 
 from app.admin.audit import log_admin_event
 from app.admin.decorators import admin_required
 from app.admin.forms import UplynkAccountForm
 from app.crypto import decrypt, encrypt, mask
-from app.models import UplynkAccount, db
+from app.models import AdServer, UplynkAccount, db
 from app.uplynk.scoped_env import ScopedEnvParseError, parse_scoped_env
 from app.uplynk.sync import sync_account
 
@@ -119,6 +119,49 @@ def delete_scoped_key(account_id: int):
     )
     flash(f"Scoped key removed from '{acct.label}'. Sync will use classic auth.", "info")
     return redirect(url_for("admin.edit_account", account_id=acct.id))
+
+
+@bp.route("/uplynk-accounts/<int:account_id>/ad-servers", methods=["POST"])
+@admin_required
+def add_ad_server(account_id: int):
+    """Add an ad configuration name (SSAI `ad=`) to the account's list."""
+    from app.ads import AdServerError
+    from app.ads import add_ad_server as add
+
+    acct = db.session.get(UplynkAccount, account_id) or abort(404)
+    try:
+        row = add(
+            acct,
+            request.form.get("name"),
+            request.form.get("description"),
+            request.form.get("params"),
+        )
+    except AdServerError as e:
+        flash(str(e), "error")
+    else:
+        log_admin_event(
+            "uplynk_account",
+            "update",
+            f"Added ad server '{row.name}' to '{acct.label}'",
+            acct.label,
+        )
+        flash(f"Ad server '{row.name}' added.", "success")
+    return redirect(url_for("admin.edit_account", account_id=acct.id) + "#ad-servers")
+
+
+@bp.route("/uplynk-accounts/<int:account_id>/ad-servers/<int:server_id>/delete", methods=["POST"])
+@admin_required
+def delete_ad_server(account_id: int, server_id: int):
+    row = db.session.get(AdServer, server_id)
+    if row is None or row.uplynk_account_id != account_id:
+        abort(404)
+    label = row.uplynk_account.label
+    name = row.name
+    db.session.delete(row)
+    db.session.commit()
+    log_admin_event("uplynk_account", "update", f"Removed ad server '{name}' from '{label}'", label)
+    flash(f"Ad server '{name}' removed.", "info")
+    return redirect(url_for("admin.edit_account", account_id=account_id) + "#ad-servers")
 
 
 @bp.route("/uplynk-accounts/<int:account_id>/delete", methods=["POST"])

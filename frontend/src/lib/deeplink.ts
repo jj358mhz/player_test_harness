@@ -20,6 +20,8 @@ export interface View {
     rays?: string;
     /** Uplynk `delay=` seconds to sign in (synced channels only). */
     delay?: number;
+    /** SSAI ad configuration to sign as `ad=` (synced channels only). */
+    ad?: string;
     /** Send CMCD with every request. */
     cmcd?: boolean;
 }
@@ -70,6 +72,8 @@ export function parseView(search: string): View {
     if (/^[a-z]{1,26}$/.test(rays)) view.rays = [...new Set(rays)].sort().reverse().join('');
     const delay = parseDelay(q.get('delay'));
     if (delay !== null) view.delay = delay;
+    const ad = q.get('ad');
+    if (ad && /^[A-Za-z0-9_.-]{1,100}$/.test(ad)) view.ad = ad;
     if (q.get('cmcd') === '1') view.cmcd = true;
     return view;
 }
@@ -90,6 +94,7 @@ export function viewQuery(view: View): string {
     if (view.drm) q.set('drm', view.drm);
     if (view.rays && !view.src) q.set('rays', view.rays);
     if (view.delay !== undefined && !view.src) q.set('delay', String(view.delay));
+    if (view.ad && !view.src) q.set('ad', view.ad);
     if (view.cmcd) q.set('cmcd', '1');
     // Keep @ and : readable; URLSearchParams escapes them.
     return q.toString().replace(/%40/g, '@').replace(/%3A/gi, ':').replace(/%2F/gi, '/');

@@ -10,6 +10,7 @@ from flask import abort, current_app, flash, jsonify, redirect, render_template,
 from flask_login import login_required
 
 from app import csl, health_history
+from app.ads import by_account as ad_servers_by_account
 from app.engines import ENGINES
 from app.main import bp
 from app.models import AdminEvent, Channel, PlaybackEvent, PlaybackSession, UplynkAccount, db
@@ -128,6 +129,8 @@ def player() -> str:
         "initialChannel": request.args.get("channel", type=int),
         "initialSrc": request.args.get("src") or None,
         "presets": list_presets(),
+        # SSAI ad configuration names per account id (entered on the account page).
+        "adServers": ad_servers_by_account(),
         "endpoints": {
             "playback": url_for("api.playback"),
             "sessions": url_for("api.save_session"),
@@ -169,6 +172,7 @@ def _channel_options() -> list[dict]:
             "favorite": c.is_favorite,
             "encryption": c.encryption,
             "slicerId": c.slicer_id,
+            "accountId": c.uplynk_account_id,
         }
         for c in channels
     ]

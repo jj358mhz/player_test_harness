@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.21.0] - 2026-10-19
+
+### Added
+- **Ad servers per account, and an Ads menu in the player.** Uplynk inserts
+  ads (SSAI) only when the playback URL names an ad configuration
+  (`ad=<name>`), and it has no API that lists them. An admin now adds each
+  account's names, with an optional description and default `ad.*` params
+  (e.g. `ad.breakend=chop`), under **Uplynk Accounts → Edit → Ad servers**
+  (`ad_servers` table, new migration). The load bar's **Ads** menu offers the
+  selected channel's account's names (None by default; disabled for pasted
+  URLs) and signs `ad=<name>` plus its params. Deep links and saved presets
+  carry it as `ad=`; a preset applies it only where the channel's account
+  has that name.
+
 ## [3.20.1] - 2026-10-19
 
 ### Fixed

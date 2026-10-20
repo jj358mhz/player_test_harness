@@ -1,6 +1,7 @@
 """Saved engine presets: validation and storage.
 
-A preset is the player's deep-link query minus the source. The browser
+A preset is the player's deep-link query minus the source (format,
+engine@version, DRM, delay, SSAI ad server, CMCD). The browser
 builds it (`frontend/src/lib/deeplink.ts`); this re-checks every key with
 the same rules, because the engine version ends up in a jsDelivr URL.
 """
@@ -17,7 +18,8 @@ NAME_MAX = 60
 ENGINES = {"hlsjs", "shaka", "dashjs", "native"}
 VERSION_RE = re.compile(r"^\d+\.\d+\.\d+(-[\w.]+)?$")
 # Same order as the player's viewQuery().
-_ORDER = ("format", "engine", "drm", "delay", "cmcd")
+_ORDER = ("format", "engine", "drm", "delay", "ad", "cmcd")
+AD_NAME_RE = re.compile(r"^[A-Za-z0-9_.-]{1,100}$")
 
 
 class PresetError(ValueError):
@@ -52,6 +54,11 @@ def normalize_query(query: str) -> str:
             if not re.fullmatch(r"\d{1,3}", value) or int(value) > 600:
                 raise PresetError(f"bad delay {value!r}")
             params[key] = str(int(value))
+        elif key == "ad":
+            # An SSAI ad configuration name; applied only where the channel's account has it.
+            if not AD_NAME_RE.match(value):
+                raise PresetError(f"bad ad server name {value!r}")
+            params[key] = value
         elif key == "cmcd":
             if value == "1":
                 params[key] = value
