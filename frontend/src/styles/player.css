@@ -43,7 +43,10 @@
 /* Load bar */
 .pl-loadbar {
     display: grid;
-    grid-template-columns: minmax(0, 2.2fr) auto minmax(0, 1fr) minmax(0, 0.7fr) minmax(0, 0.55fr) auto auto;
+    grid-template-columns: minmax(0, 2.2fr) minmax(0, 0.8fr) auto minmax(0, 1fr) minmax(0, 0.7fr) minmax(
+            0,
+            0.55fr
+        ) auto auto;
     gap: 10px;
     align-items: end;
     background: var(--surface);
@@ -51,6 +54,26 @@
     border-radius: var(--radius-lg);
     padding: 12px;
     position: relative;
+}
+.pl-preset-form {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    border-top: 1px solid var(--border);
+    padding-top: 10px;
+}
+.pl-preset-form[hidden] {
+    display: none;
+}
+.pl-preset-form input {
+    flex: 1 1 220px;
+    max-width: 320px;
+}
+.pl-preset-form .pl-preset-what {
+    color: var(--text-faint);
+    font-size: 12px;
 }
 .pl-field {
     display: grid;

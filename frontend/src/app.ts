@@ -2,16 +2,19 @@
 // Engine-agnostic: everything here talks to a PlayerEngine.
 
 import {
+    deletePreset,
     type EngineVersion,
+    fetchPresets,
     fetchSlicer,
     fetchVersions,
     type PlaybackResponse,
     type Probe,
     requestPlayback,
     type SavedSession,
+    savePreset,
     saveRecording,
 } from './api';
-import type {ChannelOption, PlayerConfig} from './config';
+import type {ChannelOption, PlayerConfig, Preset} from './config';
 import {DashJsEngine, DEFAULT_DASHJS_VERSION, loadDashJs} from './engines/dashjs';
 import {DEFAULT_HLS_VERSION, HlsJsEngine, loadHlsJs} from './engines/hlsjs';
 import {NATIVE_VERSION, NativeEngine, nativeHlsSupported} from './engines/native';
@@ -205,6 +208,8 @@ export class PlayerApp {
     private engine: PlayerEngine | null = null;
     private session = new Session();
     private source: Source | null = null;
+    /** Saved engine presets, by name (shared through the server). */
+    private presets: Preset[] = [];
     /** DRM → Widevine was chosen for a DRM channel, not by the user. */
     private autoDrm = false;
     private versions: Record<NpmEngine, EngineVersion[]> = {
@@ -225,6 +230,7 @@ export class PlayerApp {
         private root: HTMLElement,
         private config: PlayerConfig,
     ) {
+        this.presets = config.presets ?? [];
         this.video = h('video', {controls: true, muted: true, autoplay: true, playsinline: true});
         this.svgs = {
             chart: document.createElementNS('http://www.w3.org/2000/svg', 'svg'),
@@ -391,6 +397,9 @@ export class PlayerApp {
             {
                 class: 'pl-loadbar',
                 'aria-label': 'Load a stream',
+                // A hand-made change un-selects the preset it no longer matches.
+                onchange: (e: Event) => this.presetEdited(e.target),
+                onclick: (e: Event) => this.presetEdited(e.target),
                 onsubmit: (e: Event) => {
                     e.preventDefault();
                     void this.loadFromForm();
@@ -413,6 +422,26 @@ export class PlayerApp {
                     }),
                 ),
             ),
+            ...(this.config.endpoints.presets
+                ? [
+                      h(
+                          'div',
+                          {class: 'pl-field'},
+                          h('label', {for: 'pl-preset'}, 'Preset'),
+                          this.ref(
+                              'preset',
+                              h('select', {
+                                  id: 'pl-preset',
+                                  class: 'pl-control',
+                                  title: 'Saved setups: format, engine and version, DRM, delay and CMCD. Applies to the selected channel; press Load',
+                                  onchange: () => this.onPresetChosen(),
+                                  // Another tab may have saved or deleted some.
+                                  onfocus: () => void this.refreshPresets(),
+                              }),
+                          ),
+                      ),
+                  ]
+                : []),
             h(
                 'div',
                 {class: 'pl-field'},
@@ -530,8 +559,213 @@ export class PlayerApp {
                     },
                     'Save session',
                 ),
+                ...(this.config.endpoints.presets
+                    ? [
+                          h(
+                              'button',
+                              {
+                                  class: 'pl-btn-ghost',
+                                  type: 'button',
+                                  title: 'Save these settings (format, engine and version, DRM, delay, CMCD) under a name',
+                                  onclick: () => this.togglePresetForm(),
+                              },
+                              'Presets…',
+                          ),
+                      ]
+                    : []),
+            ),
+            ...(this.config.endpoints.presets ? [this.buildPresetForm()] : []),
+        );
+    }
+
+    private buildPresetForm(): HTMLElement {
+        const name = this.ref(
+            'presetName',
+            h('input', {
+                class: 'pl-control',
+                placeholder: 'Preset name, e.g. Shaka DASH Widevine',
+                maxlength: '60',
+                'aria-label': 'Preset name',
+                onkeydown: (e: Event) => {
+                    if ((e as KeyboardEvent).key !== 'Enter') return;
+                    e.preventDefault(); // not the load bar's submit
+                    void this.savePresetFromForm();
+                },
+            }),
+        );
+        return this.ref(
+            'presetForm',
+            h(
+                'div',
+                {class: 'pl-preset-form', hidden: true},
+                name,
+                h(
+                    'button',
+                    {
+                        class: 'pl-btn-primary',
+                        type: 'button',
+                        onclick: () => void this.savePresetFromForm(),
+                    },
+                    'Save preset',
+                ),
+                this.ref(
+                    'presetDelete',
+                    h(
+                        'button',
+                        {
+                            class: 'pl-btn-ghost',
+                            type: 'button',
+                            onclick: () => void this.deleteChosenPreset(),
+                        },
+                        'Delete',
+                    ),
+                ),
+                h(
+                    'button',
+                    {
+                        class: 'pl-btn-ghost',
+                        type: 'button',
+                        onclick: () => this.togglePresetForm(false),
+                    },
+                    'Close',
+                ),
+                this.ref('presetWhat', h('span', {class: 'pl-preset-what mono'})),
             ),
         );
+    }
+
+    // -------------------------------------------------------------- presets
+
+    /** The load bar's settings as a preset query (no source; default versions left out). */
+    private settingsQuery(): string {
+        const {engine, version} = this.chosenEngine();
+        return viewQuery({
+            format: this.format(),
+            engine,
+            version:
+                engine === 'native' || version === DEFAULT_VERSIONS[engine] ? undefined : version,
+            drm: this.autoDrm ? undefined : (this.drm() ?? undefined),
+            delay: this.delay() ?? undefined,
+            cmcd: this.el<HTMLInputElement>('cmcd').checked || undefined,
+        });
+    }
+
+    private chosenPreset(): Preset | null {
+        const id = Number(this.el<HTMLSelectElement>('preset').value);
+        return this.presets.find((p) => p.id === id) ?? null;
+    }
+
+    private renderPresets(selected: number | null = this.chosenPreset()?.id ?? null): void {
+        const select = this.el<HTMLSelectElement>('preset');
+        select.replaceChildren(
+            h('option', {value: ''}, this.presets.length ? '—' : 'none saved'),
+            ...this.presets.map((p) => h('option', {value: String(p.id), title: p.query}, p.name)),
+        );
+        select.value =
+            selected !== null && this.presets.some((p) => p.id === selected)
+                ? String(selected)
+                : '';
+        this.renderPresetForm();
+    }
+
+    private renderPresetForm(): void {
+        const chosen = this.chosenPreset();
+        const del = this.el<HTMLButtonElement>('presetDelete');
+        del.hidden = !chosen;
+        del.textContent = chosen ? `Delete “${chosen.name}”` : 'Delete';
+        this.el('presetWhat').textContent = this.settingsQuery();
+    }
+
+    private togglePresetForm(open?: boolean): void {
+        const form = this.el('presetForm');
+        form.hidden = open === undefined ? !form.hidden : !open;
+        if (form.hidden) return;
+        const input = this.el<HTMLInputElement>('presetName');
+        input.value = this.chosenPreset()?.name ?? '';
+        this.renderPresetForm();
+        input.focus();
+        void this.refreshPresets();
+    }
+
+    private async refreshPresets(): Promise<void> {
+        const endpoint = this.config.endpoints.presets;
+        if (!endpoint) return;
+        try {
+            const items = await fetchPresets(endpoint);
+            if (JSON.stringify(items) === JSON.stringify(this.presets)) return;
+            this.presets = items;
+            this.renderPresets();
+        } catch {
+            // keep the list we have
+        }
+    }
+
+    /** Apply a preset: reset what it doesn't name, then set what it does. */
+    private onPresetChosen(): void {
+        const preset = this.chosenPreset();
+        if (preset) {
+            const view = parseView(preset.query);
+            this.el<HTMLSelectElement>('delay').value = '';
+            this.el<HTMLInputElement>('cmcd').checked = false;
+            if (!view.drm) {
+                this.el<HTMLSelectElement>('drm').value = '';
+                this.syncDrm();
+                this.autoDrm = false;
+            }
+            this.applyView({...view, format: view.format ?? 'm3u8'});
+            if (!view.drm) this.applyChannelDrm(this.selectedChannel());
+        }
+        if (!this.el('presetForm').hidden) {
+            this.el<HTMLInputElement>('presetName').value = preset?.name ?? '';
+        }
+        this.renderPresetForm();
+    }
+
+    private presetEdited(target: EventTarget | null): void {
+        if (!this.config.endpoints.presets) return;
+        const el = target as HTMLElement | null;
+        if (!el || el.closest('#pl-preset, .pl-preset-form')) return;
+        // Let the control's own handler run first.
+        setTimeout(() => {
+            const chosen = this.chosenPreset();
+            if (chosen && chosen.query !== this.settingsQuery()) {
+                this.el<HTMLSelectElement>('preset').value = '';
+            }
+            this.renderPresetForm();
+        }, 0);
+    }
+
+    private async savePresetFromForm(): Promise<void> {
+        const endpoint = this.config.endpoints.presets;
+        const name = this.el<HTMLInputElement>('presetName').value.trim();
+        const what = this.el('presetWhat');
+        if (!endpoint) return;
+        if (!name) {
+            what.textContent = 'Give the preset a name.';
+            return;
+        }
+        try {
+            const {items, preset} = await savePreset(endpoint, name, this.settingsQuery());
+            this.presets = items;
+            this.renderPresets(preset?.id ?? null);
+            what.textContent = `Saved “${name}”: ${preset?.query ?? ''}`;
+        } catch (e) {
+            what.textContent = `Not saved: ${e instanceof Error ? e.message : String(e)}`;
+        }
+    }
+
+    private async deleteChosenPreset(): Promise<void> {
+        const endpoint = this.config.endpoints.presets;
+        const preset = this.chosenPreset();
+        if (!endpoint || !preset) return;
+        try {
+            this.presets = (await deletePreset(endpoint, preset.id)).items;
+            this.renderPresets(null);
+            this.el('presetWhat').textContent = `Deleted “${preset.name}”.`;
+        } catch (e) {
+            this.el('presetWhat').textContent =
+                `Not deleted: ${e instanceof Error ? e.message : String(e)}`;
+        }
     }
 
     private buildVitals(): HTMLElement {
@@ -1269,6 +1503,7 @@ export class PlayerApp {
         const source = this.el<HTMLSelectElement>('source');
         const view = parseView(location.search);
         this.applyView(view);
+        if (this.config.endpoints.presets) this.renderPresets(null);
         if (initialSrc) {
             source.value = PASTE;
             this.el<HTMLInputElement>('url').value = initialSrc;

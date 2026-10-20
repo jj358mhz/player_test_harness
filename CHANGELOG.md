@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.17.0] - 2026-10-19
+
+### Added
+- **Saved engine presets.** A named setup of format, engine and version,
+  DRM, delay and CMCD, kept on the server (`engine_presets` table, new
+  migration) so every browser sees the same list. The load bar has a
+  **Preset** menu that applies one to the selected channel (then press
+  Load), and **Presets…** opens a row to save the current settings under a
+  name (the same name replaces it) or delete the chosen one. An engine's
+  default version isn't pinned, so presets follow Dependabot's bumps; pick
+  an exact version to pin. Changing a setting by hand clears the menu.
+  The list refreshes when the menu is focused or the row opens.
+- `/api/presets`: GET, POST `{name, query}`, DELETE `/api/presets/<id>`.
+  The query is the player's deep-link query without the source or rays,
+  re-checked on the server with the same rules as deep links (engine
+  versions end up in a jsDelivr URL).
+
 ## [3.16.2] - 2026-10-19
 
 ### Documentation
