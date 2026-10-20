@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.22.2] - 2026-10-19
+
+### Changed
+- **Ad params read plainly in links and presets.** The player link carries
+  them as themselves, exactly as they're signed into the Uplynk URL:
+  `…&ad=fw2&ad.lib=KOR&ad.kv=genre:news`, instead of v3.22.0's packed
+  `adp=ad.lib%3DKOR`. Links and presets in the old form still load (and
+  presets list in the new one). After a preset is applied the box shows
+  the params as typed, not URL-encoded.
+
 ## [3.22.1] - 2026-10-19
 
 ### Changed

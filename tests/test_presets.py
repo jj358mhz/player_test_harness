@@ -24,9 +24,11 @@ from app.presets import PresetError, normalize_query
         ("?engine=dashjs&cmcd=0", "engine=dashjs"),
         ("cmcd=1&ad=fw2&engine=shaka&delay=20", "engine=shaka&delay=20&ad=fw2&cmcd=1"),
         (
-            "engine=shaka&ad=fw2&adp=ad.lib%3DKOR%26ad.kv%3Da%2Cb",
-            "engine=shaka&ad=fw2&adp=ad.lib%3DKOR%26ad.kv%3Da%252Cb",
+            "cmcd=1&engine=shaka&ad.lib=KOR&ad=fw2&ad.kv=a%2Cb",
+            "engine=shaka&ad=fw2&ad.lib=KOR&ad.kv=a%2Cb&cmcd=1",
         ),
+        # v3.22.0's packed form reads as the plain one.
+        ("engine=shaka&ad=fw2&adp=ad.lib%3DKOR", "engine=shaka&ad=fw2&ad.lib=KOR"),
     ],
 )
 def test_normalize(query, expected):
@@ -47,9 +49,10 @@ def test_normalize(query, expected):
         "engine=hlsjs&format=smooth",
         "engine=hlsjs&debug=1",
         "engine=hlsjs&ad=../../x",
-        "engine=hlsjs&adp=ad.lib%3DKOR",  # params without an ad server
+        "engine=hlsjs&ad.lib=KOR",  # params without an ad server
         "engine=hlsjs&ad=fw2&adp=delay%3D20",
-        "engine=hlsjs&ad=fw2&adp=ad.lib%3D%3Cx%3E",
+        "engine=hlsjs&ad=fw2&ad.lib=%3Cx%3E",
+        "engine=hlsjs&ad=fw2&" + "&".join(f"ad.k{i}=v" for i in range(11)),
         "engine=hlsjs&" + "x" * 300,
     ],
 )

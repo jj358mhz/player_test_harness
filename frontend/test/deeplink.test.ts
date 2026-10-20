@@ -28,12 +28,15 @@ describe('deep links', () => {
         expect(viewQuery({src: 'https://h/x.m3u8', ad: 'fw2'})).not.toContain('ad=');
     });
     it('carries per-load ad params with an ad server', () => {
-        const view = parseView('?channel=3&ad=fw2&adp=ad.lib%3DKOR');
-        expect(view.adParams).toBe('ad.lib=KOR');
-        expect(viewQuery(view)).toBe('channel=3&ad=fw2&adp=ad.lib%3DKOR');
-        // Without an ad server, or with anything but ad.* keys, they're dropped.
-        expect(parseView('?channel=3&adp=ad.lib%3DKOR').adParams).toBeUndefined();
-        expect(parseView('?channel=3&ad=fw2&adp=delay%3D5').adParams).toBeUndefined();
+        const view = parseView('?channel=3&ad=fw2&ad.lib=KOR&ad.kv=a,b&cmcd=1');
+        expect(view.adParams).toBe('ad.lib=KOR&ad.kv=a%2Cb');
+        expect(viewQuery(view)).toBe('channel=3&ad=fw2&ad.lib=KOR&ad.kv=a%2Cb&cmcd=1');
+        // v3.22.0 links packed them into adp=; they still load, and are rewritten plainly.
+        const old = parseView('?channel=3&ad=fw2&adp=ad.lib%3DKOR');
+        expect(viewQuery(old)).toBe('channel=3&ad=fw2&ad.lib=KOR');
+        // Without an ad server, or with bad values, they're dropped.
+        expect(parseView('?channel=3&ad.lib=KOR').adParams).toBeUndefined();
+        expect(parseView('?channel=3&ad=fw2&ad.lib=%3Cx%3E').adParams).toBeUndefined();
     });
     it('accepts long engine names and a missing version', () => {
         expect(parseView('?engine=hls.js')).toEqual({engine: 'hls.js'});
