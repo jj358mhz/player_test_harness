@@ -117,6 +117,13 @@
                 {% if ch.external_id %}<dt>Ext</dt><dd class="mono" title="{{ ch.external_id }}">{{ ch.external_id }}</dd>{% endif %}
                 {% if ch.slicer_id %}<dt>Slicer</dt><dd class="mono" title="{{ ch.slicer_id }}">{% if csl_base_url %}<a href="{{ csl_base_url }}/slicers/by-id/{{ ch.slicer_id|urlencode }}" target="_blank" rel="noopener" title="Open {{ ch.slicer_id }} in the slicer console">{{ ch.slicer_id }} ↗</a>{% else %}{{ ch.slicer_id }}{% endif %}</dd>{% endif %}
             </dl>
+            {% if sparks.get(ch.id) %}
+            <a class="channel-card__health" href="{{ url_for('main.channel_health', channel_id=ch.id) }}"
+               title="Live-edge age over the last 24 h; open the history">
+                {{ sparks[ch.id] }}
+                {% if ch.needs_attention and since.get(ch.id) %}<span class="channel-card__since">since <time datetime="{{ since[ch.id].strftime('%Y-%m-%dT%H:%M:%SZ') }}" data-local>{{ since[ch.id].strftime('%H:%M') }} UTC</time></span>{% endif %}
+            </a>
+            {% endif %}
             <div class="channel-card__check" data-check hidden></div>
             <div class="channel-card__actions">
                 <a class="button button--primary" href="{{ url_for('main.play_channel', channel_id=ch.id) }}"

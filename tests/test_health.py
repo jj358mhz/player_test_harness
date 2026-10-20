@@ -57,13 +57,14 @@ def test_assess_failures():
 
 
 def test_fmt_age():
-    assert [fmt_age(s) for s in (0, 32.4, 119, 125, 3600, 7300)] == [
+    assert [fmt_age(s) for s in (0, 32.4, 119, 125, 3600, 7300, 412800)] == [
         "0 s",
         "32 s",
         "119 s",
         "2 m",
         "60 m",
         "2 h 1 m",
+        "4 d 18 h",
     ]
 
 

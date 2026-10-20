@@ -295,7 +295,12 @@ in the `player_harness_data` volume.
 - [x] Channel health (v3.18.0, `CHANNEL_HEALTH_INTERVAL`): live-edge age per
       channel on the dashboard, run by the auto-sync thread (same lock).
       Edge age at the default delay is ~30 s; behind > 90 s, stale > 300 s
-      or `#EXT-X-ENDLIST` (`app/uplynk/health.py`).
+      or `#EXT-X-ENDLIST` (`app/uplynk/health.py`). v3.19.0: every check
+      kept in `channel_health_checks` (`HEALTH_HISTORY_DAYS`, pruned per
+      run); `app/health_history.py` draws server-side SVG sparklines (card,
+      24 h) and `/channels/<id>/health` (24 h + N days, status changes).
+      Times on cards/table are localized by `app.js` (`time[data-local]`);
+      chart axes stay UTC.
 
 ### Todo
 

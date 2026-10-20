@@ -5,14 +5,14 @@ from __future__ import annotations
 import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from flask import current_app
 from flask_login import current_user
 
 from app.crypto import decrypt
-from app.models import Channel, PlaybackEvent, UplynkAccount, db
+from app.models import Channel, ChannelHealthCheck, PlaybackEvent, UplynkAccount, db
 from app.uplynk.clock import dash_clock
 from app.uplynk.health import Health, assess
 from app.uplynk.playback import (
@@ -253,9 +253,22 @@ def check_health(
         channel.health_edge_s = health.edge_age_s
         channel.health_detail = health.detail
         channel.health_checked_at = checked_at
+        db.session.add(
+            ChannelHealthCheck(
+                channel_id=channel.id,
+                checked_at=checked_at,
+                status=health.status,
+                edge_s=health.edge_age_s,
+                detail=health.detail,
+            )
+        )
         if probe.encryption:
             record_encryption(channel, probe.encryption)
         results.append((channel, health))
+    keep = timedelta(days=current_app.config["HEALTH_HISTORY_DAYS"])
+    db.session.query(ChannelHealthCheck).filter(
+        ChannelHealthCheck.checked_at < checked_at - keep
+    ).delete(synchronize_session=False)
     db.session.commit()
     return results
 

@@ -98,10 +98,12 @@ def assess(ok: bool, error: str | None, media: str | None, now: float) -> Health
 
 
 def fmt_age(seconds: float) -> str:
-    """32 s, 4 m, 2 h 5 m."""
+    """32 s, 4 m, 2 h 5 m, 3 d 4 h."""
     s = max(0, round(seconds))
     if s < 120:
         return f"{s} s"
     if s < 7200:
         return f"{s // 60} m"
-    return f"{s // 3600} h {s % 3600 // 60} m"
+    if s < 2 * 86400:
+        return f"{s // 3600} h {s % 3600 // 60} m"
+    return f"{s // 86400} d {s % 86400 // 3600} h"
