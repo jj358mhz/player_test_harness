@@ -710,6 +710,22 @@
     white-space: pre;
 }
 
+.pl-loadbar__tools {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: -2px;
+}
+.pl-loadbar__tools .pl-btn-ghost {
+    height: 30px;
+    padding: 0 12px;
+    font-size: 13px;
+}
+.pl-field--actions .pl-btn-primary {
+    width: 100%;
+}
 @media (max-width: 1100px) {
     .pl-main {
         grid-template-columns: minmax(0, 1fr);
@@ -723,6 +739,15 @@
     .pl-field--source {
         grid-column: 1 / -1;
     }
+    .pl-field--check {
+        justify-items: start;
+    }
+    /* Load and the secondary buttons share the last row. */
+    .pl-loadbar__tools {
+        grid-column: auto;
+        align-self: end;
+        margin-top: 0;
+    }
 }
 @media (max-width: 720px) {
     .pl-vitals {
@@ -733,6 +758,9 @@
     }
     .pl-loadbar {
         grid-template-columns: minmax(0, 1fr);
+    }
+    .pl-loadbar__tools {
+        justify-content: flex-start;
     }
 }
 @media (prefers-reduced-motion: reduce) {

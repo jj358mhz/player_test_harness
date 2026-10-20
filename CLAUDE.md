@@ -265,7 +265,8 @@ in the `player_harness_data` volume.
       from in-segment `prft` (`lib/mp4.ts`; Uplynk writes none) and from
       ID3 in emsg (Shaka and dash.js); v3.16.1 asset/ray/slice from that
       ID3. **v3.17.0:** saved engine presets
-      in the DB (load bar **Preset** + **Presets…**). **Left:** native
+      in the DB (load bar **Preset** + **Presets…**). **v3.17.1:** load bar
+      = one row of fields + Load, secondary buttons in a toolbar row. **Left:** native
       verified in real Safari.
 - [~] Phase 3 — DRM. **Done (v3.2.0):** Shaka engine, Widevine/PlayReady
       over DASH from Preplay, DRM panel (key system, license timing/status,

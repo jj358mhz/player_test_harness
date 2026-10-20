@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.17.1] - 2026-10-19
+
+### Changed
+- **Load bar layout.** Load sits level with the fields; Copy link, Save
+  session and Presets… move to a slim row under them (right-aligned), so
+  the bar is one row of fields instead of four stacked buttons tall. At
+  tablet width Load and those buttons share the last row and CMCD lines up
+  under its label; on a phone they stack under Load.
+- **Site header on narrow screens** wraps the nav under the brand and hides
+  the signed-in email (Sign out stays), so no page scrolls sideways at
+  phone width. It used to push every page to about 740 px wide.
+
 ## [3.17.0] - 2026-10-19
 
 ### Added

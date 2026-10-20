@@ -532,6 +532,14 @@ export class PlayerApp {
                 'div',
                 {class: 'pl-field pl-field--actions'},
                 h('button', {class: 'pl-btn-primary', type: 'submit'}, 'Load'),
+            ),
+            h(
+                'div',
+                {
+                    class: 'pl-loadbar__tools',
+                    role: 'group',
+                    'aria-label': 'Link, session and presets',
+                },
                 // In a compare pane the compare page's own link covers both views.
                 ...(this.config.embed
                     ? []
