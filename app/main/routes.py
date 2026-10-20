@@ -33,9 +33,34 @@ def index() -> str:
         for label, items in groupby(channels, key=lambda c: c.uplynk_account.label)
     ]
     account_count = db.session.query(UplynkAccount).count()
+    checked = [c.health_checked_at for c in channels if c.health_checked_at]
     return render_template(
-        "main/index.html", groups=groups, total=len(channels), account_count=account_count
+        "main/index.html",
+        groups=groups,
+        total=len(channels),
+        account_count=account_count,
+        attention=sum(1 for c in channels if c.needs_attention),
+        health_checked_at=max(checked) if checked else None,
+        health_interval=current_app.config["CHANNEL_HEALTH_INTERVAL"],
     )
+
+
+@bp.route("/channels/health", methods=["POST"])
+@login_required
+def check_channel_health():
+    """Check every active channel's live edge now (the background check, on demand)."""
+    from app.api.service import check_health
+
+    channels = db.session.query(Channel).filter_by(is_active=True).all()
+    if not channels:
+        return redirect(url_for("main.index"))
+    results = check_health(channels)
+    bad = sum(1 for _, h in results if h.needs_attention)
+    if not bad:
+        flash(f"Checked {len(results)} channels: all at the live edge.", "success")
+        return redirect(url_for("main.index"))
+    flash(f"Checked {len(results)} channels: {bad} need attention (shown below).", "error")
+    return redirect(url_for("main.index", q="attention"))
 
 
 @bp.route("/channels/<int:channel_id>/favorite", methods=["POST"])

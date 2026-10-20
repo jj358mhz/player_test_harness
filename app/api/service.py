@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -13,6 +14,7 @@ from flask_login import current_user
 from app.crypto import decrypt
 from app.models import Channel, PlaybackEvent, UplynkAccount, db
 from app.uplynk.clock import dash_clock
+from app.uplynk.health import Health, assess
 from app.uplynk.playback import (
     DRM_TYPES,
     MANIFESTS,
@@ -219,6 +221,43 @@ def check_encryption(
             record_encryption(channel, probe.encryption)
     db.session.commit()
     return list(zip(channels, probes, strict=True))
+
+
+def check_health(
+    channels: list[Channel], workers: int = 6, now: float | None = None
+) -> list[tuple[Channel, Health]]:
+    """Probe each channel's `pdts=latency` HLS and record how old its live edge is.
+
+    Also records encryption from the same probe. Like check_encryption:
+    signs up front, probes in a pool, not audited as playback events.
+    """
+    content_base = current_app.config["UPLYNK_CONTENT_BASE"]
+    ttl = current_app.config["PLAYBACK_TOKEN_TTL"]
+    keys: dict[int, str] = {}
+    urls = []
+    for channel in channels:
+        account = channel.uplynk_account
+        if account.id not in keys:
+            keys[account.id] = decrypt(account.api_key_encrypted)
+        target = PlaybackTarget(content_type="c", content_id=channel.channel_id)
+        base_url = manifest_base_url(content_base, target, "m3u8")
+        signed = sign_url(base_url, target, keys[account.id], ttl, [("pdts", "latency")])
+        urls.append(signed.url)
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        probes = list(pool.map(probe_manifest, urls))
+    checked_at = datetime.now(UTC)
+    results = []
+    for channel, probe in zip(channels, probes, strict=True):
+        health = assess(probe.ok, probe.error, probe.media, now if now is not None else time.time())
+        channel.health_status = health.status
+        channel.health_edge_s = health.edge_age_s
+        channel.health_detail = health.detail
+        channel.health_checked_at = checked_at
+        if probe.encryption:
+            record_encryption(channel, probe.encryption)
+        results.append((channel, health))
+    db.session.commit()
+    return results
 
 
 def _int(value: Any, name: str) -> int:

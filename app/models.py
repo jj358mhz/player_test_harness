@@ -136,6 +136,14 @@ class Channel(Base):
     encryption_checked_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # Last health check (app.uplynk.health): ok / behind / stale / error / unknown,
+    # the newest segment's age on the encoder clock, and why if not ok.
+    health_status: Mapped[str | None] = mapped_column(String(12), nullable=True)
+    health_edge_s: Mapped[float | None] = mapped_column(Float, nullable=True)
+    health_detail: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    health_checked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     is_favorite: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
@@ -157,6 +165,10 @@ class Channel(Base):
     @property
     def is_drm(self) -> bool:
         return self.encryption == "drm"
+
+    @property
+    def needs_attention(self) -> bool:
+        return self.health_status in ("behind", "stale", "error")
 
     def __repr__(self) -> str:
         return f"<Channel {self.channel_id}>"

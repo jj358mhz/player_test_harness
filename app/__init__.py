@@ -50,6 +50,10 @@ def create_app(config: Config | None = None) -> Flask:
     app.register_blueprint(admin_bp)
     app.register_blueprint(api_bp)
 
+    from app.uplynk.health import fmt_age
+
+    app.add_template_filter(fmt_age, "age")
+
     @app.context_processor
     def inject_version() -> dict:
         return {"app_version": APP_VERSION, "csl_base_url": app.config["CSL_BASE_URL"]}
@@ -104,6 +108,28 @@ def _register_cli(app: Flask) -> None:
             counts[state] = counts.get(state, 0) + 1
             if not probe.ok:
                 click.echo(f"  {channel.display_name}: {probe.error}")
+        click.echo(", ".join(f"{n} {state}" for state, n in sorted(counts.items())))
+
+    @app.cli.command("check-health")
+    @click.option("--account", "label", help="Only check the account with this label.")
+    def check_health_cmd(label: str | None) -> None:
+        """Probe each active channel's live edge and record its health (dashboard badge)."""
+        from app.api.service import check_health
+        from app.models import Channel, UplynkAccount
+        from app.uplynk.health import fmt_age
+
+        query = db.session.query(Channel).filter_by(is_active=True).join(UplynkAccount)
+        if label:
+            query = query.filter(UplynkAccount.label == label)
+        channels = query.order_by(UplynkAccount.label, Channel.description).all()
+        if not channels:
+            raise click.ClickException("No matching channels.")
+        counts: dict[str, int] = {}
+        for channel, health in check_health(channels):
+            counts[health.status] = counts.get(health.status, 0) + 1
+            if health.status != "ok":
+                age = f" ({fmt_age(health.edge_age_s)})" if health.edge_age_s is not None else ""
+                click.echo(f"  {health.status}: {channel.display_name}{age} {health.detail or ''}")
         click.echo(", ".join(f"{n} {state}" for state, n in sorted(counts.items())))
 
     @app.cli.command("prune-sessions")

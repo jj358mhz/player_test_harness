@@ -87,7 +87,9 @@ after dependency changes.
   - `sync.py` — channels → DB upsert; deactivates missing, keeps favorites.
 - `app/api/service.py` — validates playback requests, signs/Preplays,
   writes `PlaybackEvent`, records `Channel.encryption` from the probe
-  (`check_encryption()` backs `flask check-encryption`). Both the JSON API and `/channels/<id>/play` use it.
+  (`check_encryption()` backs `flask check-encryption`; `check_health()`
+  backs `flask check-health`, **Check health** on the dashboard and the
+  background check: `pdts=latency` HLS → `app/uplynk/health.py` edge age). Both the JSON API and `/channels/<id>/play` use it.
 - `app/main/` — pages: channels dashboard, `/player`, `/compare`, `/sign`, `/activity`.
   `/channels/by-slicer/<slicer>` is csl-slicer-console's way in; we link
   to its `/slicers/by-id/<slicer>` when `CSL_BASE_URL` is set (console
@@ -266,8 +268,8 @@ in the `player_harness_data` volume.
       ID3 in emsg (Shaka and dash.js); v3.16.1 asset/ray/slice from that
       ID3. **v3.17.0:** saved engine presets
       in the DB (load bar **Preset** + **Presets…**). **v3.17.1:** load bar
-      = one row of fields + Load, secondary buttons in a toolbar row. **Left:** native
-      verified in real Safari.
+      = one row of fields + Load, secondary buttons in a toolbar row. Native
+      verified in real Safari (2026-10-19: FairPlay, ID3 cues, PDT).
 - [~] Phase 3 — DRM. **Done (v3.2.0):** Shaka engine, Widevine/PlayReady
       over DASH from Preplay, DRM panel (key system, license timing/status,
       robustness, expiry, per-key status with HDCP hints), FairPlay-in-Chrome
@@ -278,7 +280,7 @@ in the `player_harness_data` volume.
       engine, WebKit legacy EME for TS, #21), verified 2026-10-19:
       keys usable, ray f 720p. PlayReady is wired but untested (Chrome has no PlayReady;
       needs Edge).
-- [~] Phase 4 — triage (#24). **Done (v3.6.0):** deep links (source,
+- [x] Phase 4 — triage (#24, closed; LL-HLS on hold in #48). **Done (v3.6.0):** deep links (source,
       format, engine@version, DRM, rays, tab) + Copy link. **v3.7.0:**
       recorded sessions (`PlaybackSession`, `POST /api/sessions`,
       `/sessions/<slug>` replay via the `recording.ts` Vite entry,
@@ -290,6 +292,10 @@ in the `player_harness_data` volume.
       **v3.10.0:** CMCD toggle (query mode), slicer-console links both ways.
       **v3.11.0:** request detail in the waterfall (first byte vs download)
 - [x] Periodic background channel sync (v3.12.0, `CHANNEL_SYNC_INTERVAL`)
+- [x] Channel health (v3.18.0, `CHANNEL_HEALTH_INTERVAL`): live-edge age per
+      channel on the dashboard, run by the auto-sync thread (same lock).
+      Edge age at the default delay is ~30 s; behind > 90 s, stale > 300 s
+      or `#EXT-X-ENDLIST` (`app/uplynk/health.py`).
 
 ### Todo
 

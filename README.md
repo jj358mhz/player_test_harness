@@ -33,6 +33,12 @@ latency, drift, ABR, DRM keys, ID3/SCTE-35, captions and more.
   rays, request stats, DRM) at `/sessions/<id>`, redacted of signatures
   and tokens, for `SESSION_RETENTION_DAYS` (default 30). Deep links put the
   whole player view in the address bar.
+- 🩺 **Channel health** — every `CHANNEL_HEALTH_INTERVAL` minutes (default
+  10) the server fetches each channel's `pdts=latency` HLS and measures how
+  old the newest segment is on the encoder's clock. Cards get a badge
+  (green at the live edge, amber behind, red stale or erroring) and the
+  dashboard says how many need attention. **Check health** runs it now;
+  `flask check-health` from the CLI.
 - ▶️ **One-click play** — each channel card signs a fresh HLS URL and opens
   the monitoring player with it. Copy HLS/DASH buttons for use in other players.
 - 📊 **Monitoring player** — video first, with latency (ID3, PDT and
@@ -57,7 +63,7 @@ latency, drift, ABR, DRM keys, ID3/SCTE-35, captions and more.
 | 2a    | Player rewrite: TypeScript + Vite, video-first layout, rays, versions    | ✅ done |
 | 2     | Multi-player: player adapter interface; hls.js, Shaka, dash.js, native   | ✅ done |
 | 3     | DRM playback driven by Preplay; DRM diagnostics panel                    | 🟡 Widevine/PlayReady/FairPlay; PlayReady untested |
-| 4     | Triage: recorded sessions, side-by-side compare, LL-HLS metrics, links   | 🟡 links, sessions done |
+| 4     | Triage: recorded sessions, side-by-side compare, LL-HLS metrics, links   | ✅ done (LL-HLS on hold, #48) |
 
 ## 🏗️ Architecture
 
@@ -81,7 +87,9 @@ latency, drift, ABR, DRM keys, ID3/SCTE-35, captions and more.
 |-------------------|---------------------------------------------------------------|
 | `users`           | Login accounts                                                |
 | `uplynk_accounts` | Workspaces + encrypted API key / scoped key                   |
-| `channels`        | Synced live channels (plus local favorite flag)               |
+| `channels`        | Synced live channels (plus favorite flag, encryption, health) |
+| `engine_presets`  | Saved player setups (format, engine@version, DRM, delay, CMCD) |
+| `playback_sessions` | Recorded player sessions (redacted)                         |
 | `playback_events` | Every signing / Preplay request (no signatures stored)        |
 | `admin_events`    | Account CRUD and sync history                                 |
 
@@ -199,6 +207,7 @@ a Docker Compose stack on the shared `auth-net` network, fronted by Caddy at
 | `PLAYBACK_TOKEN_TTL`       | Default signed-token lifetime in seconds (default 3600)       |
 | `SESSION_RETENTION_DAYS`   | Days to keep recorded sessions (default 30; 0 = forever)      |
 | `CHANNEL_SYNC_INTERVAL`    | Background channel sync, minutes (default 60; 0 = off)        |
+| `CHANNEL_HEALTH_INTERVAL`  | Background channel health check, minutes (default 10; 0 = off) |
 | `MAX_RECORDING_BYTES`      | Largest recorded session accepted (default 8 MiB)             |
 | `CSL_BASE_URL`             | csl-slicer-console URL for slicer links (optional)            |
 | `CSL_API_TOKEN`            | The console's `PLAYER_API_TOKEN`: show slicer wallclock (optional) |
