@@ -119,6 +119,8 @@ after dependency changes.
     `scte35.ts` (splice_insert, time_signal, segmentation descriptors),
     `clock.ts` (which clock program dates use; `delay=` parsing),
     `bands.ts`, `stats.ts`, `cmcd.ts` (CMCD param parsing, ids),
+    `mp4.ts` (prft/tfdt/mdhd from DASH segments → encoder-time anchors
+    for the same clock ID3 uses; emsg payload preview),
     `waterfall.ts` (request detail; first byte from the engine or Resource Timing),
     `deeplink.ts` (address bar ⇄ load bar; validates
     engine versions because they end up in a jsDelivr URL).
@@ -246,8 +248,9 @@ in the `player_harness_data` volume.
       loaded from jsDelivr; default pinned in npm, bumped by Dependabot.
       Classic player deleted.
 - [x] Phase 2 — multi-player (v3.5.0): hls.js, Shaka, dash.js, native
-      adapters behind `PlayerEngine`. **Left:** DASH latency from
-      emsg/prft (PDT via the MPD is used now), presets in the DB, native
+      adapters behind `PlayerEngine`. **v3.15.0:** DASH encoder latency
+      from in-segment `prft` (`lib/mp4.ts`), not yet seen on a real
+      Uplynk stream. **Left:** presets in the DB, native
       verified in real Safari.
 - [~] Phase 3 — DRM. **Done (v3.2.0):** Shaka engine, Widevine/PlayReady
       over DASH from Preplay, DRM panel (key system, license timing/status,

@@ -6,6 +6,7 @@ import type shakaNS from 'shaka-player';
 import {version as pinned} from 'shaka-player/package.json';
 import type {CmcdConfig} from '../lib/cmcd';
 import {videoProfile} from '../lib/codecs';
+import {PrftReader, payloadPreview} from '../lib/mp4';
 import {
     type AudioTrack,
     type CencDrmConfig,
@@ -87,6 +88,7 @@ export class ShakaEngine implements PlayerEngine {
     private renditions: Rendition[] = [];
     private current: Rendition | null = null;
     private manifestText: string | null = null;
+    private prft = new PrftReader();
     private announced = false;
 
     constructor(
@@ -163,7 +165,10 @@ export class ShakaEngine implements PlayerEngine {
                 ? null
                 : (rayFromRepresentation(context?.stream?.originalId) ??
                   rayFromSegmentUrl(response.uri));
+            if (kind === 'init' && !other) this.prft.onInit(response.data);
             if (kind === 'segment' && !other) {
+                const anchor = this.prft.onSegment(response.data, context?.segment?.getStartTime());
+                if (anchor) this.events.emit('prft', anchor);
                 this.events.emit('segment', {
                     ray,
                     sn: segmentNumber(response.uri),
@@ -201,6 +206,7 @@ export class ShakaEngine implements PlayerEngine {
                 scheme: detail.schemeIdUri ?? '',
                 value: detail.value ?? '',
                 bytes: detail.messageData?.byteLength ?? 0,
+                preview: payloadPreview(detail.messageData),
             });
         });
         player.addEventListener('error', (event) =>

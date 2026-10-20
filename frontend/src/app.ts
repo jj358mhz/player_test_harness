@@ -160,6 +160,9 @@ class Session {
     /** ID3 frames by kind (TXXX description or PRIV owner), and how many carried a wallclock. */
     id3Frames = new Map<string, number>();
     id3Wallclocks = 0;
+    /** DASH: prft boxes read from video segments (they feed the same clock as ID3). */
+    prftCount = 0;
+    prftType: string | null = null;
     /** csl-slicer-console's view of the channel's slicer; null until it answers. */
     slicer: SlicerSettings | null = null;
     scteCount = 0;
@@ -706,8 +709,8 @@ export class PlayerApp {
                             {},
                             row(
                                 'id3',
-                                'ID3 wallclock',
-                                'Encoder timestamp in the segment → now, at the playhead',
+                                'Encoder wallclock',
+                                'Encoder time in the segment (HLS: ID3 TXXX; DASH: prft box) → now, at the playhead',
                             ),
                             row(
                                 'pdt',
@@ -1859,11 +1862,25 @@ export class PlayerApp {
             s().keyStatuses = {...statuses};
             this.renderKeys();
         });
-        engine.on('emsg', ({scheme, value, bytes}) => {
+        engine.on('prft', ({start, wallMs, type}) => {
+            const session = s();
+            session.id3.add(start, wallMs);
+            session.prftCount += 1;
+            if (session.prftType === null) {
+                session.prftType = type;
+                this.logEntry(
+                    'id3',
+                    'PRFT',
+                    `segments carry prft (${type}): encoder latency from the DASH segments`,
+                    'meta',
+                );
+            }
+        });
+        engine.on('emsg', ({scheme, value, bytes, preview}) => {
             this.logEntry(
                 'id3',
                 'EMSG',
-                `${scheme}${value ? ` · ${value}` : ''} · ${bytes} bytes`,
+                `${scheme}${value ? ` · ${value}` : ''} · ${bytes} bytes${preview ? ` · ${preview}` : ''}`,
                 'meta',
             );
         });
@@ -2259,7 +2276,7 @@ export class PlayerApp {
     private headline(): {stats: RunningStats; name: string} {
         const {id3, pdt} = this.session.latency;
         return id3.count
-            ? {stats: id3, name: 'ID3'}
+            ? {stats: id3, name: this.session.prftCount ? 'prft' : 'ID3'}
             : {stats: pdt, name: pdt.count ? this.pdtName() : 'ID3'};
     }
 
@@ -2642,6 +2659,12 @@ export class PlayerApp {
      */
     private id3Status(): string {
         const s = this.session;
+        if (this.source?.clock.kind.startsWith('mpd')) {
+            if (s.prftCount) return 'waiting for the playhead to reach a prft segment';
+            return s.segments.count >= 3
+                ? `no prft in ${s.segments.count} DASH segments`
+                : 'waiting for a DASH segment';
+        }
         return id3Reason(s.id3Count, s.id3Wallclocks, s.slicer);
     }
 
@@ -2686,6 +2709,18 @@ export class PlayerApp {
             ],
             ...(this.config.endpoints.slicer && this.source?.channel?.slicerId
                 ? [['Slicer wallclock', describeSlicerWallclock(s.slicer)] as [string, string]]
+                : []),
+            ...(this.source?.clock.kind.startsWith('mpd')
+                ? [
+                      [
+                          'prft',
+                          s.prftCount
+                              ? `${s.prftCount} segments · ${s.prftType}`
+                              : s.segments.count
+                                ? `none in ${s.segments.count} segments`
+                                : '--',
+                      ] as [string, string],
+                  ]
                 : []),
             ['SCTE-35 cues', String(s.scteCount)],
             [
