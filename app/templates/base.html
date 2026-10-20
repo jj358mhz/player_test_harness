@@ -62,6 +62,14 @@
     {% endif %}
     {% endwith %}
 
+    {# Every page but the dashboard itself leads back to it; a page about one
+       channel sets back_channel to land on that channel's card. #}
+    {% block back %}
+    {% if current_user.is_authenticated and not embed and request.endpoint not in ('main.index', 'auth.login') %}
+    <a class="back-link" href="{{ url_for('main.index') }}{% if back_channel %}#channel-{{ back_channel }}{% endif %}">← Back to channels</a>
+    {% endif %}
+    {% endblock %}
+
     {% block content %}{% endblock %}
 </main>
 {% block scripts %}{% endblock %}

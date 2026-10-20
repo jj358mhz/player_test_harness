@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% set back_channel = session.channel_id %}
 {% block title_suffix %} — Session {{ session.title }}{% endblock %}
 {% block main_modifier %} site-main--wide{% endblock %}
 

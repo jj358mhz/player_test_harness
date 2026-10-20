@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.22.1] - 2026-10-19
+
+### Changed
+- **"← Back to channels" on every page.** It's now part of the site
+  layout rather than a few pages' own markup: Player, Compare, Sign URL,
+  Sessions, a recorded session, Activity, the Uplynk Accounts pages and a
+  channel's health page all have it. Pages about one channel (the player
+  opened on a channel, Sign URL for a channel, a session, a health page)
+  land on that channel's card. Not shown on the dashboard itself, the
+  sign-in page or compare's embedded panes.
+
 ## [3.22.0] - 2026-10-19
 
 ### Added
