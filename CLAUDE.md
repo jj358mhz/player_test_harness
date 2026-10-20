@@ -212,6 +212,11 @@ after dependency changes.
   the rules. Deep links and presets carry them as themselves after `ad=`
   (v3.22.2; v3.22.0's packed `adp=` is still read, and listed presets are
   re-normalized).
+- **Preplay rejects `ad.preroll=1`** (undocumented param; 2026-10-20): Preplay
+  v2 answers `500 Server error, sorry` whenever it's signed (HLS without DRM
+  too), while a signed `/channel/<id>.m3u8` with the same params plays the
+  preroll. Studio DRM channels need Preplay, so no prerolls there.
+  `fetch_preplay` names the signed `ad.*` params on a Preplay 5xx.
 - **SSAI** (docs "Ad Breaks", "Client-Side Beaconing Using Dynamic Manifest
   Markers", "Ad Verification"): Uplynk stitches ads into each session's
   manifest. DASH: each ad is a Period identified by `AssetIdentifier
