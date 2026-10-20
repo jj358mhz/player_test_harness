@@ -3,6 +3,7 @@ import {bandFor} from '../src/lib/bands';
 import {
     isId3Tag,
     mpdAdAssets,
+    mpdAdPeriods,
     parseId3,
     parsePriv,
     parseTxxx,
@@ -365,6 +366,30 @@ describe('parseUplynkSlice', () => {
     it('ignores other values', () => {
         expect(parseUplynkSlice('wallclock: 2026-10-20T00:24:20.964')).toBeNull();
         expect(parseUplynkSlice('abc_f_00000b87')).toBeNull();
+    });
+});
+
+describe('mpdAdAssets (SSAI ad Periods)', () => {
+    const mpd = `<MPD>
+<Period id="p1"><AssetIdentifier schemeIdUri="urn:org:dashif:asset-id:2013" value="content1"/></Period>
+<Period id="p2"><AssetIdentifier schemeIdUri="urn:com:uplynk:ad-asset-id" value="adserver-123"/>
+<AssetIdentifier schemeIdUri="urn:org:dashif:asset-id:2013" value="ADASSET2"/></Period>
+</MPD>`;
+    it('names an ad by any identifier in an ad Period', () => {
+        expect(mpdAdAssets(mpd)).toEqual(new Set(['adserver-123', 'adasset2']));
+        expect(mpdAdAssets(mpd).has('content1')).toBe(false);
+    });
+    it('lists ad Periods for the log', () => {
+        expect(mpdAdPeriods(mpd)).toEqual([
+            {
+                id: 'p2',
+                identifiers: [
+                    'urn:com:uplynk:ad-asset-id=adserver-123',
+                    'urn:org:dashif:asset-id:2013=ADASSET2',
+                ],
+            },
+        ]);
+        expect(mpdAdPeriods(null)).toEqual([]);
     });
 });
 

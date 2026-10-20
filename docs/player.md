@@ -201,7 +201,10 @@ ray isn't counted as a rotation.
 ## Metadata
 
 On DASH the Uplynk asset (and its ray and slice) comes from the ID3 in
-each segment's emsg, ad or content from the MPD's `AssetIdentifier`.
+each segment's emsg, ad or content from the MPD: Uplynk's SSAI stitches each ad in as a Period
+marked `urn:com:uplynk:ad-asset-id`, and an asset named by any identifier
+in such a Period is an ad. The log notes when the MPD gains ad Periods
+(`MPD ADS`) and when a new asset isn't one of them (`AD CHECK`).
 Other DASH `emsg` boxes are logged with their scheme, size and payload (text if
 printable, else the leading bytes in hex).
 

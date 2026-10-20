@@ -90,13 +90,45 @@ export function parseUplynkSlice(value: string): UplynkSlice | null {
     };
 }
 
-/** Asset ids an MPD marks as ads (`AssetIdentifier urn:com:uplynk:ad-asset-id`). */
+export interface AdPeriod {
+    id: string | null;
+    /** Every AssetIdentifier in the Period, as `scheme=value`. */
+    identifiers: string[];
+}
+
+/**
+ * Uplynk SSAI: each ad is its own Period carrying
+ * `AssetIdentifier urn:com:uplynk:ad-asset-id`. Returns those Periods.
+ */
+export function mpdAdPeriods(mpd: string | null | undefined): AdPeriod[] {
+    const out: AdPeriod[] = [];
+    for (const period of mpd?.match(/<Period\b[\s\S]*?<\/Period>/g) ?? []) {
+        const tags = period.match(/<AssetIdentifier\b[^>]*>/g) ?? [];
+        if (!tags.some((t) => t.includes('urn:com:uplynk:ad-asset-id'))) continue;
+        out.push({
+            id: /^<Period\b[^>]*\sid="([^"]*)"/.exec(period)?.[1] ?? null,
+            identifiers: tags.map((t) => {
+                const scheme = /schemeIdUri="([^"]*)"/.exec(t)?.[1] ?? '?';
+                const value = /\svalue="([^"]*)"/.exec(t)?.[1] ?? '';
+                return `${scheme}=${value}`;
+            }),
+        });
+    }
+    return out;
+}
+
+/**
+ * Asset ids an MPD marks as ads: any AssetIdentifier value inside an ad
+ * Period, whichever scheme carries it (the ad-asset-id value itself, or the
+ * DASH-IF asset id content Periods use).
+ */
 export function mpdAdAssets(mpd: string | null | undefined): Set<string> {
     const out = new Set<string>();
-    for (const tag of mpd?.match(/<AssetIdentifier\b[^>]*>/g) ?? []) {
-        if (!tag.includes('urn:com:uplynk:ad-asset-id')) continue;
-        const value = /\svalue="([^"]*)"/.exec(tag)?.[1];
-        if (value) out.add(value.toLowerCase());
+    for (const period of mpdAdPeriods(mpd)) {
+        for (const identifier of period.identifiers) {
+            const value = identifier.slice(identifier.indexOf('=') + 1);
+            if (value) out.add(value.toLowerCase());
+        }
     }
     return out;
 }

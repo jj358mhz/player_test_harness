@@ -198,6 +198,17 @@ after dependency changes.
   TS uses legacy `WebKitMediaKeys` (`com.apple.fps.1_0`, `webkitneedkey`,
   init data + content id (skd host) + certificate). Certificate and key
   server hosts allow CORS (verified in Safari 2026-10-19).
+- **SSAI** (docs "Ad Breaks", "Client-Side Beaconing Using Dynamic Manifest
+  Markers", "Ad Verification"): Uplynk stitches ads into each session's
+  manifest. DASH: each ad is a Period identified by `AssetIdentifier
+  schemeIdUri="urn:com:uplynk:ad-asset-id"`; HLS: `#UPLYNK-SEGMENT` kind.
+  Opt-in Dynamic Manifest Markers with signed `ad.timedmeta=1` (+
+  `dmm.schemas.break=break_info`): HLS `#EXT-X-DATERANGE`
+  `CLASS="urn:uplynk:ad-data:break_info"` (DURATION, base64 JSON X-DATA);
+  DASH `EventStream schemeIdUri="urn:uplynk:ad-data:break_info"` inside
+  ad Periods (one Event: duration, id, presentationTime, JSON body).
+  `ad.sssb=1` turns off server-side beacons. Ad data never uses ID3/emsg.
+  Break end: `ad.breakend` (chop/drop), `ad.flex` (seconds an ad may overrun).
 - DRM: Widevine/PlayReady need DASH; FairPlay needs HLS. Studio DRM requires
   token-protected playback. License hosts: `content.uplynk.com/{wv,pr}` (use
   the Preplay `prefix` zone to avoid redirects). EME needs HTTPS.
@@ -266,7 +277,9 @@ in the `player_harness_data` volume.
       adapters behind `PlayerEngine`. **v3.15.0–3.16.0:** DASH encoder latency
       from in-segment `prft` (`lib/mp4.ts`; Uplynk writes none) and from
       ID3 in emsg (Shaka and dash.js); v3.16.1 asset/ray/slice from that
-      ID3. **v3.17.0:** saved engine presets
+      ID3. v3.20.1: SSAI ad Periods (`urn:com:uplynk:ad-asset-id`) mark an
+      asset as an ad if any identifier in the Period names it; the log
+      shows `MPD ADS` / `AD CHECK` lines until a real ad confirms the shape. **v3.17.0:** saved engine presets
       in the DB (load bar **Preset** + **Presets…**). **v3.17.1:** load bar
       = one row of fields + Load, secondary buttons in a toolbar row. Native
       verified in real Safari (2026-10-19: FairPlay, ID3 cues, PDT).

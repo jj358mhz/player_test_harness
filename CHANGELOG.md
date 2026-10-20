@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.20.1] - 2026-10-19
+
+### Fixed
+- **DASH ad detection for Uplynk SSAI.** An asset now counts as an ad when
+  any `AssetIdentifier` in an ad Period (one carrying
+  `urn:com:uplynk:ad-asset-id`) names it, not only that identifier's own
+  value, which may be an ad-server id rather than the asset in the ID3.
+  This is the layout Uplynk documents ("ad Periods identifiable via
+  AssetIdentifier urn:com:uplynk:ad-asset-id"); not yet seen on a real
+  ad break. CLAUDE.md records the SSAI signalling (incl. the opt-in
+  `ad.timedmeta=1` break markers).
+
+### Added
+- Log lines to confirm it on the next ad: **MPD ADS** when the MPD gains
+  ad Periods (their ids and identifiers), and **AD CHECK** when a new
+  asset plays that none of them name.
+
 ## [3.20.0] - 2026-10-19
 
 ### Added

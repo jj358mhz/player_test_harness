@@ -42,6 +42,7 @@ import type {PaneSnapshot} from './lib/compare';
 import {isVersion, parseView, type View, viewQuery} from './lib/deeplink';
 import {
     mpdAdAssets,
+    mpdAdPeriods,
     parsePriv,
     parseTxxx,
     parseUplynkSlice,
@@ -2158,7 +2159,19 @@ export class PlayerApp {
             while (list.length && (list[0] as RequestTiming).end < cutoff) list.shift();
         });
         engine.on('playlist', (info) => {
+            const before = mpdAdPeriods(s().playlist?.text).length;
             s().playlist = info;
+            // SSAI: say when the MPD gains ad Periods (Uplynk stitches one per ad).
+            const periods = info.format === 'dash' ? mpdAdPeriods(info.text) : [];
+            if (periods.length > before) {
+                this.logEntry(
+                    'scte',
+                    'MPD ADS',
+                    `${periods.length} ad period(s): ${periods
+                        .map((p) => `${p.id ?? '?'} [${p.identifiers.join(', ')}]`)
+                        .join('; ')}`,
+                );
+            }
             if (info.text?.includes('com.apple.streamingkeydelivery') && !s().fairplay) {
                 s().fairplay = true;
                 if (!this.playingFairPlay()) this.warnFairPlay();
@@ -2333,11 +2346,20 @@ export class PlayerApp {
             if (session !== this.session) return;
             session.slice = slice;
             if (slice.assetId !== session.asset?.assetId) {
-                const ads = mpdAdAssets(session.playlist?.text);
-                this.onAsset({
-                    assetId: slice.assetId,
-                    kind: ads.has(slice.assetId) ? 'ad' : 'content',
-                });
+                const mpd = session.playlist?.text;
+                const ad = mpdAdAssets(mpd).has(slice.assetId);
+                this.onAsset({assetId: slice.assetId, kind: ad ? 'ad' : 'content'});
+                // SSAI check: the MPD has ad Periods but this asset isn't named in any.
+                const periods = mpdAdPeriods(mpd);
+                if (!ad && periods.length) {
+                    this.logEntry(
+                        'info',
+                        'AD CHECK',
+                        `${slice.assetId} isn't in the MPD's ${periods.length} ad period(s): ${periods
+                            .map((p) => `${p.id ?? '?'} [${p.identifiers.join(', ')}]`)
+                            .join('; ')}`,
+                    );
+                }
             }
         };
         const delayMs = Math.max(0, mediaTime - this.video.currentTime) * 1000;
