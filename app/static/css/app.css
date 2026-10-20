@@ -1167,6 +1167,25 @@ form.inline {
 
 /* --- narrow viewport: hide chip nav, force sections open ------------------ */
 
+/* Site header: wrap the nav under the brand instead of overflowing. */
+@media (max-width: 860px) {
+    .site-header {
+        height: auto;
+    }
+    .site-header__inner {
+        flex-wrap: wrap;
+        gap: 6px 16px;
+        padding: 10px 16px;
+    }
+    .site-header__nav {
+        flex-wrap: wrap;
+        gap: 6px 14px;
+    }
+    .site-header__user {
+        display: none; /* the signed-in email; Sign out stays */
+    }
+}
+
 @media (max-width: 640px) {
     /* Chip nav: horizontal scroll instead of wrap so it fits narrow screens */
     .workspace-nav {
