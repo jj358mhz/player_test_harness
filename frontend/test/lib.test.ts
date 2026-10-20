@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import {bandFor} from '../src/lib/bands';
-import {parseId3, parsePriv, parseTxxx} from '../src/lib/id3';
+import {isId3Tag, parseId3, parsePriv, parseTxxx} from '../src/lib/id3';
 import {Id3Clock, ptsToSeconds} from '../src/lib/latency';
 import {parseUplynkMedia, rayFromUri, raysParam} from '../src/lib/rays';
 import {RunningStats, Series} from '../src/lib/stats';
@@ -320,5 +320,29 @@ describe('channelLabel', async () => {
         expect(channelLabel(base)).toBe('Chan');
         expect(channelLabel({...base, encryption: 'none'})).toBe('Chan');
         expect(channelLabel({...base, encryption: 'drm', favorite: true})).toBe('🔒 ★ Chan');
+    });
+});
+
+describe('ID3 in a DASH emsg (com.uplynk.asset.metadata)', () => {
+    // Shape seen in Uplynk DASH: ID3v2.4 tag, one TXXX, UTF-8, empty description.
+    const value = 'abcdef0123456789abcdef0123456789,0000001a,c';
+    const text = new TextEncoder().encode(value);
+    const frame = new Uint8Array(10 + 2 + text.length);
+    frame.set([0x54, 0x58, 0x58, 0x58], 0);
+    new DataView(frame.buffer).setUint32(4, 2 + text.length);
+    frame.set([3, 0], 10);
+    frame.set(text, 12);
+    const tag = new Uint8Array(10 + frame.length);
+    tag.set([0x49, 0x44, 0x33, 4, 0, 0, 0, 0, 0, frame.length], 0);
+    tag.set(frame, 10);
+
+    it('is recognised and parsed like HLS ID3', () => {
+        expect(isId3Tag(tag)).toBe(true);
+        expect(isId3Tag(new TextEncoder().encode('not id3 at all'))).toBe(false);
+        expect(isId3Tag(undefined)).toBe(false);
+        const frames = parseId3(tag);
+        expect(frames.map((f) => f.id)).toEqual(['TXXX']);
+        const txxx = parseTxxx(frames[0]?.data ?? new Uint8Array());
+        expect(txxx).toEqual({description: '', value, wallclock: null});
     });
 });

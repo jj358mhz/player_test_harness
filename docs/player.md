@@ -79,7 +79,7 @@ All three are measured at the playhead, once a second:
 
 | Measure | What it is |
 |---|---|
-| **Encoder wallclock** | The encoder's time carried in the segments, carried forward to the frame on screen: `now − (wallclock + (currentTime − sample time))`. HLS: the ID3 TXXX frame (needs `wallclock` enabled on the slicer). DASH (Shaka, dash.js): the `prft` box in each video segment, anchored at the segment's start (`tfdt` and the init's timescale correct for a prft stamped later in the segment); the Metadata tab's **prft** row counts them, or says none were found. |
+| **Encoder wallclock** | The encoder's time carried in the segments, carried forward to the frame on screen: `now − (wallclock + (currentTime − sample time))`. HLS: the ID3 TXXX frame (needs `wallclock` enabled on the slicer). DASH (Shaka, dash.js): Uplynk's `com.uplynk.asset.metadata` emsg, which carries the same ID3 (so the same `wallclock: 1` rule applies), or a `prft` box in each video segment if the packager writes one (Uplynk doesn't), anchored at the segment's start (`tfdt` and the init's timescale correct for a prft stamped later in the segment); the Metadata tab's **prft** row counts them, or says none were found. |
 | **Program date-time** | `#EXT-X-PROGRAM-DATE-TIME` at the playhead (`hls.playingDate`) to now. For DASH, the MPD's clock at the playhead, plus the measured offset (below). |
 | **Live-edge drift** | Playhead to the live edge of the playlist (`hls.latency`), with the engine's target shown alongside. |
 

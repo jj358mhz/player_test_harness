@@ -6,7 +6,8 @@ import type * as dashjsNS from 'dashjs';
 import pkg from '../../package.json';
 import type {CmcdConfig} from '../lib/cmcd';
 import {videoProfile} from '../lib/codecs';
-import {PrftReader} from '../lib/mp4';
+import {isId3Tag, parseId3} from '../lib/id3';
+import {PrftReader, payloadPreview} from '../lib/mp4';
 import {drmHint, mpdInfo, rayFromRepresentation, rayFromSegmentUrl} from './shaka';
 import {
     type AudioTrack,
@@ -48,6 +49,9 @@ const WIDEVINE_ROBUSTNESS = {
 const FATAL_CODES = new Set([10, 11, 23, 24, 25, 27, 31, 33, 34, 35]);
 
 /** What dash.js tells us about a request in its customData. */
+/** emsg schemes dash.js should hand us: Uplynk's asset metadata and AOM ID3. */
+const EMSG_SCHEMES = ['com.uplynk.asset.metadata', 'https://aomedia.org/emsg/ID3'];
+
 interface RequestContext {
     type?: string | null; // InitializationSegment | MediaSegment
     mediaType?: string; // video | audio | text
@@ -102,6 +106,12 @@ export class DashJsEngine implements PlayerEngine {
             this.onResponse(response);
             return response;
         });
+        // In-band events arrive only for schemes we subscribe to (and the MPD declares).
+        for (const scheme of EMSG_SCHEMES) {
+            player.on(scheme, (e: unknown) => this.onEmsg(scheme, e), undefined, {
+                mode: 'eventModeOnReceive',
+            });
+        }
         player.on(E.STREAM_INITIALIZED, () => this.onStream());
         on('periodSwitchCompleted', () => this.readRenditions());
         player.on(E.QUALITY_CHANGE_RENDERED, (e) => {
@@ -158,6 +168,23 @@ export class DashJsEngine implements PlayerEngine {
             });
         }
         player.initialize(video, url, true);
+    }
+
+    private onEmsg(scheme: string, e: unknown): void {
+        const event = (e as {event?: {messageData?: unknown; calculatedPresentationTime?: number}})
+            .event;
+        const data = event?.messageData instanceof Uint8Array ? event.messageData : undefined;
+        const time = event?.calculatedPresentationTime;
+        if (isId3Tag(data) && time !== undefined && Number.isFinite(time)) {
+            this.events.emit('id3', {mediaTime: time, frames: parseId3(data)});
+            return;
+        }
+        this.events.emit('emsg', {
+            scheme,
+            value: '',
+            bytes: data?.byteLength ?? 0,
+            preview: payloadPreview(data),
+        });
     }
 
     private onResponse(response: MediaResponse): void {
