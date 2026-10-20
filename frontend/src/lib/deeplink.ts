@@ -22,6 +22,8 @@ export interface View {
     delay?: number;
     /** SSAI ad configuration to sign as `ad=` (synced channels only). */
     ad?: string;
+    /** Per-load `ad.*` params signed with it, as a query (`ad.lib=KOR`). */
+    adParams?: string;
     /** Send CMCD with every request. */
     cmcd?: boolean;
 }
@@ -74,6 +76,8 @@ export function parseView(search: string): View {
     if (delay !== null) view.delay = delay;
     const ad = q.get('ad');
     if (ad && /^[A-Za-z0-9_.-]{1,100}$/.test(ad)) view.ad = ad;
+    const adp = parseAdParams(q.get('adp') ?? '');
+    if (view.ad && 'query' in adp && adp.query) view.adParams = adp.query;
     if (q.get('cmcd') === '1') view.cmcd = true;
     return view;
 }
@@ -95,7 +99,43 @@ export function viewQuery(view: View): string {
     if (view.rays && !view.src) q.set('rays', view.rays);
     if (view.delay !== undefined && !view.src) q.set('delay', String(view.delay));
     if (view.ad && !view.src) q.set('ad', view.ad);
+    if (view.ad && view.adParams && !view.src) q.set('adp', view.adParams);
     if (view.cmcd) q.set('cmcd', '1');
     // Keep @ and : readable; URLSearchParams escapes them.
     return q.toString().replace(/%40/g, '@').replace(/%3A/gi, ':').replace(/%2F/gi, '/');
+}
+
+/** An `ad.*` key, and the characters its value may use (kept URL-plain on purpose). */
+const AD_PARAM_KEY = /^ad\.[A-Za-z0-9_.]{1,40}$/;
+const AD_PARAM_VALUE = /^[A-Za-z0-9_.,:/|\- ]{0,200}$/;
+
+/**
+ * Per-load SSAI params typed in the load bar (`ad.lib=KOR&ad.kv=…`): only
+ * `ad.*` keys, plain values. Returns the normalized query, or what's wrong.
+ */
+export function parseAdParams(
+    text: string,
+): {query: string; pairs: [string, string][]} | {error: string} {
+    const trimmed = text.trim().replace(/^[?&]+/, '');
+    if (!trimmed) return {query: '', pairs: []};
+    const pairs: [string, string][] = [];
+    for (const part of trimmed.split('&')) {
+        if (!part) continue;
+        const at = part.indexOf('=');
+        if (at < 0) return {error: `${part} needs a value (ad.lib=KOR)`};
+        const key = part.slice(0, at).trim();
+        let value: string;
+        try {
+            value = decodeURIComponent(part.slice(at + 1).replace(/\+/g, ' ')).trim();
+        } catch {
+            return {error: `${part} isn't valid`};
+        }
+        if (key === 'ad') return {error: 'choose the ad server in the Ads menu, not as ad='};
+        if (!AD_PARAM_KEY.test(key)) return {error: `only ad.* params here, not ${key}`};
+        if (!AD_PARAM_VALUE.test(value))
+            return {error: `${key} has characters that aren't allowed`};
+        pairs.push([key, value]);
+    }
+    if (pairs.length > 10) return {error: 'at most 10 ad params'};
+    return {query: new URLSearchParams(pairs).toString(), pairs};
 }

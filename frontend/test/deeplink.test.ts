@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {isVersion, parseView, viewQuery} from '../src/lib/deeplink';
+import {isVersion, parseAdParams, parseView, viewQuery} from '../src/lib/deeplink';
 
 describe('deep links', () => {
     it('reads a full view', () => {
@@ -26,6 +26,14 @@ describe('deep links', () => {
             'channel=3&delay=20&ad=fw2&cmcd=1',
         );
         expect(viewQuery({src: 'https://h/x.m3u8', ad: 'fw2'})).not.toContain('ad=');
+    });
+    it('carries per-load ad params with an ad server', () => {
+        const view = parseView('?channel=3&ad=fw2&adp=ad.lib%3DKOR');
+        expect(view.adParams).toBe('ad.lib=KOR');
+        expect(viewQuery(view)).toBe('channel=3&ad=fw2&adp=ad.lib%3DKOR');
+        // Without an ad server, or with anything but ad.* keys, they're dropped.
+        expect(parseView('?channel=3&adp=ad.lib%3DKOR').adParams).toBeUndefined();
+        expect(parseView('?channel=3&ad=fw2&adp=delay%3D5').adParams).toBeUndefined();
     });
     it('accepts long engine names and a missing version', () => {
         expect(parseView('?engine=hls.js')).toEqual({engine: 'hls.js'});
@@ -69,5 +77,30 @@ describe('deep links', () => {
         expect(query).not.toContain('channel=');
         expect(query).not.toContain('rays=');
         expect(parseView(`?${query}`)).toEqual({src, engine: 'hls.js', version: '1.7.3'});
+    });
+});
+
+describe('parseAdParams', () => {
+    it('normalizes ad.* params', () => {
+        expect(parseAdParams('')).toEqual({query: '', pairs: []});
+        expect(parseAdParams(' ?ad.lib=KOR ')).toEqual({
+            query: 'ad.lib=KOR',
+            pairs: [['ad.lib', 'KOR']],
+        });
+        expect(parseAdParams('ad.lib=JPN&ad.kv=a,b')).toEqual({
+            query: 'ad.lib=JPN&ad.kv=a%2Cb',
+            pairs: [
+                ['ad.lib', 'JPN'],
+                ['ad.kv', 'a,b'],
+            ],
+        });
+    });
+    it('says what is wrong', () => {
+        for (const bad of ['ad.lib', 'delay=20', 'ad=fw2', 'ad.lib=<x>', 'ad.lib=%E0%A4%A']) {
+            expect(parseAdParams(bad)).toHaveProperty('error');
+        }
+        expect(parseAdParams('ad=fw2')).toEqual({
+            error: 'choose the ad server in the Ads menu, not as ad=',
+        });
     });
 });

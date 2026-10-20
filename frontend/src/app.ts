@@ -39,7 +39,7 @@ import {
 } from './lib/clock';
 import {type CmcdConfig, cmcdFromUrl, contentIdFor, describeCmcd, newSessionId} from './lib/cmcd';
 import type {PaneSnapshot} from './lib/compare';
-import {isVersion, parseView, type View, viewQuery} from './lib/deeplink';
+import {isVersion, parseAdParams, parseView, type View, viewQuery} from './lib/deeplink';
 import {
     mpdAdAssets,
     mpdAdPeriods,
@@ -530,7 +530,18 @@ export class PlayerApp {
                         title: "SSAI: the ad configuration signed as ad=<name>, from the account's Ad servers list. None plays without ads. Synced channels only",
                         onchange: () => {
                             this.pendingAd = null;
+                            this.syncAdParams();
                         },
+                    }),
+                ),
+                this.ref(
+                    'adParams',
+                    h('input', {
+                        class: 'pl-control mono',
+                        placeholder: 'ad.lib=KOR',
+                        hidden: true,
+                        'aria-label': 'Ad params for this load',
+                        title: "This load's ad.* params, e.g. ad.lib=KOR or ad.lib=JPN&ad.kv=…; signed on top of the ad server's own params",
                     }),
                 ),
             ),
@@ -674,6 +685,7 @@ export class PlayerApp {
             drm: this.autoDrm ? undefined : (this.drm() ?? undefined),
             delay: this.delay() ?? undefined,
             ad: this.el<HTMLSelectElement>('ad').value || undefined,
+            adParams: this.adParamsQuery() || undefined,
             cmcd: this.el<HTMLInputElement>('cmcd').checked || undefined,
         });
     }
@@ -735,6 +747,7 @@ export class PlayerApp {
             const view = parseView(preset.query);
             this.el<HTMLSelectElement>('delay').value = '';
             this.el<HTMLSelectElement>('ad').value = '';
+            this.el<HTMLInputElement>('adParams').value = '';
             this.pendingAd = null;
             this.el<HTMLInputElement>('cmcd').checked = false;
             if (!view.drm) {
@@ -1388,6 +1401,19 @@ export class PlayerApp {
             select.value = want;
             this.pendingAd = null;
         }
+        this.syncAdParams();
+    }
+
+    /** The ad params box shows only while an ad server is chosen. */
+    private syncAdParams(): void {
+        this.el<HTMLInputElement>('adParams').hidden = !this.el<HTMLSelectElement>('ad').value;
+    }
+
+    /** The typed ad params, normalized; '' when none or no ad server is chosen. */
+    private adParamsQuery(): string {
+        if (!this.el<HTMLSelectElement>('ad').value) return '';
+        const parsed = parseAdParams(this.el<HTMLInputElement>('adParams').value);
+        return 'query' in parsed ? parsed.query : '';
     }
 
     private adServer(): AdServerOption | null {
@@ -1617,6 +1643,7 @@ export class PlayerApp {
         if (view.delay !== undefined) this.setDelay(view.delay);
         if (view.ad) {
             this.pendingAd = view.ad;
+            this.el<HTMLInputElement>('adParams').value = view.adParams ?? '';
             this.renderAdOptions();
         }
         if (view.cmcd) this.el<HTMLInputElement>('cmcd').checked = true;
@@ -1672,11 +1699,17 @@ export class PlayerApp {
         const manifest = this.format();
         const delay = this.delay();
         const ad = this.adServer();
+        const typed = ad ? parseAdParams(this.el<HTMLInputElement>('adParams').value) : null;
+        if (typed && 'error' in typed) {
+            this.notice('error', `Ad params: ${typed.error}.`);
+            return;
+        }
         this.updateQuery({
             channel: channel.id,
             rays: params.rays,
             delay: delay ?? undefined,
             ad: ad?.name,
+            adParams: typed?.query || undefined,
         });
         // Encoder-time program dates make HLS latency real; DASH ignores pdts
         // (the server measures its clock offset instead).
@@ -1685,7 +1718,14 @@ export class PlayerApp {
             ...(manifest === 'm3u8' ? {pdts: 'latency'} : {}),
             ...(delay !== null ? {delay: String(delay)} : {}),
             // SSAI: the ad configuration, then its own ad.* params.
-            ...(ad ? {ad: ad.name, ...Object.fromEntries(new URLSearchParams(ad.params))} : {}),
+            // The account's ad.* defaults, then this load's (which win on a clash).
+            ...(ad
+                ? {
+                      ad: ad.name,
+                      ...Object.fromEntries(new URLSearchParams(ad.params)),
+                      ...Object.fromEntries(typed && 'pairs' in typed ? typed.pairs : []),
+                  }
+                : {}),
         };
         let response: PlaybackResponse;
         try {
@@ -1787,6 +1827,7 @@ export class PlayerApp {
         rays?: string;
         delay?: number;
         ad?: string;
+        adParams?: string;
     }): void {
         const {engine, version} = this.chosenEngine();
         const query = viewQuery({

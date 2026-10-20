@@ -15,8 +15,12 @@ Uplynk stream is doing while it plays.
   so an admin adds each account's names (and any default `ad.*` params) under
   **Uplynk Accounts → Edit → Ad servers**. **Ads** in the load bar then offers
   the selected channel's account's names and signs `ad=<name>` with its
-  params. Deep links and presets carry it (`ad=fw2`); a preset's ad server
-  applies only on channels whose account has that name.
+  params. With one chosen, a box under it takes this load's own `ad.*`
+  params (e.g. `ad.lib=KOR`, or `ad.lib=JPN&ad.kv=…`): only `ad.*` keys and
+  plain values, signed on top of the account's defaults (yours win on a
+  clash). Deep links and presets carry both (`ad=fw2&adp=ad.lib%3DKOR`), so
+  each variant can be a saved preset; a preset's ad server applies only on
+  channels whose account has that name.
 - **Presets:** a named setup of format, engine and version, DRM, delay and
   CMCD, saved on the server for everyone using the harness. Picking one in
   **Preset** sets the load bar (anything it doesn't name goes back to the
