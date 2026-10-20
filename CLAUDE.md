@@ -198,6 +198,17 @@ after dependency changes.
   TS uses legacy `WebKitMediaKeys` (`com.apple.fps.1_0`, `webkitneedkey`,
   init data + content id (skd host) + certificate). Certificate and key
   server hosts allow CORS (verified in Safari 2026-10-19).
+- **SSAI** (docs "Ad Breaks", "Client-Side Beaconing Using Dynamic Manifest
+  Markers", "Ad Verification"): Uplynk stitches ads into each session's
+  manifest. DASH: each ad is a Period identified by `AssetIdentifier
+  schemeIdUri="urn:com:uplynk:ad-asset-id"`; HLS: `#UPLYNK-SEGMENT` kind.
+  Opt-in Dynamic Manifest Markers with signed `ad.timedmeta=1` (+
+  `dmm.schemas.break=break_info`): HLS `#EXT-X-DATERANGE`
+  `CLASS="urn:uplynk:ad-data:break_info"` (DURATION, base64 JSON X-DATA);
+  DASH `EventStream schemeIdUri="urn:uplynk:ad-data:break_info"` inside
+  ad Periods (one Event: duration, id, presentationTime, JSON body).
+  `ad.sssb=1` turns off server-side beacons. Ad data never uses ID3/emsg.
+  Break end: `ad.breakend` (chop/drop), `ad.flex` (seconds an ad may overrun).
 - DRM: Widevine/PlayReady need DASH; FairPlay needs HLS. Studio DRM requires
   token-protected playback. License hosts: `content.uplynk.com/{wv,pr}` (use
   the Preplay `prefix` zone to avoid redirects). EME needs HTTPS.
