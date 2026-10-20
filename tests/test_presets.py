@@ -208,3 +208,10 @@ def test_player_opens_with_a_preset(auth_client, monkeypatch):
     page = auth_client.get("/player?preset=7").get_data(as_text=True)
     assert '"initialPreset": 7' in page
     assert '"presetsPage": "/presets"' in page
+
+
+def test_page_heading_says_what_it_counts(auth_client):
+    auth_client.post("/presets", data=_form())
+    assert '<span class="page-header__meta">1 saved</span>' in auth_client.get("/presets").get_data(
+        as_text=True
+    )
