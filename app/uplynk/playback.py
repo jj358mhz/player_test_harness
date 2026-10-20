@@ -190,6 +190,8 @@ class ProbeResult:
     # The manifest served (never sent to the browser: it carries session tokens).
     body: str | None = field(default=None, repr=False)
     fetched_at: float | None = None
+    # HLS: the first media playlist behind the master (same caveat as body).
+    media: str | None = field(default=None, repr=False)
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -224,10 +226,12 @@ def probe_manifest(
     fetched_at = time.time()
     body = response.text or ""
     if response.status_code == 200 and body.lstrip().startswith(_MANIFEST_MARKERS):
-        encryption = None
+        encryption = media = None
         if body.lstrip().startswith("#EXTM3U"):
-            encryption = _hls_encryption(body, url, timeout, http)
-        return ProbeResult(True, 200, None, elapsed, encryption, body, fetched_at)
+            # Keys only appear in media playlists, so follow the first variant.
+            media = _media_playlist(body, url, timeout, http)
+            encryption = None if media is None else classify_hls_encryption(media)
+        return ProbeResult(True, 200, None, elapsed, encryption, body, fetched_at, media)
     detail = _strip_html(body) or "response is not a manifest"
     return ProbeResult(
         False, response.status_code, f"HTTP {response.status_code}: {detail}", elapsed
@@ -262,12 +266,6 @@ def first_variant_url(master: str, base_url: str) -> str | None:
                 if uri and not uri.startswith("#"):
                     return urljoin(base_url, uri)
     return None
-
-
-def _hls_encryption(body: str, url: str, timeout: int, http: Any) -> str | None:
-    """Keys only appear in media playlists, so follow the first variant."""
-    media = _media_playlist(body, url, timeout, http)
-    return None if media is None else classify_hls_encryption(media)
 
 
 def fetch_media_playlist(

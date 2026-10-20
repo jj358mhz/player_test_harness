@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.18.0] - 2026-10-19
+
+### Added
+- **Channel health on the dashboard.** The server fetches each active
+  channel's HLS signed with `pdts=latency` (master and first media
+  playlist) and measures how old the newest segment is on the encoder's
+  clock. Each card gets a badge: green with the age at the live edge
+  (about 30 s with the default delay), amber when more than 90 s behind,
+  red when stale (over 5 minutes, or the playlist has ended) or when
+  Uplynk answers with an error (its text on hover), grey when the playlist
+  has no program dates. The header says how many need attention (a link
+  that filters to them; `attention`, `stale`, `error` also work in the
+  filter box) or "all at the live edge".
+- Runs every `CHANNEL_HEALTH_INTERVAL` minutes (default 10, 0 = off) in
+  the auto-sync thread, **Check health** on the dashboard runs it now, and
+  `flask check-health [--account …]` from the CLI. Each check also records
+  the channel's encryption (the 🔒 DRM badge). New columns on `channels`
+  (migration).
+
+### Changed
+- Issue #24 (Phase 4) closed; LL-HLS moved to #48 (on hold).
+
 ## [3.17.1] - 2026-10-19
 
 ### Changed

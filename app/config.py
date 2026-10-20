@@ -43,6 +43,8 @@ class Config:
         self.MAX_RECORDING_BYTES = int(os.getenv("MAX_RECORDING_BYTES", str(8 * 1024 * 1024)))
         # Background channel sync, minutes (0 = off; UI, CLI or cron only).
         self.CHANNEL_SYNC_INTERVAL = int(os.getenv("CHANNEL_SYNC_INTERVAL", "60"))
+        # Background health check of every active channel, minutes (0 = off).
+        self.CHANNEL_HEALTH_INTERVAL = int(os.getenv("CHANNEL_HEALTH_INTERVAL", "10"))
         # csl-slicer-console, for links from a channel to its slicer (empty = no links).
         self.CSL_BASE_URL = os.getenv("CSL_BASE_URL", "").strip().rstrip("/")
         # Its settings API (slicer wallclock), server to server: the URL this

@@ -69,6 +69,7 @@ def test_failed_account_waits_before_retrying(app, make_account, monkeypatch):
 
 def test_interval_zero_turns_it_off(app, make_account, monkeypatch):
     app.config["CHANNEL_SYNC_INTERVAL"] = 0
+    app.config["CHANNEL_HEALTH_INTERVAL"] = 0
     make_account()
     monkeypatch.setattr(autosync, "sync_account", lambda a: (_ for _ in ()).throw(AssertionError))
     assert autosync.run_due(app, now=NOW) == []

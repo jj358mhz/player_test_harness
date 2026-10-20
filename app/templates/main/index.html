@@ -14,6 +14,17 @@
         <button type="button" class="btn-ghost" id="collapse-all-btn">Collapse all</button>
         <button type="button" class="btn-ghost" id="expand-all-btn">Expand all</button>
         {% endif %}
+        {% if total %}
+        <span class="health-summary" title="Live-edge check{% if health_interval %} every {{ health_interval }} min{% else %} (background check off){% endif %}{% if health_checked_at %}; last {{ health_checked_at.strftime('%H:%M') }} UTC{% endif %}">
+            {%- if attention %}<a href="{{ url_for('main.index', q='attention') }}">⚠ {{ attention }} need{{ 's' if attention == 1 }} attention</a>
+            {%- elif health_checked_at %}✓ all at the live edge
+            {%- else %}not checked yet{% endif -%}
+        </span>
+        <form method="post" action="{{ url_for('main.check_channel_health') }}" class="inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn-ghost" title="Fetch every channel's HLS now and measure how old its live edge is">Check health</button>
+        </form>
+        {% endif %}
         {% if current_user.is_admin and account_count %}
         <form method="post" action="{{ url_for('admin.sync_all') }}" class="inline">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -68,7 +79,7 @@
         <article class="channel-card{% if ch.is_favorite %} channel-card--favorite{% endif %}"
                  id="channel-{{ ch.id }}"
                  data-channel
-                 data-search="{{ [ch.description, ch.channel_id, ch.external_id, ch.slicer_id, 'drm' if ch.is_drm else None]|select|join(' ')|lower }}">
+                 data-search="{{ [ch.description, ch.channel_id, ch.external_id, ch.slicer_id, 'drm' if ch.is_drm else None, ch.health_status, 'attention' if ch.needs_attention else None]|select|join(' ')|lower }}">
             <div class="channel-card__header">
                 <label class="channel-card__select">
                     <input type="checkbox" class="channel-checkbox" value="{{ ch.id }}"
@@ -82,6 +93,17 @@
                     <span class="badge badge--drm" data-drm-badge
                           title="Studio DRM: FairPlay over HLS (Safari only); Chrome plays DASH with Widevine"
                           {% if not ch.is_drm %}hidden{% endif %}>🔒 DRM</span>
+                    {% if ch.health_status %}
+                    {% set age = ch.health_edge_s|age if ch.health_edge_s is not none else None %}
+                    <span class="badge badge--health badge--health--{{ ch.health_status }}"
+                          title="{{ {'ok': 'Live edge', 'behind': 'Behind live', 'stale': 'Stale', 'error': 'Error', 'unknown': 'Unknown'}[ch.health_status] }}{% if age %}: newest segment {{ age }} old (encoder clock){% endif %}{% if ch.health_detail %} · {{ ch.health_detail }}{% endif %} · checked {{ ch.health_checked_at.strftime('%H:%M') }} UTC">
+                        {%- if ch.health_status == 'ok' %}● {{ age }}
+                        {%- elif ch.health_status == 'behind' %}● {{ age }} behind
+                        {%- elif ch.health_status == 'stale' %}● stale{% if age %} {{ age }}{% endif %}
+                        {%- elif ch.health_status == 'error' %}✕ error
+                        {%- else %}● no dates{% endif -%}
+                    </span>
+                    {% endif %}
                 </div>
                 <form method="post" action="{{ url_for('main.toggle_favorite', channel_id=ch.id) }}">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

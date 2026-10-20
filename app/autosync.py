@@ -1,4 +1,5 @@
-"""Background channel sync every CHANNEL_SYNC_INTERVAL minutes.
+"""Background channel sync every CHANNEL_SYNC_INTERVAL minutes, and a
+health check of every active channel every CHANNEL_HEALTH_INTERVAL.
 
 Started per gunicorn worker by `post_worker_init` (gunicorn.conf.py), so the
 `flask` CLI and the tests never start it. Only the worker holding an
@@ -24,7 +25,7 @@ from typing import IO
 
 from flask import Flask
 
-from app.models import AdminEvent, UplynkAccount, db
+from app.models import AdminEvent, Channel, UplynkAccount, db
 from app.uplynk.sync import SyncResult, sync_account
 
 log = logging.getLogger(__name__)
@@ -42,6 +43,33 @@ _lock_file: IO[str] | None = None
 def interval(app: Flask) -> timedelta | None:
     minutes = app.config["CHANNEL_SYNC_INTERVAL"]
     return timedelta(minutes=minutes) if minutes > 0 else None
+
+
+def health_interval(app: Flask) -> timedelta | None:
+    minutes = app.config["CHANNEL_HEALTH_INTERVAL"]
+    return timedelta(minutes=minutes) if minutes > 0 else None
+
+
+def run_health(app: Flask, last: datetime | None, now: datetime | None = None) -> datetime | None:
+    """Check every active channel's health if the interval has passed.
+
+    Returns when the last check ran (the new time if one ran now).
+    """
+    every = health_interval(app)
+    now = now or datetime.now(UTC)
+    if every is None or (last is not None and now - last < every):
+        return last
+    from app.api.service import check_health
+
+    with app.app_context():
+        channels = db.session.query(Channel).filter_by(is_active=True).all()
+        if channels:
+            results = check_health(channels)
+            bad = sum(1 for _, h in results if h.needs_attention)
+            if bad:
+                log.info("health: %d of %d channels need attention", bad, len(results))
+        db.session.remove()
+    return now
 
 
 def due_accounts(
@@ -109,6 +137,7 @@ def try_lock(path: str = LOCK_PATH) -> IO[str] | None:
 def _loop(app: Flask, stop: threading.Event) -> None:
     global _lock_file
     failed: dict[int, datetime] = {}
+    health_last: datetime | None = None
     while not stop.is_set():
         if _lock_file is None:
             _lock_file = try_lock()
@@ -119,13 +148,18 @@ def _loop(app: Flask, stop: threading.Event) -> None:
                 run_due(app, failed=failed)
             except Exception:  # keep the thread alive whatever one pass does
                 log.exception("auto-sync pass failed")
+            try:
+                health_last = run_health(app, health_last)
+            except Exception:
+                health_last = datetime.now(UTC)  # don't retry every minute
+                log.exception("health check failed")
         stop.wait(TICK_SECONDS)
 
 
 def start(app: Flask) -> threading.Thread | None:
     """Start the background thread once per process, if an interval is set."""
     global _started
-    if _started or interval(app) is None:
+    if _started or (interval(app) is None and health_interval(app) is None):
         return None
     _started = True
     thread = threading.Thread(

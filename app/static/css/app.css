@@ -551,6 +551,34 @@ form.inline {
     border-color: rgba(34, 197, 94, 0.3);
 }
 
+/* Channel health (dashboard): live-edge age from the last check. */
+.badge--health {
+    font-variant-numeric: tabular-nums;
+}
+.badge--health--ok {
+    background: rgba(34, 197, 94, 0.12);
+    color: #86efac;
+    border-color: rgba(34, 197, 94, 0.3);
+}
+.badge--health--behind {
+    background: rgba(245, 158, 11, 0.14);
+    color: #fcd34d;
+    border-color: rgba(245, 158, 11, 0.4);
+}
+.badge--health--stale,
+.badge--health--error {
+    background: rgba(224, 82, 82, 0.16);
+    color: #fca5a5;
+    border-color: rgba(224, 82, 82, 0.45);
+}
+.health-summary {
+    font-size: 13px;
+    color: var(--text-dim);
+}
+.health-summary a {
+    color: #fca5a5;
+}
+
 /* Slicer state pills (dashboard). Solid fills to read at a glance. */
 .badge--state {
     background: rgba(255, 255, 255, .06);
