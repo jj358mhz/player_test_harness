@@ -494,6 +494,23 @@ form.inline {
     overflow: hidden;
 }
 
+.data-table.ad-servers {
+    table-layout: fixed;
+    margin-bottom: 1.25rem;
+}
+.data-table.ad-servers td {
+    padding: 0.6rem 0.75rem;
+    overflow-wrap: break-word;
+}
+.data-table.ad-servers th:first-child {
+    width: 34%;
+}
+.data-table.ad-servers th:last-child,
+.data-table.ad-servers td:last-child {
+    width: 5.5rem;
+    text-align: right;
+}
+
 .data-table th,
 .data-table td {
     padding: 0.75rem 1rem;

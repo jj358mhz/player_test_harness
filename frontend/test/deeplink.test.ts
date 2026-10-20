@@ -18,6 +18,15 @@ describe('deep links', () => {
         expect(viewQuery({channel: 3, delay: 20})).toBe('channel=3&delay=20');
         expect(viewQuery({src: 'https://h/x.m3u8', delay: 20})).not.toContain('delay');
     });
+    it('reads and writes the SSAI ad server for channels only', () => {
+        expect(parseView('?channel=3&ad=fw2').ad).toBe('fw2');
+        expect(parseView('?channel=3&ad=../x').ad).toBeUndefined();
+        expect(parseView('?channel=3&ad=a%20b').ad).toBeUndefined();
+        expect(viewQuery({channel: 3, delay: 20, ad: 'fw2', cmcd: true})).toBe(
+            'channel=3&delay=20&ad=fw2&cmcd=1',
+        );
+        expect(viewQuery({src: 'https://h/x.m3u8', ad: 'fw2'})).not.toContain('ad=');
+    });
     it('accepts long engine names and a missing version', () => {
         expect(parseView('?engine=hls.js')).toEqual({engine: 'hls.js'});
         expect(parseView('?engine=dash.js@5.2.1')).toEqual({engine: 'dashjs', version: '5.2.1'});

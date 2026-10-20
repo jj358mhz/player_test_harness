@@ -10,6 +10,16 @@ export interface ChannelOption {
     encryption?: string | null;
     /** Uplynk slicer feeding the channel (links to csl-slicer-console). */
     slicerId?: string | null;
+    /** The channel's Uplynk account (keys `adServers`). */
+    accountId?: number;
+}
+
+/** An SSAI ad configuration name entered on the account page (`ad=<name>`). */
+export interface AdServerOption {
+    name: string;
+    description: string | null;
+    /** Extra `ad.*` params signed with it, as a query string. */
+    params: string;
 }
 
 /** A saved load-bar setup (deep-link query without a source). */
@@ -25,6 +35,8 @@ export interface PlayerConfig {
     initialSrc: string | null;
     /** Saved engine presets, by name. */
     presets?: Preset[];
+    /** Ad servers per account id. */
+    adServers?: Record<string, AdServerOption[]>;
     endpoints: {
         playback: string;
         sessions: string;

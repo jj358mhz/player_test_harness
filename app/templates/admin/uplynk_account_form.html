@@ -49,4 +49,56 @@
     </form>
     {% endif %}
 </div>
+
+{% if mode == 'edit' %}
+<div class="card card--narrow" id="ad-servers">
+    <h2>Ad servers</h2>
+    <p class="muted">The ad configuration names this workspace uses for server-side ad insertion
+        (the <code>ad=</code> playback param, e.g. <code>fw2</code>). Uplynk has no API that lists them,
+        so add them here; the player's <strong>Ads</strong> menu offers them for this account's channels.
+        A name that doesn't exist in the workspace stops playback.</p>
+    {% if account.ad_servers %}
+    <table class="data-table ad-servers">
+        <thead><tr><th>Name</th><th>Extra params</th><th></th></tr></thead>
+        <tbody>
+        {% for s in account.ad_servers %}
+        <tr>
+            <td><span class="mono">{{ s.name }}</span>{% if s.description %}<br><span class="muted">{{ s.description }}</span>{% endif %}</td>
+            {# Break long param lists after each &, not mid-word. #}
+            <td class="mono">{% for part in (s.params or '—').split('&') %}{{ part }}{% if not loop.last %}&amp;<wbr>{% endif %}{% endfor %}</td>
+            <td>
+                <form method="post" action="{{ url_for('admin.delete_ad_server', account_id=account.id, server_id=s.id) }}"
+                      onsubmit="return confirm('Remove ad server {{ s.name }}?');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="link-button link-button--danger">Remove</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="muted">None yet.</p>
+    {% endif %}
+    <form method="post" action="{{ url_for('admin.add_ad_server', account_id=account.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="field">
+            <label for="ad-name">Name (the <code>ad=</code> value)</label>
+            <input id="ad-name" class="input mono" name="name" required maxlength="100"
+                   pattern="[A-Za-z0-9_.\-]{1,100}" placeholder="fw2">
+        </div>
+        <div class="field">
+            <label for="ad-description">Description (optional)</label>
+            <input id="ad-description" class="input" name="description" maxlength="200" placeholder="FreeWheel, live">
+        </div>
+        <div class="field">
+            <label for="ad-params">Extra ad.* params (optional)</label>
+            <input id="ad-params" class="input mono" name="params" maxlength="500"
+                   placeholder="ad.breakend=chop&amp;ad.flex=10">
+            <p class="field__help">Signed with the URL whenever this ad server is chosen.</p>
+        </div>
+        <div><button type="submit" class="button button--primary">Add ad server</button></div>
+    </form>
+</div>
+{% endif %}
 {% endblock %}

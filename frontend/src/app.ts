@@ -14,7 +14,7 @@ import {
     savePreset,
     saveRecording,
 } from './api';
-import type {ChannelOption, PlayerConfig, Preset} from './config';
+import type {AdServerOption, ChannelOption, PlayerConfig, Preset} from './config';
 import {DashJsEngine, DEFAULT_DASHJS_VERSION, loadDashJs} from './engines/dashjs';
 import {DEFAULT_HLS_VERSION, HlsJsEngine, loadHlsJs} from './engines/hlsjs';
 import {NATIVE_VERSION, NativeEngine, nativeHlsSupported} from './engines/native';
@@ -211,6 +211,8 @@ export class PlayerApp {
     private source: Source | null = null;
     /** Saved engine presets, by name (shared through the server). */
     private presets: Preset[] = [];
+    /** An ad server a link or preset asked for, kept until the channel's list has it. */
+    private pendingAd: string | null = null;
     /** DRM → Widevine was chosen for a DRM channel, not by the user. */
     private autoDrm = false;
     private versions: Record<NpmEngine, EngineVersion[]> = {
@@ -518,6 +520,22 @@ export class PlayerApp {
             ),
             h(
                 'div',
+                {class: 'pl-field'},
+                h('label', {for: 'pl-ad'}, 'Ads'),
+                this.ref(
+                    'ad',
+                    h('select', {
+                        id: 'pl-ad',
+                        class: 'pl-control',
+                        title: "SSAI: the ad configuration signed as ad=<name>, from the account's Ad servers list. None plays without ads. Synced channels only",
+                        onchange: () => {
+                            this.pendingAd = null;
+                        },
+                    }),
+                ),
+            ),
+            h(
+                'div',
                 {class: 'pl-field pl-field--check'},
                 h('label', {for: 'pl-cmcd'}, 'CMCD'),
                 this.ref(
@@ -655,6 +673,7 @@ export class PlayerApp {
                 engine === 'native' || version === DEFAULT_VERSIONS[engine] ? undefined : version,
             drm: this.autoDrm ? undefined : (this.drm() ?? undefined),
             delay: this.delay() ?? undefined,
+            ad: this.el<HTMLSelectElement>('ad').value || undefined,
             cmcd: this.el<HTMLInputElement>('cmcd').checked || undefined,
         });
     }
@@ -715,6 +734,8 @@ export class PlayerApp {
         if (preset) {
             const view = parseView(preset.query);
             this.el<HTMLSelectElement>('delay').value = '';
+            this.el<HTMLSelectElement>('ad').value = '';
+            this.pendingAd = null;
             this.el<HTMLInputElement>('cmcd').checked = false;
             if (!view.drm) {
                 this.el<HTMLSelectElement>('drm').value = '';
@@ -1337,6 +1358,41 @@ export class PlayerApp {
         // delay= is signed in; a pasted URL's signature is fixed.
         this.el<HTMLSelectElement>('delay').disabled = paste;
         this.applyChannelDrm(paste ? null : this.selectedChannel());
+        this.renderAdOptions();
+    }
+
+    /** The selected channel's account's ad servers. */
+    private adServers(): AdServerOption[] {
+        const channel = this.selectedChannel();
+        if (!channel?.accountId) return [];
+        return this.config.adServers?.[String(channel.accountId)] ?? [];
+    }
+
+    /** Fill the Ads menu for the selected channel, keeping the choice where it still exists. */
+    private renderAdOptions(): void {
+        const select = this.el<HTMLSelectElement>('ad');
+        const want = this.pendingAd ?? select.value;
+        const servers = this.adServers();
+        select.replaceChildren(
+            h('option', {value: ''}, servers.length ? 'None' : 'None set up'),
+            ...servers.map((s) =>
+                h(
+                    'option',
+                    {value: s.name, title: [s.description, s.params].filter(Boolean).join(' · ')},
+                    s.description ? `${s.name} · ${s.description}` : s.name,
+                ),
+            ),
+        );
+        select.disabled = !servers.length;
+        if (want && servers.some((s) => s.name === want)) {
+            select.value = want;
+            this.pendingAd = null;
+        }
+    }
+
+    private adServer(): AdServerOption | null {
+        const name = this.el<HTMLSelectElement>('ad').value;
+        return name ? (this.adServers().find((s) => s.name === name) ?? null) : null;
     }
 
     private selectedChannel(): ChannelOption | null {
@@ -1521,6 +1577,7 @@ export class PlayerApp {
         } else if (initialChannel && channels.some((c) => c.id === initialChannel)) {
             source.value = String(initialChannel);
             this.applyChannelDrm(this.selectedChannel());
+            this.renderAdOptions(); // before the load signs: a link's ad= needs the list
             void this.loadFromForm(view.rays ? {rays: view.rays} : {});
         } else if (!channels.length) {
             source.value = PASTE;
@@ -1530,6 +1587,7 @@ export class PlayerApp {
                 'No synced channels yet. Paste a URL, or add an Uplynk account and sync it.',
             );
         }
+        this.renderAdOptions();
     }
 
     /** Set the load bar from a deep link: engine, then format, then DRM (each may adjust the others). */
@@ -1557,6 +1615,10 @@ export class PlayerApp {
             this.autoDrm = false;
         }
         if (view.delay !== undefined) this.setDelay(view.delay);
+        if (view.ad) {
+            this.pendingAd = view.ad;
+            this.renderAdOptions();
+        }
         if (view.cmcd) this.el<HTMLInputElement>('cmcd').checked = true;
     }
 
@@ -1609,13 +1671,21 @@ export class PlayerApp {
         const drm = this.drm();
         const manifest = this.format();
         const delay = this.delay();
-        this.updateQuery({channel: channel.id, rays: params.rays, delay: delay ?? undefined});
+        const ad = this.adServer();
+        this.updateQuery({
+            channel: channel.id,
+            rays: params.rays,
+            delay: delay ?? undefined,
+            ad: ad?.name,
+        });
         // Encoder-time program dates make HLS latency real; DASH ignores pdts
         // (the server measures its clock offset instead).
         const signed: Record<string, string> = {
             ...params,
             ...(manifest === 'm3u8' ? {pdts: 'latency'} : {}),
             ...(delay !== null ? {delay: String(delay)} : {}),
+            // SSAI: the ad configuration, then its own ad.* params.
+            ...(ad ? {ad: ad.name, ...Object.fromEntries(new URLSearchParams(ad.params))} : {}),
         };
         let response: PlaybackResponse;
         try {
@@ -1716,6 +1786,7 @@ export class PlayerApp {
         channel?: number;
         rays?: string;
         delay?: number;
+        ad?: string;
     }): void {
         const {engine, version} = this.chosenEngine();
         const query = viewQuery({

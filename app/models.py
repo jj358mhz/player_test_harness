@@ -89,6 +89,11 @@ class UplynkAccount(Base):
         DateTime(timezone=True), default=utcnow, nullable=False
     )
 
+    ad_servers: Mapped[list[AdServer]] = relationship(
+        back_populates="uplynk_account",
+        cascade="all, delete-orphan",
+        order_by="AdServer.name",
+    )
     channels: Mapped[list[Channel]] = relationship(
         back_populates="uplynk_account", cascade="all, delete-orphan"
     )
@@ -331,3 +336,32 @@ class ChannelHealthCheck(Base):
     detail: Mapped[str | None] = mapped_column(String(300), nullable=True)
 
     __table_args__ = (Index("ix_health_channel_time", "channel_id", "checked_at"),)
+
+
+class AdServer(Base):
+    """An ad configuration name for an account's SSAI playback (`ad=<name>`).
+
+    Uplynk has no API that lists them, so they're entered by hand.
+    `params` are extra `ad.*` query params signed along with it
+    (normalized by `app.ads`).
+    """
+
+    __tablename__ = "ad_servers"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    uplynk_account_id: Mapped[int] = mapped_column(
+        ForeignKey("uplynk_accounts.id", ondelete="CASCADE"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    description: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    params: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+
+    uplynk_account: Mapped[UplynkAccount] = relationship(back_populates="ad_servers")
+
+    __table_args__ = (UniqueConstraint("uplynk_account_id", "name", name="uq_account_ad_server"),)
+
+    def as_dict(self) -> dict[str, object]:
+        return {"name": self.name, "description": self.description, "params": self.params or ""}

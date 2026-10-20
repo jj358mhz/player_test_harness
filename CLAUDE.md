@@ -198,6 +198,12 @@ after dependency changes.
   TS uses legacy `WebKitMediaKeys` (`com.apple.fps.1_0`, `webkitneedkey`,
   init data + content id (skd host) + certificate). Certificate and key
   server hosts allow CORS (verified in Safari 2026-10-19).
+- **SSAI needs `ad=<ad configuration name>`** on the playback URL (docs
+  "Customize Playback via Parameters"): without it no ads, an unknown name
+  stops playback. No API lists the configurations (`/api2/ad/external/get`
+  is about transcoded creatives), so `AdServer` rows are entered per account
+  (`app/ads.py`, account edit page) and the player's **Ads** menu signs
+  `ad=` plus the row's `ad.*` params (v3.21.0).
 - **SSAI** (docs "Ad Breaks", "Client-Side Beaconing Using Dynamic Manifest
   Markers", "Ad Verification"): Uplynk stitches ads into each session's
   manifest. DASH: each ad is a Period identified by `AssetIdentifier
