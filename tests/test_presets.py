@@ -23,6 +23,10 @@ from app.presets import PresetError, normalize_query
         ),
         ("?engine=dashjs&cmcd=0", "engine=dashjs"),
         ("cmcd=1&ad=fw2&engine=shaka&delay=20", "engine=shaka&delay=20&ad=fw2&cmcd=1"),
+        (
+            "engine=shaka&ad=fw2&adp=ad.lib%3DKOR%26ad.kv%3Da%2Cb",
+            "engine=shaka&ad=fw2&adp=ad.lib%3DKOR%26ad.kv%3Da%252Cb",
+        ),
     ],
 )
 def test_normalize(query, expected):
@@ -43,6 +47,9 @@ def test_normalize(query, expected):
         "engine=hlsjs&format=smooth",
         "engine=hlsjs&debug=1",
         "engine=hlsjs&ad=../../x",
+        "engine=hlsjs&adp=ad.lib%3DKOR",  # params without an ad server
+        "engine=hlsjs&ad=fw2&adp=delay%3D20",
+        "engine=hlsjs&ad=fw2&adp=ad.lib%3D%3Cx%3E",
         "engine=hlsjs&" + "x" * 300,
     ],
 )

@@ -18,8 +18,21 @@ NAME_MAX = 60
 ENGINES = {"hlsjs", "shaka", "dashjs", "native"}
 VERSION_RE = re.compile(r"^\d+\.\d+\.\d+(-[\w.]+)?$")
 # Same order as the player's viewQuery().
-_ORDER = ("format", "engine", "drm", "delay", "ad", "cmcd")
+_ORDER = ("format", "engine", "drm", "delay", "ad", "adp", "cmcd")
 AD_NAME_RE = re.compile(r"^[A-Za-z0-9_.-]{1,100}$")
+# Per-load ad.* params (deeplink.ts parseAdParams): same keys and characters.
+AD_PARAM_KEY = re.compile(r"^ad\.[A-Za-z0-9_.]{1,40}$")
+AD_PARAM_VALUE = re.compile(r"^[A-Za-z0-9_.,:/|\- ]{0,200}$")
+
+
+def normalize_ad_params(text: str) -> str:
+    pairs = parse_qsl(text, keep_blank_values=True)
+    if not pairs or len(pairs) > 10:
+        raise PresetError("ad params must be 1 to 10 ad.* params")
+    for key, value in pairs:
+        if not AD_PARAM_KEY.match(key) or not AD_PARAM_VALUE.match(value):
+            raise PresetError(f"bad ad param {key!r}")
+    return urlencode(pairs)
 
 
 class PresetError(ValueError):
@@ -59,6 +72,8 @@ def normalize_query(query: str) -> str:
             if not AD_NAME_RE.match(value):
                 raise PresetError(f"bad ad server name {value!r}")
             params[key] = value
+        elif key == "adp":
+            params[key] = normalize_ad_params(value)
         elif key == "cmcd":
             if value == "1":
                 params[key] = value
@@ -66,7 +81,9 @@ def normalize_query(query: str) -> str:
             raise PresetError(f"unknown setting {key!r}")
     if "engine" not in params:
         raise PresetError("a preset needs an engine")
-    return urlencode([(k, params[k]) for k in _ORDER if k in params], safe="@")
+    if "adp" in params and "ad" not in params:
+        raise PresetError("ad params need an ad server")
+    return urlencode([(k, params[k]) for k in _ORDER if k in params], safe="@:/")
 
 
 def clean_name(name: Any) -> str:

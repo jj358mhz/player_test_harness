@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.22.0] - 2026-10-19
+
+### Added
+- **Per-load ad params.** With an ad server chosen in **Ads**, a box under
+  it takes this playback's own `ad.*` params, e.g. `ad.lib=KOR` or
+  `ad.lib=JPN&ad.kv=…`, for values that change per customer or test and
+  don't belong in the account's list. Only `ad.*` keys with plain values
+  (letters, digits, `_ . , : / | -` and spaces), at most 10; they're signed
+  on top of the account's defaults and win on a clash. Deep links and
+  presets carry them as `adp=` (checked again on the server), so "fw2 KOR"
+  and "fw2 JPN" can be saved presets.
+
 ## [3.21.0] - 2026-10-19
 
 ### Added

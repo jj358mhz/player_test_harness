@@ -203,7 +203,10 @@ after dependency changes.
   stops playback. No API lists the configurations (`/api2/ad/external/get`
   is about transcoded creatives), so `AdServer` rows are entered per account
   (`app/ads.py`, account edit page) and the player's **Ads** menu signs
-  `ad=` plus the row's `ad.*` params (v3.21.0).
+  `ad=` plus the row's `ad.*` params (v3.21.0). Per-load params such as
+  `ad.lib=KOR` (they vary per customer/playback) go in the box under Ads:
+  `parseAdParams` (deeplink.ts) / `normalize_ad_params` (presets.py) share
+  the rules; deep link `adp=` (v3.22.0).
 - **SSAI** (docs "Ad Breaks", "Client-Side Beaconing Using Dynamic Manifest
   Markers", "Ad Verification"): Uplynk stitches ads into each session's
   manifest. DASH: each ad is a Period identified by `AssetIdentifier
