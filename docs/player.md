@@ -113,6 +113,15 @@ starts at the oldest segment) and about 45–50 s with DASH (the newest
 segment is about 32 s old, plus the engine's `suggestedPresentationDelay`
 of 12.3 s). With `delay=20`: about 28 s and 21 s.
 
+**Encoder wallclock vs program date.** On a slicer with `wallclock: 1`
+the ID3 wallclock reads about one slice (≈ 4 s) more latency than the
+`pdts=latency` program date for the same picture, on HLS (72.6 vs 68.2 s)
+and on DASH (50.4 vs 46.4 s, where the program date comes through the MPD
+offset). So the two stamp different moments of a slice, most likely
+capture start (wallclock) vs the slice being complete (program date);
+ID3, which drives the headline when present, is the closer to
+glass-to-glass.
+
 **Delay** in the load bar signs Uplynk's `delay=` (seconds behind live;
 Default is the channel's latency profile, 60 s unless set). Synced
 channels only; it's kept in the link. The **Clock** table in the Latency
