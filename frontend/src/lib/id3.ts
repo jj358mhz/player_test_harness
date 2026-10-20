@@ -67,3 +67,36 @@ export function parsePriv(data: Uint8Array): Priv {
 export const toHex = (bytes: Uint8Array, max = 64): string =>
     Array.from(bytes.subarray(0, max), (b) => b.toString(16).padStart(2, '0')).join('') +
     (bytes.length > max ? '…' : '');
+
+export interface UplynkSlice {
+    assetId: string;
+    ray: string;
+    /** Slice number within the asset (the hex in #UPLYNK-SEGMENT, as a number). */
+    slice: number;
+}
+
+/**
+ * The description-less TXXX Uplynk puts in each segment's ID3:
+ * `<asset id>_<ray>_<slice, 8 hex digits>`.
+ */
+export function parseUplynkSlice(value: string): UplynkSlice | null {
+    const match = /^([0-9a-f]{32})_([a-z]{1,2})_([0-9a-f]{8})$/i.exec(value.trim());
+    if (!match) return null;
+    const [, assetId = '', ray = '', slice = '0'] = match;
+    return {
+        assetId: assetId.toLowerCase(),
+        ray: ray.toLowerCase(),
+        slice: Number.parseInt(slice, 16),
+    };
+}
+
+/** Asset ids an MPD marks as ads (`AssetIdentifier urn:com:uplynk:ad-asset-id`). */
+export function mpdAdAssets(mpd: string | null | undefined): Set<string> {
+    const out = new Set<string>();
+    for (const tag of mpd?.match(/<AssetIdentifier\b[^>]*>/g) ?? []) {
+        if (!tag.includes('urn:com:uplynk:ad-asset-id')) continue;
+        const value = /\svalue="([^"]*)"/.exec(tag)?.[1];
+        if (value) out.add(value.toLowerCase());
+    }
+    return out;
+}

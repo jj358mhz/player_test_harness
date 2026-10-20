@@ -1,6 +1,13 @@
 import {describe, expect, it} from 'vitest';
 import {bandFor} from '../src/lib/bands';
-import {isId3Tag, parseId3, parsePriv, parseTxxx} from '../src/lib/id3';
+import {
+    isId3Tag,
+    mpdAdAssets,
+    parseId3,
+    parsePriv,
+    parseTxxx,
+    parseUplynkSlice,
+} from '../src/lib/id3';
 import {Id3Clock, ptsToSeconds} from '../src/lib/latency';
 import {parseUplynkMedia, rayFromUri, raysParam} from '../src/lib/rays';
 import {RunningStats, Series} from '../src/lib/stats';
@@ -344,5 +351,28 @@ describe('ID3 in a DASH emsg (com.uplynk.asset.metadata)', () => {
         expect(frames.map((f) => f.id)).toEqual(['TXXX']);
         const txxx = parseTxxx(frames[0]?.data ?? new Uint8Array());
         expect(txxx).toEqual({description: '', value, wallclock: null});
+    });
+});
+
+describe('parseUplynkSlice', () => {
+    it('splits asset, ray and slice', () => {
+        expect(parseUplynkSlice('abcdef0123456789abcdef0123456789_f_00000b87')).toEqual({
+            assetId: 'abcdef0123456789abcdef0123456789',
+            ray: 'f',
+            slice: 0xb87,
+        });
+    });
+    it('ignores other values', () => {
+        expect(parseUplynkSlice('wallclock: 2026-10-20T00:24:20.964')).toBeNull();
+        expect(parseUplynkSlice('abc_f_00000b87')).toBeNull();
+    });
+});
+
+describe('mpdAdAssets', () => {
+    it('collects ad asset ids only', () => {
+        const mpd = `<MPD><Period><AssetIdentifier schemeIdUri="urn:com:uplynk:content-asset-id" value="c1"/></Period>
+<Period><AssetIdentifier schemeIdUri="urn:com:uplynk:ad-asset-id" value="AD1"/></Period></MPD>`;
+        expect([...mpdAdAssets(mpd)]).toEqual(['ad1']);
+        expect(mpdAdAssets(null).size).toBe(0);
     });
 });

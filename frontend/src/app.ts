@@ -37,7 +37,14 @@ import {
 import {type CmcdConfig, cmcdFromUrl, contentIdFor, describeCmcd, newSessionId} from './lib/cmcd';
 import type {PaneSnapshot} from './lib/compare';
 import {isVersion, parseView, type View, viewQuery} from './lib/deeplink';
-import {parsePriv, parseTxxx, toHex} from './lib/id3';
+import {
+    mpdAdAssets,
+    parsePriv,
+    parseTxxx,
+    parseUplynkSlice,
+    toHex,
+    type UplynkSlice,
+} from './lib/id3';
 import {Id3Clock} from './lib/latency';
 import {raysParam} from './lib/rays';
 import {
@@ -173,6 +180,8 @@ class Session {
     playlist: MediaPlaylistInfo | null = null;
     audio: {tracks: AudioTrack[]; current: number} = {tracks: [], current: -1};
     asset: {assetId: string; kind: string} | null = null;
+    /** DASH: the slice on screen, from the asset TXXX in each segment's ID3. */
+    slice: UplynkSlice | null = null;
     pending: number[] = []; // timers to cancel on reload
     /** performance.now() when the engine was given the URL, and load → first frame. */
     loadAt: number | null = null;
@@ -710,7 +719,7 @@ export class PlayerApp {
                             row(
                                 'id3',
                                 'Encoder wallclock',
-                                'Encoder time in the segment (HLS: ID3 TXXX; DASH: prft box) → now, at the playhead',
+                                'Encoder time in the segment (ID3 TXXX: HLS in-segment, DASH in emsg; or a DASH prft box) → now, at the playhead',
                             ),
                             row(
                                 'pdt',
@@ -1913,18 +1922,7 @@ export class PlayerApp {
             }
             if (this.manifestView === 'media' || info.format === 'dash') this.renderManifest();
         });
-        engine.on('asset', (asset) => {
-            const previous = s().asset;
-            s().asset = asset;
-            const ad = asset.kind === 'ad';
-            this.logEntry(
-                ad ? 'scte' : 'info',
-                ad ? 'AD ASSET' : 'ASSET',
-                `${asset.assetId} (${asset.kind})`,
-            );
-            if (ad && previous?.kind !== 'ad') this.openBreak('Uplynk ad', null);
-            if (!ad && previous?.kind === 'ad') this.closeBreak();
-        });
+        engine.on('asset', (asset) => this.onAsset(asset));
         engine.on('daterange', (range) => {
             if (range.scte35) {
                 const date = engine.playingDate();
@@ -2067,6 +2065,43 @@ export class PlayerApp {
         if (open) open.end = Date.now();
     }
 
+    /** The playhead entered a new Uplynk asset. */
+    private onAsset(asset: {assetId: string; kind: string}): void {
+        const s = this.session;
+        const previous = s.asset;
+        s.asset = asset;
+        const ad = asset.kind === 'ad';
+        this.logEntry(
+            ad ? 'scte' : 'info',
+            ad ? 'AD ASSET' : 'ASSET',
+            `${asset.assetId} (${asset.kind})`,
+        );
+        if (ad && previous?.kind !== 'ad') this.openBreak('Uplynk ad', null);
+        if (!ad && previous?.kind === 'ad') this.closeBreak();
+    }
+
+    /**
+     * DASH has no #UPLYNK-SEGMENT; its ID3 names asset, ray and slice instead.
+     * Applied when the slice reaches the playhead; ad or not from the MPD.
+     */
+    private onDashSlice(mediaTime: number, slice: UplynkSlice): void {
+        const session = this.session;
+        const act = () => {
+            if (session !== this.session) return;
+            session.slice = slice;
+            if (slice.assetId !== session.asset?.assetId) {
+                const ads = mpdAdAssets(session.playlist?.text);
+                this.onAsset({
+                    assetId: slice.assetId,
+                    kind: ads.has(slice.assetId) ? 'ad' : 'content',
+                });
+            }
+        };
+        const delayMs = Math.max(0, mediaTime - this.video.currentTime) * 1000;
+        if (delayMs > 50) session.pending.push(window.setTimeout(act, delayMs));
+        else act();
+    }
+
     private onId3(mediaTime: number, frames: {id: string; data: Uint8Array}[]): void {
         const s = this.session;
         s.id3Count += 1;
@@ -2078,6 +2113,10 @@ export class PlayerApp {
                 if (txxx.wallclock) {
                     s.id3Wallclocks += 1;
                     s.id3.add(mediaTime, txxx.wallclock.getTime());
+                }
+                const slice = txxx.description ? null : parseUplynkSlice(txxx.value);
+                if (slice && this.source?.clock.kind.startsWith('mpd')) {
+                    this.onDashSlice(mediaTime, slice);
                 }
                 this.logEntry(
                     'id3',
@@ -2730,7 +2769,12 @@ export class PlayerApp {
                 'Ad break',
                 open ? `in progress · ${Math.round((Date.now() - open.start) / 1000)} s` : 'no',
             ],
-            ['Asset', s.asset ? `${s.asset.kind} · ${s.asset.assetId}` : '--'],
+            [
+                'Asset',
+                s.asset
+                    ? `${s.asset.kind} · ${s.asset.assetId}${s.slice ? ` · slice ${s.slice.slice} · ray ${s.slice.ray}` : ''}`
+                    : '--',
+            ],
         ]);
         const last = this.el('scteLast');
         last.hidden = !s.lastScte;
