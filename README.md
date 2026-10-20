@@ -33,6 +33,10 @@ latency, drift, ABR, DRM keys, ID3/SCTE-35, captions and more.
   rays, request stats, DRM) at `/sessions/<id>`, redacted of signatures
   and tokens, for `SESSION_RETENTION_DAYS` (default 30). Deep links put the
   whole player view in the address bar.
+- 🎛️ **Presets** — named player setups (format, engine and version, DRM,
+  delay, ad server and `ad.*` params, CMCD), first in the player's load bar;
+  the **Presets** page lists them in plain words, adds, edits and deletes
+  them, and opens the player with one applied.
 - 🩺 **Channel health** — every `CHANNEL_HEALTH_INTERVAL` minutes (default
   10) the server fetches each channel's `pdts=latency` HLS and measures how
   old the newest segment is on the encoder's clock. Cards get a badge

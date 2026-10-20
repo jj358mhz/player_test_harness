@@ -11,14 +11,13 @@ from __future__ import annotations
 import contextlib
 import re
 from typing import Any
-from urllib.parse import parse_qsl, urlencode
+from urllib.parse import parse_qsl, unquote_plus, urlencode
 
 from app.models import EnginePreset, User, db
 
 NAME_MAX = 60
 ENGINES = {"hlsjs", "shaka", "dashjs", "native"}
 VERSION_RE = re.compile(r"^\d+\.\d+\.\d+(-[\w.]+)?$")
-# Same order as the player's viewQuery().
 # Same order as the player's viewQuery(); the ad.* params follow ad.
 _ORDER = ("format", "engine", "drm", "delay", "ad", "cmcd")
 AD_NAME_RE = re.compile(r"^[A-Za-z0-9_.-]{1,100}$")
@@ -120,6 +119,93 @@ def save_preset(data: Any, user: User | None) -> tuple[EnginePreset, bool]:
         row.query = query
     db.session.commit()
     return row, created
+
+
+def update_preset(row: EnginePreset, name: Any, query: Any) -> EnginePreset:
+    """Rename and/or change a preset in place (the Presets page's Edit)."""
+    name = clean_name(name)
+    query = normalize_query(query)
+    clash = db.session.query(EnginePreset).filter_by(name=name).first()
+    if clash is not None and clash.id != row.id:
+        raise PresetError(f"another preset is already called {name!r}")
+    row.name, row.query = name, query
+    db.session.commit()
+    return row
+
+
+ENGINE_LABELS = {"hlsjs": "hls.js", "shaka": "Shaka", "dashjs": "dash.js", "native": "Native"}
+DRM_LABELS = {"wv": "Widevine", "pr": "PlayReady", "fps": "FairPlay"}
+# The player's Delay menu (frontend/src/lib/clock.ts DELAY_CHOICES).
+DELAY_CHOICES = (15, 20, 30, 45, 60, 90, 120)
+
+
+def parse_ad_params(text: Any) -> list[tuple[str, str]]:
+    """`ad.lib=KOR&ad.kv=a,b` as typed (deeplink.ts parseAdParams), checked."""
+    text = text.strip().lstrip("?&") if isinstance(text, str) else ""
+    pairs = []
+    for part in filter(None, text.split("&")):
+        key, eq, value = part.partition("=")
+        if not eq:
+            raise PresetError(f"{part} needs a value (ad.lib=KOR)")
+        key, value = key.strip(), unquote_plus(value).strip()
+        if key == "ad":
+            raise PresetError("choose the ad server in Ads, not as ad=")
+        if not key.startswith("ad."):
+            raise PresetError(f"only ad.* params here, not {key}")
+        pairs.append(_ad_param(key, value))
+    return pairs
+
+
+def query_from_form(form: Any) -> str:
+    """A preset query from the Presets page's fields; validated like the API's."""
+
+    def field(name: str) -> str:
+        return (form.get(name) or "").strip()
+
+    engine, version = field("engine"), field("version")
+    pairs = [("format", field("format") or "hls")]
+    pairs.append(("engine", f"{engine}@{version}" if version else engine))
+    for key in ("drm", "delay", "ad"):
+        if field(key):
+            pairs.append((key, field(key)))
+    ad_params = parse_ad_params(field("ad_params"))
+    pairs += ad_params
+    if form.get("cmcd"):
+        pairs.append(("cmcd", "1"))
+    return normalize_query(urlencode(pairs))
+
+
+def describe(query: str) -> dict[str, Any]:
+    """A preset's settings for people: labels, plus the form's field values."""
+    params = parse_qsl(query, keep_blank_values=True)
+    get = dict(params).get
+    engine, _, version = (get("engine") or "").partition("@")
+    ad_params = [(k, v) for k, v in params if k.startswith("ad.")]
+    parts = [
+        "DASH" if get("format") == "dash" else "HLS",
+        f"{ENGINE_LABELS.get(engine, engine)} {version or '(default version)'}",
+    ]
+    if get("drm"):
+        parts.append(DRM_LABELS.get(get("drm"), get("drm")))
+    if get("delay"):
+        parts.append(f"delay {get('delay')} s")
+    if get("ad"):
+        parts.append(" ".join([f"ad={get('ad')}", *(f"{k}={v}" for k, v in ad_params)]))
+    if get("cmcd"):
+        parts.append("CMCD")
+    return {
+        "parts": parts,
+        "fields": {
+            "format": get("format") or "hls",
+            "engine": engine,
+            "version": version,
+            "drm": get("drm") or "",
+            "delay": get("delay") or "",
+            "ad": get("ad") or "",
+            "ad_params": "&".join(f"{k}={v}" for k, v in ad_params),
+            "cmcd": bool(get("cmcd")),
+        },
+    }
 
 
 def list_presets() -> list[dict[str, object]]:

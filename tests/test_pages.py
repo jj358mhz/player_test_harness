@@ -20,6 +20,7 @@ from app.uplynk.sync import SyncResult
         "/sign",
         "/activity",
         "/sessions",
+        "/presets",
         "/admin/uplynk-accounts",
         "/api/channels",
     ],
@@ -32,7 +33,16 @@ def test_pages_require_login(client, path):
 
 @pytest.mark.parametrize(
     "path",
-    ["/", "/player", "/compare", "/sign", "/activity", "/sessions", "/admin/uplynk-accounts"],
+    [
+        "/",
+        "/player",
+        "/compare",
+        "/presets",
+        "/sign",
+        "/activity",
+        "/sessions",
+        "/admin/uplynk-accounts",
+    ],
 )
 def test_pages_render(auth_client, path):
     assert auth_client.get(path).status_code == 200
@@ -232,6 +242,7 @@ def test_every_page_but_the_dashboard_leads_back(
     pages = [
         "/activity",
         "/sessions",
+        "/presets",
         "/compare",
         "/sign",
         "/admin/uplynk-accounts",

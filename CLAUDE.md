@@ -145,6 +145,9 @@ after dependency changes.
   query without source/rays, re-validated server-side with the
   deeplink.ts rules (versions go into jsDelivr URLs); `/api/presets`
   GET/POST (same name replaces)/DELETE; listed in the player's config.
+  v3.23.0: `/presets` page (`main/presets.html`: list with `describe()`,
+  add/edit/rename via `query_from_form()`, delete; **Open in player** =
+  `/player?preset=<id>` → config `initialPreset`).
 - `app/csl.py` — csl-slicer-console settings lookup (slicer `wallclock`), cached 5 min.
 - `app/autosync.py` — background channel sync, started per worker by
   gunicorn's `post_worker_init`; one worker syncs (flock on a temp file).
@@ -292,7 +295,10 @@ in the `player_harness_data` volume.
       asset as an ad if any identifier in the Period names it; the log
       shows `MPD ADS` / `AD CHECK` lines until a real ad confirms the shape. **v3.17.0:** saved engine presets
       in the DB (load bar **Preset** + **Presets…**). **v3.17.1:** load bar
-      = one row of fields + Load, secondary buttons in a toolbar row. Native
+      = one row of fields + Load, secondary buttons in a toolbar row.
+      **v3.23.0:** Preset first; second row = extras a choice asks for
+      (custom version, ad params) left, Copy link / Save session / Save as
+      preset… right; presets managed on the `/presets` page. Native
       verified in real Safari (2026-10-19: FairPlay, ID3 cues, PDT).
 - [~] Phase 3 — DRM. **Done (v3.2.0):** Shaka engine, Widevine/PlayReady
       over DASH from Preplay, DRM panel (key system, license timing/status,

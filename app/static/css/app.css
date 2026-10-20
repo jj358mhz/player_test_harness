@@ -1702,3 +1702,37 @@ select.input {
 .session-title {
     overflow-wrap: anywhere;
 }
+
+/* Presets page */
+.presets-table td {
+    vertical-align: middle;
+}
+.presets-table tr.is-editing td {
+    background: var(--accent-bg);
+}
+.preset-part {
+    display: inline-block;
+    margin: 2px 6px 2px 0;
+    padding: 1px 8px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: 12px;
+    overflow-wrap: anywhere;
+}
+.presets-table__actions {
+    white-space: nowrap;
+    text-align: right;
+}
+.presets-table__actions > * {
+    margin-left: 6px;
+}
+.preset-form {
+    max-width: 760px;
+    margin-top: 1.5rem;
+}
+.preset-form h2 {
+    margin-top: 0;
+}
+.preset-form__cmcd {
+    align-self: center;
+}

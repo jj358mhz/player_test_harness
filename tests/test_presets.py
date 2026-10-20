@@ -115,3 +115,96 @@ def test_player_config_lists_presets(auth_client, monkeypatch):
     page = auth_client.get("/player").get_data(as_text=True)
     assert '"presets": "/api/presets"' in page
     assert '"name": "Native"' in page
+
+
+def test_describe():
+    from app.presets import describe
+
+    d = describe("format=dash&engine=shaka@5.3.0&drm=wv&delay=20&ad=fw2&ad.lib=KOR&cmcd=1")
+    assert d["parts"] == [
+        "DASH",
+        "Shaka 5.3.0",
+        "Widevine",
+        "delay 20 s",
+        "ad=fw2 ad.lib=KOR",
+        "CMCD",
+    ]
+    assert d["fields"]["ad_params"] == "ad.lib=KOR"
+    assert d["fields"]["version"] == "5.3.0"
+    assert describe("engine=hlsjs")["parts"] == ["HLS", "hls.js (default version)"]
+
+
+def _form(**fields):
+    base = {"name": "Shaka DASH", "format": "dash", "engine": "shaka", "version": ""}
+    return {**base, **fields}
+
+
+def test_page_adds_edits_and_deletes(auth_client):
+    from app.models import EnginePreset, db
+
+    r = auth_client.post(
+        "/presets",
+        data=_form(drm="wv", delay="30", ad="fw2", ad_params=" ad.lib=KOR & ad.flex=10 ", cmcd="1"),
+    )
+    assert r.status_code == 302
+    row = db.session.query(EnginePreset).one()
+    assert (
+        row.query == "format=dash&engine=shaka&drm=wv&delay=30&ad=fw2&ad.lib=KOR&ad.flex=10&cmcd=1"
+    )
+
+    page = auth_client.get("/presets").get_data(as_text=True)
+    assert "Shaka DASH" in page and "ad=fw2 ad.lib=KOR ad.flex=10" in page
+    assert f'href="/player?preset={row.id}"' in page
+
+    # Edit renames in place and the form is filled from the stored query.
+    edit = auth_client.get(f"/presets?edit={row.id}").get_data(as_text=True)
+    assert 'value="ad.lib=KOR&amp;ad.flex=10"' in edit
+    r = auth_client.post(
+        "/presets", data=_form(name="Shaka 5", version="5.3.0", preset_id=str(row.id))
+    )
+    assert r.status_code == 302
+    db.session.refresh(row)
+    assert (row.name, row.query) == ("Shaka 5", "format=dash&engine=shaka@5.3.0")
+    assert db.session.query(EnginePreset).count() == 1
+
+    assert auth_client.post(f"/presets/{row.id}/delete").status_code == 302
+    assert db.session.query(EnginePreset).count() == 0
+    assert auth_client.post(f"/presets/{row.id}/delete").status_code == 404
+
+
+@pytest.mark.parametrize(
+    ("fields", "message"),
+    [
+        ({"version": "latest"}, "bad engine version"),
+        ({"ad_params": "ad.lib=KOR"}, "ad params need an ad server"),
+        ({"ad": "fw2", "ad_params": "lib=KOR"}, "only ad.* params"),
+        ({"ad": "fw2", "ad_params": "ad.lib"}, "needs a value"),
+        ({"name": " "}, "name is required"),
+    ],
+)
+def test_page_rejects_and_keeps_input(auth_client, fields, message):
+    r = auth_client.post("/presets", data=_form(**fields))
+    assert r.status_code == 400
+    page = r.get_data(as_text=True)
+    assert message in page.replace("&#39;", "'")
+    assert 'value="dash" selected' in page  # what was typed stays
+
+
+def test_page_rename_cannot_take_another_name(auth_client):
+    from app.models import EnginePreset, db
+
+    auth_client.post("/presets", data=_form(name="One"))
+    auth_client.post("/presets", data=_form(name="Two", engine="dashjs"))
+    two = db.session.query(EnginePreset).filter_by(name="Two").one()
+    r = auth_client.post("/presets", data=_form(name="One", preset_id=str(two.id)))
+    assert r.status_code == 400
+    assert "already called" in r.get_data(as_text=True)
+
+
+def test_player_opens_with_a_preset(auth_client, monkeypatch):
+    from app.main import routes
+
+    monkeypatch.setattr(routes, "vite_assets", lambda entry="": {"js": "/x.js", "css": []})
+    page = auth_client.get("/player?preset=7").get_data(as_text=True)
+    assert '"initialPreset": 7' in page
+    assert '"presetsPage": "/presets"' in page

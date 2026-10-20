@@ -7,14 +7,33 @@ from datetime import UTC, datetime, timedelta
 from itertools import groupby
 
 from flask import abort, current_app, flash, jsonify, redirect, render_template, request, url_for
-from flask_login import login_required
+from flask_login import current_user, login_required
 
 from app import csl, health_history
 from app.ads import by_account as ad_servers_by_account
 from app.engines import ENGINES
 from app.main import bp
-from app.models import AdminEvent, Channel, PlaybackEvent, PlaybackSession, UplynkAccount, db
-from app.presets import list_presets
+from app.models import (
+    AdminEvent,
+    AdServer,
+    Channel,
+    EnginePreset,
+    PlaybackEvent,
+    PlaybackSession,
+    UplynkAccount,
+    db,
+)
+from app.presets import (
+    DELAY_CHOICES,
+    DRM_LABELS,
+    ENGINE_LABELS,
+    PresetError,
+    describe,
+    list_presets,
+    query_from_form,
+    save_preset,
+    update_preset,
+)
 from app.sessions import expires_at
 from app.uplynk.health import BEHIND_AFTER_S, STALE_AFTER_S
 from app.uplynk.playback import CONTENT_TYPES
@@ -128,6 +147,8 @@ def player() -> str:
         "cslBase": current_app.config["CSL_BASE_URL"] or None,
         "initialChannel": request.args.get("channel", type=int),
         "initialSrc": request.args.get("src") or None,
+        # From the Presets page's "Open in player".
+        "initialPreset": request.args.get("preset", type=int),
         "presets": list_presets(),
         # SSAI ad configuration names per account id (entered on the account page).
         "adServers": ad_servers_by_account(),
@@ -135,6 +156,7 @@ def player() -> str:
             "playback": url_for("api.playback"),
             "sessions": url_for("api.save_session"),
             "presets": url_for("api.presets"),
+            "presetsPage": url_for("main.presets"),
             # "{id}" → channel id; absent when the console API isn't configured.
             "slicer": url_for("api.channel_slicer", channel_id=0).replace("/0/", "/{id}/")
             if csl.enabled()
@@ -263,6 +285,70 @@ def delete_session(slug: str):
     db.session.commit()
     flash(f"Deleted the recording of {row.title}.", "success")
     return redirect(url_for("main.sessions"))
+
+
+@bp.route("/presets")
+@login_required
+def presets(form: dict | None = None, error: str | None = None, editing: int | None = None):
+    """Saved engine presets: list, edit, add. The player's Preset menu picks from them."""
+    rows = db.session.query(EnginePreset).order_by(EnginePreset.name).all()
+    editing = editing if editing is not None else request.args.get("edit", type=int)
+    current = next((r for r in rows if r.id == editing), None)
+    if form is None:
+        form = (
+            {"name": current.name, **describe(current.query)["fields"]}
+            if current
+            else describe("engine=hlsjs")["fields"]
+        )
+    ad_names = sorted({name for (name,) in db.session.query(AdServer.name).all()})
+    return render_template(
+        "main/presets.html",
+        rows=[(r, describe(r.query)["parts"]) for r in rows],
+        editing=current,
+        form=form,
+        error=error,
+        engines=ENGINE_LABELS,
+        drms=DRM_LABELS,
+        delays=sorted({*DELAY_CHOICES, *([int(form["delay"])] if form.get("delay") else [])}),
+        ad_names=ad_names,
+    ), (400 if error else 200)
+
+
+@bp.route("/presets", methods=["POST"])
+@login_required
+def save_preset_form():
+    editing = request.form.get("preset_id", type=int)
+    row = db.session.get(EnginePreset, editing) if editing else None
+    if editing and row is None:
+        abort(404)
+    form = {
+        k: request.form.get(k, "")
+        for k in ("name", "format", "engine", "version", "drm", "delay", "ad", "ad_params")
+    }
+    form["cmcd"] = bool(request.form.get("cmcd"))
+    try:
+        query = query_from_form(request.form)
+        if row is not None:
+            update_preset(row, request.form.get("name"), query)
+            created = False
+        else:
+            row, created = save_preset(
+                {"name": request.form.get("name"), "query": query}, current_user
+            )
+    except PresetError as e:
+        return presets(form=form, error=str(e), editing=editing or 0)
+    flash(f"{'Saved' if created else 'Updated'} preset “{row.name}”.", "success")
+    return redirect(url_for("main.presets"))
+
+
+@bp.route("/presets/<int:preset_id>/delete", methods=["POST"])
+@login_required
+def delete_preset_form(preset_id: int):
+    row = db.session.get(EnginePreset, preset_id) or abort(404)
+    db.session.delete(row)
+    db.session.commit()
+    flash(f"Deleted preset “{row.name}”.", "success")
+    return redirect(url_for("main.presets"))
 
 
 @bp.route("/health")

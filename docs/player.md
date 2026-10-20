@@ -6,28 +6,33 @@ Uplynk stream is doing while it plays.
 
 ## Layout
 
-- **Load bar:** channel or pasted URL, preset, format (HLS or DASH), player
-  engine and version, DRM, delay, ads, CMCD, Load, **Copy link**, **Save
-  session**, **Presets…**.
+- **Load bar:** preset, channel or pasted URL, format (HLS or DASH), player
+  engine and version, DRM, delay, ads, CMCD, Load. The second row holds the
+  boxes a choice asks for (**Engine version** for Custom, **Ad params** once
+  an ad server is chosen) on the left, and **Copy link**, **Save session**,
+  **Save as preset…** on the right, so the first row never changes height.
 - **Ads (SSAI):** Uplynk inserts ads only when the playback URL names an ad
   configuration (`ad=<name>`); without it there are no ads, and a name the
   workspace doesn't have stops playback. Uplynk has no API that lists them,
   so an admin adds each account's names (and any default `ad.*` params) under
   **Uplynk Accounts → Edit → Ad servers**. **Ads** in the load bar then offers
   the selected channel's account's names and signs `ad=<name>` with its
-  params. With one chosen, a box under it takes this load's own `ad.*`
+  params. With one chosen, **Ad params** (second row) takes this load's own `ad.*`
   params (e.g. `ad.lib=KOR`, or `ad.lib=JPN&ad.kv=…`): only `ad.*` keys and
   plain values, signed on top of the account's defaults (yours win on a
   clash). Deep links and presets carry both as they are signed
   (`ad=fw2&ad.lib=KOR&ad.kv=genre:news`), so each variant can be a saved
   preset; a preset's ad server applies only on
   channels whose account has that name.
-- **Presets:** a named setup of format, engine and version, DRM, delay and
-  CMCD, saved on the server for everyone using the harness. Picking one in
-  **Preset** sets the load bar (anything it doesn't name goes back to the
-  default; no DRM means the channel's default) for the selected channel;
-  press **Load**. **Presets…** opens a row to save the current settings
-  under a name (the same name replaces it) or delete the chosen preset.
+- **Presets:** a named setup of format, engine and version, DRM, delay, ads
+  and CMCD, saved on the server for everyone using the harness. Picking one
+  in **Preset** (first in the load bar) sets the rest of it (anything it
+  doesn't name goes back to the default; no DRM means the channel's
+  default) for the selected channel; press **Load**. **Save as preset…**
+  saves the current settings under a name (the same name replaces it).
+  The **Presets** page in the site menu lists them all in plain words and
+  adds, edits, renames and deletes them; **Open in player** opens the
+  player with one chosen (`/player?preset=<id>`).
   The default version of an engine isn't pinned, so a preset follows the
   default when Dependabot bumps it; pick an exact version to pin it.
   Changing a setting by hand clears the Preset menu. Rays and the source
