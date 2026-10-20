@@ -1,12 +1,10 @@
 {% extends "base.html" %}
+{% set back_channel = channel.id if channel else None %}
 {% block title_suffix %} — Sign URL{% endblock %}
 
 {% block content %}
 <div class="page-header">
     <div>
-        {% if channel %}
-        <a class="back-link" href="{{ url_for('main.index') }}#channel-{{ channel.id }}">← Back to channels</a>
-        {% endif %}
         <h1>Sign a playback URL</h1>
     </div>
 </div>

@@ -214,7 +214,45 @@ def test_sign_page_for_channel_links_back_to_its_card(auth_client, make_account,
     ch = make_channel(make_account(), "abc", description="Alpha")
     html = auth_client.get(f"/sign?channel={ch.id}").get_data(as_text=True)
     assert f'href="/#channel-{ch.id}">← Back to channels</a>' in html
-    assert "Back to channels" not in auth_client.get("/sign").get_data(as_text=True)
+    # Without a channel it still leads back, just to the top.
+    assert 'href="/">← Back to channels</a>' in auth_client.get("/sign").get_data(as_text=True)
+
+
+BACK = "← Back to channels"
+
+
+def test_every_page_but_the_dashboard_leads_back(
+    auth_client, make_account, make_channel, monkeypatch
+):
+    from app.main import routes
+
+    monkeypatch.setattr(routes, "vite_assets", lambda entry="": {"js": "/x.js", "css": []})
+    account = make_account()
+    ch = make_channel(account)
+    pages = [
+        "/activity",
+        "/sessions",
+        "/compare",
+        "/sign",
+        "/admin/uplynk-accounts",
+        f"/admin/uplynk-accounts/{account.id}/edit",
+        "/admin/uplynk-accounts/new",
+        f"/channels/{ch.id}/health",
+    ]
+    for path in pages:
+        html = auth_client.get(path).get_data(as_text=True)
+        assert html.count(BACK) == 1, path
+    # The player lands on the channel it was opened for.
+    html = auth_client.get(f"/player?channel={ch.id}").get_data(as_text=True)
+    assert f'href="/#channel-{ch.id}">{BACK}</a>' in html
+    assert f'href="/">{BACK}' in auth_client.get("/player?channel=x").get_data(as_text=True)
+    # Not on the dashboard itself, a compare pane, or the login page.
+    assert BACK not in auth_client.get("/").get_data(as_text=True)
+    assert BACK not in auth_client.get(f"/player?embed=1&channel={ch.id}").get_data(as_text=True)
+
+
+def test_login_page_has_no_back_link(client):
+    assert BACK not in client.get("/auth/login").get_data(as_text=True)
 
 
 def test_dashboard_has_nav_collapse_and_select_all(auth_client, make_account, make_channel):

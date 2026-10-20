@@ -1,8 +1,8 @@
 {% extends "base.html" %}
+{% set back_channel = channel.id %}
 {% block title_suffix %} — {{ channel.display_name }} health{% endblock %}
 
 {% block content %}
-<p><a href="{{ url_for('main.index') }}#channel-{{ channel.id }}">← Back to channels</a></p>
 <div class="page-header">
     <h1>{{ channel.display_name }} <span class="page-header__meta">live-edge health</span></h1>
     <div class="page-header__controls">

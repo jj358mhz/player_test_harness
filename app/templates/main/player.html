@@ -1,4 +1,6 @@
 {% extends "base.html" %}
+{% set opened = request.args.get('channel', '') %}
+{% set back_channel = opened if opened.isdigit() else None %}
 {% block title_suffix %} — Player{% endblock %}
 {% block main_modifier %} site-main--wide{% if embed %} site-main--embed{% endif %}{% endblock %}
 
