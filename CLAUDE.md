@@ -266,7 +266,9 @@ in the `player_harness_data` volume.
       adapters behind `PlayerEngine`. **v3.15.0–3.16.0:** DASH encoder latency
       from in-segment `prft` (`lib/mp4.ts`; Uplynk writes none) and from
       ID3 in emsg (Shaka and dash.js); v3.16.1 asset/ray/slice from that
-      ID3. **v3.17.0:** saved engine presets
+      ID3. v3.20.1: SSAI ad Periods (`urn:com:uplynk:ad-asset-id`) mark an
+      asset as an ad if any identifier in the Period names it; the log
+      shows `MPD ADS` / `AD CHECK` lines until a real ad confirms the shape. **v3.17.0:** saved engine presets
       in the DB (load bar **Preset** + **Presets…**). **v3.17.1:** load bar
       = one row of fields + Load, secondary buttons in a toolbar row. Native
       verified in real Safari (2026-10-19: FairPlay, ID3 cues, PDT).
