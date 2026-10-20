@@ -166,8 +166,9 @@ after dependency changes.
   letter (`D00003391.m4f`, `F_init.mp4`); FairPlay HLS segments are
   `FP_<RAY>…`. Ads are separate Periods with `AssetIdentifier
   urn:com:uplynk:ad-asset-id`; `InbandEventStream com.uplynk.asset.metadata`:
-  each emsg is an ID3v2.4 tag (the same ID3 as HLS; seen: one TXXX, UTF-8,
-  empty description, value starting with the asset id). Segments carry
+  each emsg is an ID3v2.4 tag (the same ID3 as HLS): a TXXX with no
+  description, `<asset id>_<ray>_<slice, 8 hex>`, plus on `wallclock: 1`
+  slicers a TXXX `wallclock` = ISO time without a zone (UTC). Segments carry
   **no `prft`** (checked 2026-10-19), so DASH encoder latency comes from
   that ID3's wallclock TXXX (slicers with `wallclock: 1`).
 - Encryption shows only in **media** playlists, not the master: the probe
@@ -254,7 +255,9 @@ in the `player_harness_data` volume.
 - [x] Phase 2 — multi-player (v3.5.0): hls.js, Shaka, dash.js, native
       adapters behind `PlayerEngine`. **v3.15.0–3.16.0:** DASH encoder latency
       from in-segment `prft` (`lib/mp4.ts`; Uplynk writes none) and from
-      ID3 in emsg (Shaka and dash.js). **Left:** presets in the DB, native
+      ID3 in emsg (Shaka and dash.js); v3.16.1 asset/ray/slice from that
+      ID3. **Open:** on one channel DASH ID3 latency read ~4 s (≈ one
+      slice) above MPD clock + offset (51.8 vs 47.8 s); find which is off. **Left:** presets in the DB, native
       verified in real Safari.
 - [~] Phase 3 — DRM. **Done (v3.2.0):** Shaka engine, Widevine/PlayReady
       over DASH from Preplay, DRM panel (key system, license timing/status,

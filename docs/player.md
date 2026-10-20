@@ -180,7 +180,9 @@ ray isn't counted as a rotation.
 
 ## Metadata
 
-DASH `emsg` boxes are logged with their scheme, size and payload (text if
+On DASH the Uplynk asset (and its ray and slice) comes from the ID3 in
+each segment's emsg, ad or content from the MPD's `AssetIdentifier`.
+Other DASH `emsg` boxes are logged with their scheme, size and payload (text if
 printable, else the leading bytes in hex).
 
 ID3 frames as they arrive, tallied by kind (TXXX description or PRIV

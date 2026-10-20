@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.16.1] - 2026-10-19
+
+### Added
+- **DASH asset from ID3.** Uplynk's DASH ID3 names the slice in a TXXX
+  with no description: `<asset id>_<ray>_<slice>`. When that slice
+  reaches the playhead the Metadata tab's **Asset** row shows the asset,
+  slice and ray (it said "--" on DASH), and an asset change is logged
+  like HLS's `#UPLYNK-SEGMENT`. Ad or content comes from the MPD's
+  `AssetIdentifier urn:com:uplynk:ad-asset-id`, so ad assets open an ad
+  break on the timeline.
+
+### Changed
+- The Encoder wallclock row's description names ID3 in DASH emsg.
+
 ## [3.16.0] - 2026-10-19
 
 ### Added
