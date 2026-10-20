@@ -57,3 +57,15 @@ document.addEventListener('click', async (event) => {
         button.disabled = false;
     }
 });
+
+// <time datetime="…Z" data-local> shows UTC from the server; show it in local time.
+// data-local="date" adds the day.
+for (const el of document.querySelectorAll('time[data-local]')) {
+    const date = new Date(el.getAttribute('datetime'));
+    if (Number.isNaN(date.getTime())) continue;
+    const time = date.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+    el.textContent = el.dataset.local === 'date'
+        ? `${date.toLocaleDateString([], {month: 'short', day: 'numeric'})} ${time}`
+        : time;
+    el.title = date.toString();
+}

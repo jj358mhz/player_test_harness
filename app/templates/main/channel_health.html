@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title_suffix %} — {{ channel.display_name }} health{% endblock %}
+
+{% block content %}
+<p><a href="{{ url_for('main.index') }}#channel-{{ channel.id }}">← Back to channels</a></p>
+<div class="page-header">
+    <h1>{{ channel.display_name }} <span class="page-header__meta">live-edge health</span></h1>
+    <div class="page-header__controls">
+        <a class="button button--primary" href="{{ url_for('main.play_channel', channel_id=channel.id) }}">▶ Play</a>
+    </div>
+</div>
+
+<p class="muted">
+    How old the newest segment of the channel's <code>pdts=latency</code> HLS is, on the encoder's clock,
+    {% if health_interval %}checked every {{ health_interval }} min{% else %}checked on demand (background check off){% endif %}.
+    About 30 s is normal with the default delay; the dashed lines mark <em>behind</em> ({{ behind_s }} s) and
+    <em>stale</em> ({{ stale_s }} s). Red marks are stale or failed checks, amber behind, grey without dates.
+</p>
+
+{% if not points %}
+<div class="card"><p class="muted">No checks in the last {{ days }} days yet. Use <strong>Check health</strong> on the dashboard.</p></div>
+{% else %}
+<div class="card health-chart">
+    <h2>Last 24 hours</h2>
+    {{ chart_day if chart_day else '<p class="muted">No checks in the last 24 hours.</p>'|safe }}
+</div>
+{% if days > 1 %}
+<div class="card health-chart">
+    <h2>Last {{ days }} days</h2>
+    {{ chart_all }}
+</div>
+{% endif %}
+
+<h2>Status changes</h2>
+<table class="data-table">
+    <thead>
+    <tr><th>From</th><th>Status</th><th>Edge age then</th><th>Lasted</th></tr>
+    </thead>
+    <tbody>
+    {% for c in changes[:50] %}
+    <tr>
+        <td class="mono"><time datetime="{{ c.at.strftime('%Y-%m-%dT%H:%M:%SZ') }}" data-local="date">{{ c.at.strftime('%b %d %H:%M') }} UTC</time></td>
+        <td><span class="badge badge--health badge--health--{{ c.status }}">{{ c.status }}</span></td>
+        <td class="mono">{{ c.edge_s|age if c.edge_s is not none else '—' }}</td>
+        <td class="mono">{{ (c.lasted.total_seconds())|age if c.lasted is not none else 'now' }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% if changes|length > 50 %}<p class="muted">The 50 most recent changes of {{ changes|length }}.</p>{% endif %}
+{% if channel.health_detail %}<p class="muted">Last check: {{ channel.health_detail }}</p>{% endif %}
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+{% endblock %}

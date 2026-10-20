@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.19.0] - 2026-10-19
+
+### Added
+- **Health history.** Every health check is kept (`channel_health_checks`,
+  new migration) for `HEALTH_HISTORY_DAYS` (default 7; each run prunes
+  older ones).
+- **Sparklines on the dashboard.** Each checked channel's card shows its
+  live-edge age over the last 24 hours (amber and red dots for behind,
+  stale and failed checks, dashed lines at the 90 s and 5 min thresholds,
+  gaps where nothing was checked), and a channel that needs attention says
+  since when, in your local time.
+- **Channel health page** (`/channels/<id>/health`, from the sparkline):
+  the last 24 hours and the whole kept history as larger charts, and every
+  status change with the edge age then and how long it lasted.
+
+### Changed
+- Durations of two days or more read as days and hours (`4 d 18 h`).
+
 ## [3.18.0] - 2026-10-19
 
 ### Added

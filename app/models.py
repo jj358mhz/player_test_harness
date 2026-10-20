@@ -15,6 +15,7 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
@@ -156,6 +157,8 @@ class Channel(Base):
         UniqueConstraint("uplynk_account_id", "channel_id", name="uq_account_channel"),
     )
 
+    # Deleted with the channel (SQLite doesn't enforce the FK's ON DELETE here).
+    health_checks: Mapped[list[ChannelHealthCheck]] = relationship(cascade="all, delete-orphan")
     uplynk_account: Mapped[UplynkAccount] = relationship(back_populates="channels")
 
     @property
@@ -308,3 +311,23 @@ class EnginePreset(Base):
 
     def as_dict(self) -> dict[str, object]:
         return {"id": self.id, "name": self.name, "query": self.query}
+
+
+class ChannelHealthCheck(Base):
+    """One health check of one channel (see app.uplynk.health), for history.
+
+    Kept `HEALTH_HISTORY_DAYS`; every check run prunes older rows.
+    """
+
+    __tablename__ = "channel_health_checks"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    channel_id: Mapped[int] = mapped_column(
+        ForeignKey("channels.id", ondelete="CASCADE"), nullable=False
+    )
+    checked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    status: Mapped[str] = mapped_column(String(12), nullable=False)
+    edge_s: Mapped[float | None] = mapped_column(Float, nullable=True)
+    detail: Mapped[str | None] = mapped_column(String(300), nullable=True)
+
+    __table_args__ = (Index("ix_health_channel_time", "channel_id", "checked_at"),)

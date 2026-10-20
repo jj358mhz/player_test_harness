@@ -45,6 +45,8 @@ class Config:
         self.CHANNEL_SYNC_INTERVAL = int(os.getenv("CHANNEL_SYNC_INTERVAL", "60"))
         # Background health check of every active channel, minutes (0 = off).
         self.CHANNEL_HEALTH_INTERVAL = int(os.getenv("CHANNEL_HEALTH_INTERVAL", "10"))
+        # Days of health checks to keep for the history charts.
+        self.HEALTH_HISTORY_DAYS = int(os.getenv("HEALTH_HISTORY_DAYS", "7"))
         # csl-slicer-console, for links from a channel to its slicer (empty = no links).
         self.CSL_BASE_URL = os.getenv("CSL_BASE_URL", "").strip().rstrip("/")
         # Its settings API (slicer wallclock), server to server: the URL this

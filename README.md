@@ -37,7 +37,9 @@ latency, drift, ABR, DRM keys, ID3/SCTE-35, captions and more.
   10) the server fetches each channel's `pdts=latency` HLS and measures how
   old the newest segment is on the encoder's clock. Cards get a badge
   (green at the live edge, amber behind, red stale or erroring) and the
-  dashboard says how many need attention. **Check health** runs it now;
+  dashboard says how many need attention. Each card has a 24-hour
+  sparkline and links to the channel's history page (`HEALTH_HISTORY_DAYS`,
+  default 7: charts and status changes). **Check health** runs it now;
   `flask check-health` from the CLI.
 - ▶️ **One-click play** — each channel card signs a fresh HLS URL and opens
   the monitoring player with it. Copy HLS/DASH buttons for use in other players.
@@ -88,6 +90,7 @@ latency, drift, ABR, DRM keys, ID3/SCTE-35, captions and more.
 | `users`           | Login accounts                                                |
 | `uplynk_accounts` | Workspaces + encrypted API key / scoped key                   |
 | `channels`        | Synced live channels (plus favorite flag, encryption, health) |
+| `channel_health_checks` | Every health check, kept `HEALTH_HISTORY_DAYS`          |
 | `engine_presets`  | Saved player setups (format, engine@version, DRM, delay, CMCD) |
 | `playback_sessions` | Recorded player sessions (redacted)                         |
 | `playback_events` | Every signing / Preplay request (no signatures stored)        |
@@ -208,6 +211,7 @@ a Docker Compose stack on the shared `auth-net` network, fronted by Caddy at
 | `SESSION_RETENTION_DAYS`   | Days to keep recorded sessions (default 30; 0 = forever)      |
 | `CHANNEL_SYNC_INTERVAL`    | Background channel sync, minutes (default 60; 0 = off)        |
 | `CHANNEL_HEALTH_INTERVAL`  | Background channel health check, minutes (default 10; 0 = off) |
+| `HEALTH_HISTORY_DAYS`      | Days of health checks kept for charts (default 7)              |
 | `MAX_RECORDING_BYTES`      | Largest recorded session accepted (default 8 MiB)             |
 | `CSL_BASE_URL`             | csl-slicer-console URL for slicer links (optional)            |
 | `CSL_API_TOKEN`            | The console's `PLAYER_API_TOKEN`: show slicer wallclock (optional) |

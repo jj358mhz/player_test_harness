@@ -3,17 +3,19 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime, timedelta
 from itertools import groupby
 
 from flask import abort, current_app, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import login_required
 
-from app import csl
+from app import csl, health_history
 from app.engines import ENGINES
 from app.main import bp
 from app.models import AdminEvent, Channel, PlaybackEvent, PlaybackSession, UplynkAccount, db
 from app.presets import list_presets
 from app.sessions import expires_at
+from app.uplynk.health import BEHIND_AFTER_S, STALE_AFTER_S
 from app.uplynk.playback import CONTENT_TYPES
 from app.vite import COMPARE_ENTRY, RECORDING_ENTRY, vite_assets
 
@@ -34,6 +36,9 @@ def index() -> str:
     ]
     account_count = db.session.query(UplynkAccount).count()
     checked = [c.health_checked_at for c in channels if c.health_checked_at]
+    now = datetime.now(UTC)
+    day_ago = now - timedelta(days=1)
+    past = health_history.history([c.id for c in channels], day_ago)
     return render_template(
         "main/index.html",
         groups=groups,
@@ -42,6 +47,36 @@ def index() -> str:
         attention=sum(1 for c in channels if c.needs_attention),
         health_checked_at=max(checked) if checked else None,
         health_interval=current_app.config["CHANNEL_HEALTH_INTERVAL"],
+        sparks={
+            cid: health_history.sparkline(points, day_ago, now) for cid, points in past.items()
+        },
+        since={cid: health_history.streak_start(points) for cid, points in past.items()},
+    )
+
+
+@bp.route("/channels/<int:channel_id>/health")
+@login_required
+def channel_health(channel_id: int) -> str:
+    """One channel's live-edge age over the kept history, and its status changes."""
+    channel = db.session.get(Channel, channel_id) or abort(404)
+    days = max(1, current_app.config["HEALTH_HISTORY_DAYS"])
+    now = datetime.now(UTC)
+    start = now - timedelta(days=days)
+    points = health_history.history([channel.id], start)[channel.id]
+    day_ago = now - timedelta(days=1)
+    return render_template(
+        "main/channel_health.html",
+        channel=channel,
+        days=days,
+        points=points,
+        chart_day=health_history.sparkline(
+            [p for p in points if p.at >= day_ago], day_ago, now, 900, 170, axis=True
+        ),
+        chart_all=health_history.sparkline(points, start, now, 900, 170, axis=True),
+        changes=health_history.changes(points, now),
+        health_interval=current_app.config["CHANNEL_HEALTH_INTERVAL"],
+        behind_s=BEHIND_AFTER_S,
+        stale_s=STALE_AFTER_S,
     )
 
 

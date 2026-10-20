@@ -571,6 +571,34 @@ form.inline {
     color: #fca5a5;
     border-color: rgba(224, 82, 82, 0.45);
 }
+.channel-card__health {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+    color: var(--text-dim);
+    font-size: 12px;
+}
+.channel-card__health:hover .health-spark {
+    background: rgba(255, 255, 255, .04);
+}
+.channel-card__since {
+    color: #fca5a5;
+}
+.health-spark {
+    display: block;
+    border-radius: 4px;
+    flex: none;
+}
+.health-chart .health-spark {
+    width: 100%;
+    height: auto;
+}
+.health-spark__label {
+    font-size: 10px;
+    fill: var(--text-faint);
+    font-family: inherit;
+}
 .health-summary {
     font-size: 13px;
     color: var(--text-dim);
