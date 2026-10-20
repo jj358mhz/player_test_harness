@@ -300,7 +300,10 @@ in the `player_harness_data` volume.
       run); `app/health_history.py` draws server-side SVG sparklines (card,
       24 h) and `/channels/<id>/health` (24 h + N days, status changes).
       Times on cards/table are localized by `app.js` (`time[data-local]`);
-      chart axes stay UTC.
+      chart axes stay UTC. v3.20.0: `GET /api/health/slicers` (bearer
+      `CSL_API_TOKEN`, the same shared secret both ways) feeds health
+      badges on csl-slicer-console's slicer cards (console v1.18.0,
+      `PLAYER_API_URL`).
 
 ### Todo
 

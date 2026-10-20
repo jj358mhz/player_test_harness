@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hmac
+
 from flask import Blueprint, abort, current_app, jsonify, request, url_for
 from flask_login import current_user, login_required
 
@@ -156,3 +158,41 @@ def delete_preset(preset_id: int):
     db.session.delete(row)
     db.session.commit()
     return jsonify(items=list_presets())
+
+
+@bp.route("/health/slicers")
+def health_by_slicer():
+    """Latest health of every channel with a slicer, for csl-slicer-console.
+
+    Bearer `CSL_API_TOKEN` (the same shared secret the console checks for
+    its settings API) instead of a login; 404 when it isn't set.
+    """
+    token = current_app.config["CSL_API_TOKEN"]
+    if not token:
+        abort(404)
+    scheme, _, presented = request.headers.get("Authorization", "").partition(" ")
+    if scheme.lower() != "bearer" or not hmac.compare_digest(presented.strip(), token):
+        return jsonify(error="unauthorized"), 401
+    rows = (
+        db.session.query(Channel)
+        .filter(Channel.is_active.is_(True), Channel.slicer_id.isnot(None))
+        .order_by(Channel.slicer_id, Channel.id)
+        .all()
+    )
+    return jsonify(
+        items=[
+            {
+                "slicer_id": c.slicer_id,
+                "channel": c.id,
+                "name": c.display_name,
+                "status": c.health_status,
+                "edge_s": None if c.health_edge_s is None else round(c.health_edge_s, 1),
+                "detail": c.health_detail,
+                "checked_at": None
+                if c.health_checked_at is None
+                else c.health_checked_at.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "health_url": url_for("main.channel_health", channel_id=c.id),
+            }
+            for c in rows
+        ]
+    )

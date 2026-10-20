@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.20.0] - 2026-10-19
+
+### Added
+- **Channel health for the slicer console.** `GET /api/health/slicers`
+  returns the latest health check of every active channel that has a
+  slicer (status, edge age, detail, when, and a link to its health page).
+  It takes `Authorization: Bearer <CSL_API_TOKEN>` (the secret the player
+  already shares with csl-slicer-console) instead of a login, and is off
+  (404) without it. csl-slicer-console v1.18.0 shows it as a badge on each
+  slicer card.
+
 ## [3.19.0] - 2026-10-19
 
 ### Added
