@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.23.1] - 2026-10-20
+
+### Fixed
+- The count beside the Presets and Recorded sessions headings now says
+  what it counts ("3 saved"), like the dashboard's "12 active", instead of
+  a bare number that read like a footnote.
+
 ## [3.23.0] - 2026-10-20
 
 ### Added
