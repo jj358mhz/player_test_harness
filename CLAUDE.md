@@ -206,7 +206,9 @@ after dependency changes.
   `ad=` plus the row's `ad.*` params (v3.21.0). Per-load params such as
   `ad.lib=KOR` (they vary per customer/playback) go in the box under Ads:
   `parseAdParams` (deeplink.ts) / `normalize_ad_params` (presets.py) share
-  the rules; deep link `adp=` (v3.22.0).
+  the rules. Deep links and presets carry them as themselves after `ad=`
+  (v3.22.2; v3.22.0's packed `adp=` is still read, and listed presets are
+  re-normalized).
 - **SSAI** (docs "Ad Breaks", "Client-Side Beaconing Using Dynamic Manifest
   Markers", "Ad Verification"): Uplynk stitches ads into each session's
   manifest. DASH: each ad is a Period identified by `AssetIdentifier

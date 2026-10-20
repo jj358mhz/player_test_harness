@@ -76,7 +76,13 @@ export function parseView(search: string): View {
     if (delay !== null) view.delay = delay;
     const ad = q.get('ad');
     if (ad && /^[A-Za-z0-9_.-]{1,100}$/.test(ad)) view.ad = ad;
-    const adp = parseAdParams(q.get('adp') ?? '');
+    // The ad server's per-load params ride as themselves (ad.lib=KOR); links
+    // from v3.22.0 packed them into adp=.
+    const own = [...q].filter(([k]) => k.startsWith('ad.'));
+    const text = [q.get('adp') ?? '', new URLSearchParams(own).toString()]
+        .filter(Boolean)
+        .join('&');
+    const adp = parseAdParams(text);
     if (view.ad && 'query' in adp && adp.query) view.adParams = adp.query;
     if (q.get('cmcd') === '1') view.cmcd = true;
     return view;
@@ -99,7 +105,9 @@ export function viewQuery(view: View): string {
     if (view.rays && !view.src) q.set('rays', view.rays);
     if (view.delay !== undefined && !view.src) q.set('delay', String(view.delay));
     if (view.ad && !view.src) q.set('ad', view.ad);
-    if (view.ad && view.adParams && !view.src) q.set('adp', view.adParams);
+    if (view.ad && view.adParams && !view.src) {
+        for (const [key, value] of new URLSearchParams(view.adParams)) q.append(key, value);
+    }
     if (view.cmcd) q.set('cmcd', '1');
     // Keep @ and : readable; URLSearchParams escapes them.
     return q.toString().replace(/%40/g, '@').replace(/%3A/gi, ':').replace(/%2F/gi, '/');

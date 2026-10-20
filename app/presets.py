@@ -8,6 +8,7 @@ the same rules, because the engine version ends up in a jsDelivr URL.
 
 from __future__ import annotations
 
+import contextlib
 import re
 from typing import Any
 from urllib.parse import parse_qsl, urlencode
@@ -18,21 +19,18 @@ NAME_MAX = 60
 ENGINES = {"hlsjs", "shaka", "dashjs", "native"}
 VERSION_RE = re.compile(r"^\d+\.\d+\.\d+(-[\w.]+)?$")
 # Same order as the player's viewQuery().
-_ORDER = ("format", "engine", "drm", "delay", "ad", "adp", "cmcd")
+# Same order as the player's viewQuery(); the ad.* params follow ad.
+_ORDER = ("format", "engine", "drm", "delay", "ad", "cmcd")
 AD_NAME_RE = re.compile(r"^[A-Za-z0-9_.-]{1,100}$")
 # Per-load ad.* params (deeplink.ts parseAdParams): same keys and characters.
 AD_PARAM_KEY = re.compile(r"^ad\.[A-Za-z0-9_.]{1,40}$")
 AD_PARAM_VALUE = re.compile(r"^[A-Za-z0-9_.,:/|\- ]{0,200}$")
 
 
-def normalize_ad_params(text: str) -> str:
-    pairs = parse_qsl(text, keep_blank_values=True)
-    if not pairs or len(pairs) > 10:
-        raise PresetError("ad params must be 1 to 10 ad.* params")
-    for key, value in pairs:
-        if not AD_PARAM_KEY.match(key) or not AD_PARAM_VALUE.match(value):
-            raise PresetError(f"bad ad param {key!r}")
-    return urlencode(pairs)
+def _ad_param(key: str, value: str) -> tuple[str, str]:
+    if not AD_PARAM_KEY.match(key) or not AD_PARAM_VALUE.match(value):
+        raise PresetError(f"bad ad param {key!r}")
+    return key, value
 
 
 class PresetError(ValueError):
@@ -44,6 +42,7 @@ def normalize_query(query: str) -> str:
     if not isinstance(query, str) or len(query) > 300:
         raise PresetError("query must be a short string")
     params: dict[str, str] = {}
+    ad_params: list[tuple[str, str]] = []
     for key, value in parse_qsl(query.lstrip("?"), keep_blank_values=True):
         if key in ("channel", "src", "rays", "tab"):
             continue  # the source and per-channel choices aren't part of a preset
@@ -72,8 +71,11 @@ def normalize_query(query: str) -> str:
             if not AD_NAME_RE.match(value):
                 raise PresetError(f"bad ad server name {value!r}")
             params[key] = value
+        elif key.startswith("ad."):
+            ad_params.append(_ad_param(key, value))
         elif key == "adp":
-            params[key] = normalize_ad_params(value)
+            # v3.22.0 packed them into one param; read those too.
+            ad_params += [_ad_param(k, v) for k, v in parse_qsl(value, keep_blank_values=True)]
         elif key == "cmcd":
             if value == "1":
                 params[key] = value
@@ -81,9 +83,17 @@ def normalize_query(query: str) -> str:
             raise PresetError(f"unknown setting {key!r}")
     if "engine" not in params:
         raise PresetError("a preset needs an engine")
-    if "adp" in params and "ad" not in params:
+    if ad_params and "ad" not in params:
         raise PresetError("ad params need an ad server")
-    return urlencode([(k, params[k]) for k in _ORDER if k in params], safe="@:/")
+    if len(ad_params) > 10:
+        raise PresetError("at most 10 ad params")
+    pairs: list[tuple[str, str]] = []
+    for key in _ORDER:
+        if key in params:
+            pairs.append((key, params[key]))
+        if key == "ad":
+            pairs += ad_params
+    return urlencode(pairs, safe="@:/")
 
 
 def clean_name(name: Any) -> str:
@@ -114,4 +124,10 @@ def save_preset(data: Any, user: User | None) -> tuple[EnginePreset, bool]:
 
 def list_presets() -> list[dict[str, object]]:
     rows = db.session.query(EnginePreset).order_by(EnginePreset.name).all()
-    return [r.as_dict() for r in rows]
+    out = []
+    for row in rows:
+        item = row.as_dict()
+        with contextlib.suppress(PresetError):  # an older release's form, today's way
+            item["query"] = normalize_query(row.query)
+        out.append(item)
+    return out

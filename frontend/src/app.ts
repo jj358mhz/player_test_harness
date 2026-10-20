@@ -1643,7 +1643,12 @@ export class PlayerApp {
         if (view.delay !== undefined) this.setDelay(view.delay);
         if (view.ad) {
             this.pendingAd = view.ad;
-            this.el<HTMLInputElement>('adParams').value = view.adParams ?? '';
+            // As typed: values can't hold & or =, so they read fine unencoded.
+            this.el<HTMLInputElement>('adParams').value = [
+                ...new URLSearchParams(view.adParams ?? ''),
+            ]
+                .map(([k, v]) => `${k}=${v}`)
+                .join('&');
             this.renderAdOptions();
         }
         if (view.cmcd) this.el<HTMLInputElement>('cmcd').checked = true;
