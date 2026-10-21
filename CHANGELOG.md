@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.26.1] - 2026-10-20
+
+### Fixed
+- **Dashboard much faster with many channels.** With 178 channels it took
+  about 1 s to render on the Pi: about half reading the day's ~25,000
+  health checks, the rest drawing 178 sparklines and the page. Each worker
+  now keeps the sparklines until the next health check run (every
+  `CHANNEL_HEALTH_INTERVAL` minutes) or until the channel list changes.
+  Locally a repeat view went from 79 ms to 10 ms. The 24-hour window ends
+  at the latest check instead of now. Sparklines use whole-pixel
+  coordinates, cutting their markup by about a quarter (442 KB to 337 KB
+  for 178 cards).
+
 ## [3.26.0] - 2026-10-20
 
 ### Added

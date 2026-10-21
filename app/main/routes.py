@@ -57,9 +57,9 @@ def index() -> str:
     ]
     account_count = db.session.query(UplynkAccount).count()
     checked = [c.health_checked_at for c in channels if c.health_checked_at]
-    now = datetime.now(UTC)
-    day_ago = now - timedelta(days=1)
-    past = health_history.history([c.id for c in channels], day_ago)
+    sparks, since = health_history.dashboard(
+        [c.id for c in channels], max(checked) if checked else None
+    )
     return render_template(
         "main/index.html",
         groups=groups,
@@ -68,10 +68,8 @@ def index() -> str:
         attention=sum(1 for c in channels if c.needs_attention),
         health_checked_at=max(checked) if checked else None,
         health_interval=current_app.config["CHANNEL_HEALTH_INTERVAL"],
-        sparks={
-            cid: health_history.sparkline(points, day_ago, now) for cid, points in past.items()
-        },
-        since={cid: health_history.streak_start(points) for cid, points in past.items()},
+        sparks=sparks,
+        since=since,
     )
 
 

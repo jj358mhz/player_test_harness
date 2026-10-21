@@ -112,3 +112,30 @@ def test_account_delete_takes_history(auth_client, channel, probe_calls):
     assert r.status_code in (302, 303)
     db.session.expire_all()
     assert db.session.query(ChannelHealthCheck).count() == 0
+
+
+def test_dashboard_draws_once_per_health_run(app, channel, probe_calls, monkeypatch):
+    from app import health_history
+    from app.api.service import check_health
+
+    drawn = []
+    real = health_history.history
+    monkeypatch.setattr(health_history, "history", lambda *a: drawn.append(1) or real(*a))
+    check_health([channel], now=serve(probe_calls, 35))
+    latest = channel.health_checked_at
+    sparks, _ = health_history.dashboard([channel.id], latest)
+    assert 'class="health-spark"' in sparks[channel.id] or sparks[channel.id] == ""
+    health_history.dashboard([channel.id], latest)
+    assert len(drawn) == 1  # same run: cached
+    check_health([channel], now=serve(probe_calls, 40))
+    health_history.dashboard([channel.id], channel.health_checked_at)
+    assert len(drawn) == 2  # a new run draws again
+    health_history.dashboard([], channel.health_checked_at)
+    assert len(drawn) == 3  # so does another channel list
+
+
+def test_sparkline_uses_whole_pixels():
+    svg = sparkline(
+        pts((0, "ok", 30), (10, "ok", 31.7), (20, "behind", 95)), T, T + timedelta(hours=1)
+    )
+    assert "." not in svg.split('points="')[1].split('"')[0]

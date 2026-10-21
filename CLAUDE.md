@@ -363,7 +363,10 @@ in the `player_harness_data` volume.
       kept in `channel_health_checks` (`HEALTH_HISTORY_DAYS`, pruned per
       run); `app/health_history.py` draws server-side SVG sparklines (card,
       24 h) and `/channels/<id>/health` (24 h + N days, status changes).
-      Times on cards/table are localized by `app.js` (`time[data-local]`);
+      v3.26.1: the dashboard's sparklines are cached per worker until the
+      next health run (`health_history.dashboard()`, keyed by the newest
+      `health_checked_at` + channel ids; ~1 s → ~0.15 s on the Pi at 178
+      channels). Times on cards/table are localized by `app.js` (`time[data-local]`);
       chart axes stay UTC. v3.20.0: `GET /api/health/slicers` (bearer
       `CSL_API_TOKEN`, the same shared secret both ways) feeds health
       badges on csl-slicer-console's slicer cards (console v1.18.0,

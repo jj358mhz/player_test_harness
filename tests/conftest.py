@@ -36,6 +36,14 @@ def app(monkeypatch, tmp_path):
 
 
 @pytest.fixture(autouse=True)
+def fresh_dashboard_cache(monkeypatch):
+    """Each test draws its own dashboard sparklines."""
+    from app import health_history
+
+    monkeypatch.setattr(health_history, "_dashboard_cache", None)
+
+
+@pytest.fixture(autouse=True)
 def probe_calls(monkeypatch):
     """Stub the post-signing manifest probe so tests never hit Uplynk.
 

@@ -3,11 +3,13 @@
 Charts are inline SVG drawn on the server from `ChannelHealthCheck` rows,
 so the dashboard needs no script for them. The y axis is the live edge's
 age (seconds); stale and erroring checks are marked in red, behind in
-amber, and gaps in checking leave gaps in the line.
+amber, and gaps in checking leave gaps in the line. Coordinates are whole
+pixels: a dashboard of ~180 cards carries ~25k points.
 """
 
 from __future__ import annotations
 
+import threading
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
@@ -140,7 +142,7 @@ def sparkline(
                 runs.append(run)
             run = []
         if point.edge_s is not None:
-            run.append(f"{x(point.at):.1f},{y(point.edge_s):.1f}")
+            run.append(f"{x(point.at):.0f},{y(point.edge_s):.0f}")
         previous = point
     if len(run) > 1:
         runs.append(run)
@@ -155,7 +157,7 @@ def sparkline(
         if colour is None:
             continue
         cy = y(point.edge_s) if point.edge_s is not None else pad_top + plot_h - 1.5
-        parts.append(f'<circle cx="{x(point.at):.1f}" cy="{cy:.1f}" r="1.8" fill="{colour}"/>')
+        parts.append(f'<circle cx="{x(point.at):.0f}" cy="{cy:.0f}" r="1.8" fill="{colour}"/>')
     if len(points) == 1 and points[0].edge_s is not None and points[0].status == "ok":
         p = points[0]
         parts.append(f'<circle cx="{x(p.at):.1f}" cy="{y(p.edge_s):.1f}" r="1.8" fill="#86efac"/>')
@@ -189,3 +191,31 @@ def _axis(start, end, x, y, top, pad_left, height, width) -> str:
             )
         tick += step
     return "".join(parts)
+
+
+# One dashboard's sparklines per worker, until the next health run.
+_dashboard_lock = threading.Lock()
+_dashboard_cache: tuple[tuple, dict[int, Markup], dict[int, datetime | None]] | None = None
+
+
+def dashboard(
+    channel_ids: list[int], latest: datetime | None
+) -> tuple[dict[int, Markup], dict[int, datetime | None]]:
+    """Sparklines (24 h up to the latest check) and streak starts per channel.
+
+    History only changes when the health check runs, so the result is kept
+    until `latest` (the newest check) or the channel list changes.
+    """
+    global _dashboard_cache
+    key = (latest, tuple(channel_ids))
+    cached = _dashboard_cache
+    if cached is not None and cached[0] == key:
+        return cached[1], cached[2]
+    with _dashboard_lock:
+        end = utc(latest) if latest else datetime.now(UTC)
+        start = end - timedelta(days=1)
+        past = history(channel_ids, start)
+        sparks = {cid: sparkline(points, start, end) for cid, points in past.items()}
+        since = {cid: streak_start(points) for cid, points in past.items()}
+        _dashboard_cache = (key, sparks, since)
+    return sparks, since
