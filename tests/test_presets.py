@@ -27,6 +27,12 @@ from app.presets import PresetError, normalize_query
             "cmcd=1&engine=shaka&ad.lib=KOR&ad=fw2&ad.kv=a%2Cb",
             "engine=shaka&ad=fw2&ad.lib=KOR&ad.kv=a%2Cb&cmcd=1",
         ),
+        # Uplynk params ride after ad=; expand= lets ad.* go without an ad server.
+        (
+            "ifo=1&engine=shaka&expand=ad_01%2Cpb_01&ad.flex=10",
+            "engine=shaka&ifo=1&expand=ad_01%2Cpb_01&ad.flex=10",
+        ),
+        ("engine=shaka&fp.hd.hdcp=-1", "engine=shaka&fp.hd.hdcp=-1"),
         # v3.22.0's packed form reads as the plain one.
         ("engine=shaka&ad=fw2&adp=ad.lib%3DKOR", "engine=shaka&ad=fw2&ad.lib=KOR"),
     ],
@@ -52,7 +58,9 @@ def test_normalize(query, expected):
         "engine=hlsjs&ad.lib=KOR",  # params without an ad server
         "engine=hlsjs&ad=fw2&adp=delay%3D20",
         "engine=hlsjs&ad=fw2&ad.lib=%3Cx%3E",
-        "engine=hlsjs&ad=fw2&" + "&".join(f"ad.k{i}=v" for i in range(11)),
+        "engine=hlsjs&ad=fw2&" + "&".join(f"ad.k{i}=v" for i in range(21)),
+        "engine=hlsjs&expand=a%20b",
+        "engine=hlsjs&sig=abc",
         "engine=hlsjs&" + "x" * 300,
     ],
 )
@@ -129,7 +137,8 @@ def test_describe():
         "ad=fw2 ad.lib=KOR",
         "CMCD",
     ]
-    assert d["fields"]["ad_params"] == "ad.lib=KOR"
+    assert d["fields"]["params"] == "ad.lib=KOR"
+    assert describe("engine=hlsjs&expand=pb_01&ifo=1")["parts"][-1] == "expand=pb_01 ifo=1"
     assert d["fields"]["version"] == "5.3.0"
     assert describe("engine=hlsjs")["parts"] == ["HLS", "hls.js (default version)"]
 
@@ -144,7 +153,7 @@ def test_page_adds_edits_and_deletes(auth_client):
 
     r = auth_client.post(
         "/presets",
-        data=_form(drm="wv", delay="30", ad="fw2", ad_params=" ad.lib=KOR & ad.flex=10 ", cmcd="1"),
+        data=_form(drm="wv", delay="30", ad="fw2", params=" ad.lib=KOR & ad.flex=10 ", cmcd="1"),
     )
     assert r.status_code == 302
     row = db.session.query(EnginePreset).one()
@@ -176,9 +185,10 @@ def test_page_adds_edits_and_deletes(auth_client):
     ("fields", "message"),
     [
         ({"version": "latest"}, "bad engine version"),
-        ({"ad_params": "ad.lib=KOR"}, "ad params need an ad server"),
-        ({"ad": "fw2", "ad_params": "lib=KOR"}, "only ad.* params"),
-        ({"ad": "fw2", "ad_params": "ad.lib"}, "needs a value"),
+        ({"params": "ad.lib=KOR"}, "ad.lib needs an ad server"),
+        ({"ad": "fw2", "params": "lib=KOR"}, "lib isn't a param this player signs"),
+        ({"ad": "fw2", "params": "ad.lib"}, "needs a value"),
+        ({"params": "rays=fe"}, "pick rays in the ABR tab"),
         ({"name": " "}, "name is required"),
     ],
 )

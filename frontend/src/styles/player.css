@@ -746,6 +746,26 @@
 .pl-extra .pl-control {
     height: 30px;
 }
+.pl-extra--params {
+    flex: 1 1 420px;
+    flex-wrap: wrap;
+}
+.pl-extra--params #pl-params {
+    flex: 1 1 200px;
+    min-width: 0;
+}
+.pl-param-pick {
+    flex: 0 0 auto;
+    width: 92px;
+}
+.pl-extra__hint {
+    flex: 1 1 100%;
+    font-size: 12px;
+    color: var(--text-dim);
+}
+.pl-extra__hint:empty {
+    display: none;
+}
 .pl-loadbar__tools {
     display: flex;
     flex-wrap: wrap;

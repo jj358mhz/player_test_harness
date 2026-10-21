@@ -81,6 +81,7 @@ after dependency changes.
     until `total_items`. Allowed params: after, include_deleted, order,
     page, page_size, search, type (+ msg/sig).
   - `playback.py` — URL templates, token signing, Preplay v2 fetch.
+  - `params.py` — customization params a load may sign (the Params box).
   - `clock.py` — DASH clock offset: matches MPD `$Number$` slices (per
     Period `AssetIdentifier`) to `pdts=latency` HLS `#UPLYNK-SEGMENT`
     slices. `create_playback` returns it as `clock` for live DASH.
@@ -124,6 +125,9 @@ after dependency changes.
     `mp4.ts` (prft/tfdt/mdhd from DASH segments → encoder-time anchors
     for the same clock ID3 uses; emsg payload preview),
     `waterfall.ts` (request detail; first byte from the engine or Resource Timing),
+    `uplynkParams.ts` (the Params box: + param menu, accepted keys/families,
+    refused keys; `app/uplynk/params.py` mirrors it for presets and
+    `tests/test_uplynk_params.py` checks they match),
     `deeplink.ts` (address bar ⇄ load bar; validates
     engine versions because they end up in a jsDelivr URL).
   - `compare.ts` — third Vite entry, `/compare`: two `/player?embed=1`
@@ -207,12 +211,19 @@ after dependency changes.
   is about transcoded creatives), so `AdServer` rows are entered per account
   (`app/ads.py`, account edit page) and the player's **Ads** menu signs
   `ad=` plus the row's `ad.*` params (v3.21.0). Per-load params such as
-  `ad.lib=KOR` (they vary per customer/playback) go in the box under Ads:
-  `parseAdParams` (deeplink.ts) / `normalize_ad_params` (presets.py) share
-  the rules. Deep links and presets carry them as themselves after `ad=`
+  `ad.lib=KOR` (they vary per customer/playback) go in the **Params** box
+  (v3.24.0; `parseParams` in uplynkParams.ts / `check_params` in
+  `app/uplynk/params.py` share the rules). Deep links and presets carry
+  them as themselves after `ad=`
   (v3.22.2; v3.22.0's packed `adp=` is still read, and listed presets are
   re-normalized).
-- **Preplay rejects `ad.preroll=1`** (undocumented param; 2026-10-20): Preplay
+- **Parameter expansion** (`expand=set1,set2`, signed like any param):
+  sets are defined on the CMS Parameter Expansion page, no API lists them;
+  Uplynk expands them server-side (not `jsonp`, `pbs`, `skip_drm`, `oid`,
+  channel `start`/`stop`, `stageplayer`). Typed in the player's **Params**
+  box (v3.24.0), whose **+ param** menu is the docs' live-channel list.
+- **Preplay rejects `ad.preroll=1`** (only named in passing in the docs,
+  under `ad_interval`: "Use `ad.preroll`" for a pre-roll; 2026-10-20): Preplay
   v2 answers `500 Server error, sorry` whenever it's signed (HLS without DRM
   too), while a signed `/channel/<id>.m3u8` with the same params plays the
   preroll. Studio DRM channels need Preplay, so no prerolls there.
@@ -303,7 +314,9 @@ in the `player_harness_data` volume.
       = one row of fields + Load, secondary buttons in a toolbar row.
       **v3.23.0:** Preset first; second row = extras a choice asks for
       (custom version, ad params) left, Copy link / Save session / Save as
-      preset… right; presets managed on the `/presets` page. Native
+      preset… right; presets managed on the `/presets` page. **v3.24.0:**
+      **Params** box for any synced channel (`expand=` sets, `ad.*`,
+      documented Uplynk params) with a grouped **+ param** menu (#57). Native
       verified in real Safari (2026-10-19: FairPlay, ID3 cues, PDT).
 - [~] Phase 3 — DRM. **Done (v3.2.0):** Shaka engine, Widevine/PlayReady
       over DASH from Preplay, DRM panel (key system, license timing/status,

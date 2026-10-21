@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.24.0] - 2026-10-20
+
+### Added
+- **Params box with a + param menu** (#57). The load bar's second row now
+  has **Params** for every synced channel (it was **Ad params**, shown only
+  with an ad server). It signs Uplynk customization params into the load,
+  including **`expand=`** (parameter expansion sets from the CMS).
+  **+ param** lists the documented live-channel params, grouped (General,
+  Ads, Studio DRM), each with a line on what it does; picking one adds it
+  to the box. Also accepted: any `ad.*`, `fp.*`, `rmp.*` and `pr.*` key.
+  `ad.*` needs an ad server or an `expand=` set. Keys the player sets
+  itself (`ad`, `rays`, `delay`, `pdts`, CMCD, `ak`, the token) are refused,
+  with a pointer to their control. Deep links and presets carry the params
+  as themselves; the Presets page's **Ad params** field is now
+  **Uplynk params**. The same rules live in `frontend/src/lib/uplynkParams.ts`
+  and `app/uplynk/params.py`, and a test checks the two match.
+
 ## [3.23.3] - 2026-10-20
 
 ### Fixed

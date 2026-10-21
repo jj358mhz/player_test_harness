@@ -323,7 +323,7 @@ def save_preset_form():
         abort(404)
     form = {
         k: request.form.get(k, "")
-        for k in ("name", "format", "engine", "version", "drm", "delay", "ad", "ad_params")
+        for k in ("name", "format", "engine", "version", "drm", "delay", "ad", "params")
     }
     form["cmcd"] = bool(request.form.get("cmcd"))
     try:
