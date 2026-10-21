@@ -158,3 +158,55 @@ def test_list_channels_error_on_a_later_page_fails_the_sync():
     client, _ = _client([_page(0, 40, 80), FakeResponse(500, text="boom")])
     with pytest.raises(UplynkAPIError, match="HTTP 500"):
         client.list_channels()
+
+
+def _ad_item(name, type_="Promo", provider="vz"):
+    # Shape seen 2026-10-20: @id is just the collection path.
+    return {
+        "@id": "/api/v4/ads/servers/",
+        "@type": "AdServer",
+        "name": name,
+        "type": type_,
+        "provider": provider,
+    }
+
+
+def test_list_ad_servers_uses_classic_auth_even_with_a_scoped_key(ec_keypair):
+    scoped = ScopedCredentials(
+        "kid1", "sub1", ec_keypair["private_b64"], "video.services.channels:read"
+    )
+    payload = {"items": [_ad_item("adcfg1"), _ad_item("adcfg2", "", "")], "total_items": 2}
+    client, session = _client(FakeResponse(200, payload), scoped=scoped)
+    servers = client.list_ad_servers()
+    url, kwargs = session.calls[0]
+    assert url == "https://services.uplynk.com/api/v4/ads/servers"
+    assert set(kwargs["params"]) == {"msg", "sig", "page"}
+    assert "X-Auth-Uplynk-Jwt" not in kwargs["headers"]
+    assert [(s.name, s.type, s.provider) for s in servers] == [
+        ("adcfg1", "Promo", "vz"),
+        ("adcfg2", None, None),
+    ]
+
+
+@pytest.mark.parametrize(
+    ("response", "match"),
+    [
+        (FakeResponse(403), r"refused /api/v4/ads/servers \(403\)"),
+        (FakeResponse(401), "workspace ID / API key"),
+        (FakeResponse(200, {"items": [{"type": "x"}]}), "missing a name"),
+    ],
+)
+def test_list_ad_servers_errors(response, match):
+    client, _ = _client(response)
+    with pytest.raises(UplynkAPIError, match=match):
+        client.list_ad_servers()
+
+
+def test_list_ad_servers_walks_pages():
+    pages = [
+        FakeResponse(200, {"items": [_ad_item(f"a{i}") for i in range(40)], "total_items": 41}),
+        FakeResponse(200, {"items": [_ad_item("a40")], "total_items": 41}),
+    ]
+    client, session = _client(pages)
+    assert len(client.list_ad_servers()) == 41
+    assert [kw["params"]["page"] for _, kw in session.calls] == [1, 2]

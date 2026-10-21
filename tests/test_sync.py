@@ -6,7 +6,7 @@ import pytest
 
 from app.models import Channel, db
 from app.uplynk import sync as sync_module
-from app.uplynk.channels import DiscoveredChannel, UplynkAPIError
+from app.uplynk.channels import DiscoveredAdServer, DiscoveredChannel, UplynkAPIError
 
 
 def _dc(channel_id, desc="Desc", **kwargs):
@@ -16,15 +16,21 @@ def _dc(channel_id, desc="Desc", **kwargs):
 
 
 class StubClient:
-    def __init__(self, channels=None, error=None, auth_mode="classic"):
+    def __init__(self, channels=None, error=None, auth_mode="classic", ad_servers=None):
         self.channels = channels or []
         self.error = error
         self.auth_mode = auth_mode
+        self.ad_servers = ad_servers or []
 
     def list_channels(self):
         if self.error:
             raise self.error
         return self.channels
+
+    def list_ad_servers(self):
+        if isinstance(self.ad_servers, Exception):
+            raise self.ad_servers
+        return self.ad_servers
 
 
 @pytest.fixture
@@ -121,3 +127,67 @@ def test_cli_sync_channels_exits_nonzero_on_error(app, make_account, stub_client
     result = app.test_cli_runner().invoke(args=["sync-channels"])
     assert result.exit_code == 1
     assert "nope" in result.output
+
+
+def test_sync_lists_ad_servers_without_choosing_one(
+    app, auth_client, make_account, make_channel, stub_client, monkeypatch
+):
+    """New names are added, hand-set params survive, unlisted rows stay."""
+    from app.main import routes
+    from app.models import AdServer
+
+    monkeypatch.setattr(routes, "vite_assets", lambda entry="": {"js": "/x.js", "css": []})
+
+    acct = make_account()
+    make_channel(acct, "keep")
+    db.session.add_all(
+        [
+            AdServer(uplynk_account_id=acct.id, name="fw2", params="ad.flex=10"),
+            AdServer(uplynk_account_id=acct.id, name="handmade"),
+        ]
+    )
+    db.session.commit()
+    stub_client(
+        StubClient(
+            [_dc("keep")],
+            ad_servers=[
+                DiscoveredAdServer("fw2", "vast", "freewheel"),
+                DiscoveredAdServer("gam1", "vast", "google"),
+                DiscoveredAdServer("bad name!", None, None),
+            ],
+        )
+    )
+    result = sync_module.sync_account(acct)
+    assert (result.ad_servers.added, result.ad_servers.skipped) == (1, 1)
+    assert "ad servers: 1 new, 1 skipped" in result.summary
+    rows = {r.name: r for r in db.session.query(AdServer).filter_by(uplynk_account_id=acct.id)}
+    assert set(rows) == {"fw2", "gam1", "handmade"}
+    assert (rows["fw2"].params, rows["fw2"].provider, rows["fw2"].is_listed) == (
+        "ad.flex=10",
+        "freewheel",
+        True,
+    )
+    assert rows["handmade"].last_seen_at is None and not rows["handmade"].as_dict()["unlisted"]
+
+    # Dropped from the API: kept with its params, marked unlisted.
+    stub_client(
+        StubClient([_dc("keep")], ad_servers=[DiscoveredAdServer("gam1", "vast", "google")])
+    )
+    result = sync_module.sync_account(acct)
+    assert result.ad_servers.unlisted == 1
+    db.session.refresh(rows["fw2"])
+    assert rows["fw2"].params == "ad.flex=10" and rows["fw2"].as_dict()["unlisted"]
+
+    # The player lists them; nothing selects one (the Ads menu starts at None).
+    page = auth_client.get("/player").get_data(as_text=True)
+    assert '"gam1"' in page
+    assert '"ad":' not in page and "initialAd" not in page
+
+
+def test_ad_server_failure_keeps_channel_sync(app, make_account, stub_client):
+    acct = make_account()
+    stub_client(StubClient([_dc("c1")], ad_servers=UplynkAPIError("Uplynk API refused (403)")))
+    result = sync_module.sync_account(acct)
+    assert result.error is None and result.created == 1
+    assert "ad servers not synced: Uplynk API refused (403)" in result.summary
+    assert acct.last_sync_error is None

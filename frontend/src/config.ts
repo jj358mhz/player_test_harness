@@ -20,6 +20,11 @@ export interface AdServerOption {
     description: string | null;
     /** Extra `ad.*` params signed with it, as a query string. */
     params: string;
+    /** From channel sync (Uplynk's ad server list); null when entered by hand. */
+    provider?: string | null;
+    type?: string | null;
+    /** Synced once, but Uplynk no longer lists it. */
+    unlisted?: boolean;
 }
 
 /** A saved load-bar setup (deep-link query without a source). */

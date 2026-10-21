@@ -207,9 +207,19 @@ after dependency changes.
   server hosts allow CORS (verified in Safari 2026-10-19).
 - **SSAI needs `ad=<ad configuration name>`** on the playback URL (docs
   "Customize Playback via Parameters"): without it no ads, an unknown name
-  stops playback. No API lists the configurations (`/api2/ad/external/get`
-  is about transcoded creatives), so `AdServer` rows are entered per account
-  (`app/ads.py`, account edit page) and the player's **Ads** menu signs
+  stops playback. **`GET /api/v4/ads/servers`** (undocumented; an Uplynk
+  dev pointed it out 2026-10-20) lists the configurations: `items` of
+  `{@id, @type, name, type, provider}` + `total_items`, classic `msg`/`sig`
+  auth works. `name` = the CMS's Ad Configuration Name = the `ad=` value;
+  `type` is a label (e.g. a promo carousel type). Each item's `@id` is
+  just `/api/v4/ads/servers/` (no id); `/api/v4/ads/servers/<name>` returns
+  the same fields, no params. (`/api2/ad/external/get` is about transcoded
+  creatives.) Channel sync fills `AdServer` rows from it (v3.25.0,
+  `app/ads.py` `sync_ad_servers`: adds new names, keeps hand-set params,
+  marks dropped ones `is_listed=False`); names can still be added by hand
+  on the account page. **Nothing auto-selects an ad server for a channel**
+  (the user's rule): the **Ads** menu starts at None unless a link/preset
+  names one. The player's **Ads** menu signs
   `ad=` plus the row's `ad.*` params (v3.21.0). Per-load params such as
   `ad.lib=KOR` (they vary per customer/playback) go in the **Params** box
   (v3.24.0; `parseParams` in uplynkParams.ts / `check_params` in
@@ -316,7 +326,9 @@ in the `player_harness_data` volume.
       (custom version, ad params) left, Copy link / Save session / Save as
       preset… right; presets managed on the `/presets` page. **v3.24.0:**
       **Params** box for any synced channel (`expand=` sets, `ad.*`,
-      documented Uplynk params) with a grouped **+ param** menu (#57). Native
+      documented Uplynk params) with a grouped **+ param** menu (#57).
+      **v3.25.0:** ad servers synced from `/api/v4/ads/servers` with
+      channels; dashboard health history reads plain columns. Native
       verified in real Safari (2026-10-19: FairPlay, ID3 cues, PDT).
 - [~] Phase 3 — DRM. **Done (v3.2.0):** Shaka engine, Widevine/PlayReady
       over DASH from Preplay, DRM panel (key system, license timing/status,

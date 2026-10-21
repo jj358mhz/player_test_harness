@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.25.0] - 2026-10-20
+
+### Added
+- **Ad servers come from Uplynk.** Channel sync (the account's **Sync**,
+  **Sync all** and the background sync) now also lists the account's ad
+  configurations from `/api/v4/ads/servers`. That endpoint is undocumented;
+  an Uplynk dev pointed it out. New names are added. Existing rows keep
+  their description and extra `ad.*` params and gain the API's type and
+  provider. A name Uplynk stops listing is kept and marked **not listed**.
+  Names can still be added by hand. If the ad server request fails, the
+  channel sync still succeeds and its summary says why.
+- The **Ads** menu shows each name with its type. The account page marks
+  synced and no-longer-listed rows.
+
+### Changed
+- Nothing picks an ad server for a channel: the **Ads** menu still starts at
+  **None** unless a link or preset names one. A test now covers this.
+
+### Fixed
+- **Faster dashboard.** The 24-hour health history behind the sparklines
+  is read as plain columns instead of ORM objects (about half the render
+  time with a full day of checks).
+
 ## [3.24.0] - 2026-10-20
 
 ### Added

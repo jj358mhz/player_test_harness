@@ -1412,13 +1412,20 @@ export class PlayerApp {
         const servers = this.adServers();
         select.replaceChildren(
             h('option', {value: ''}, servers.length ? 'None' : 'None set up'),
-            ...servers.map((s) =>
-                h(
+            ...servers.map((s) => {
+                const what = s.description || s.type;
+                const label = [s.name, what].filter(Boolean).join(' · ');
+                return h(
                     'option',
-                    {value: s.name, title: [s.description, s.params].filter(Boolean).join(' · ')},
-                    s.description ? `${s.name} · ${s.description}` : s.name,
-                ),
-            ),
+                    {
+                        value: s.name,
+                        title: [s.description, s.type, s.provider, s.params]
+                            .filter(Boolean)
+                            .join(' · '),
+                    },
+                    s.unlisted ? `${label} (no longer listed)` : label,
+                );
+            }),
         );
         select.disabled = !servers.length;
         if (want && servers.some((s) => s.name === want)) {

@@ -80,7 +80,16 @@ def test_player_config_has_ad_servers(auth_client, make_account, make_channel, m
         ]
     )
     assert config["adServers"] == {
-        str(account.id): [{"name": "fw2", "description": None, "params": "ad.flex=10"}]
+        str(account.id): [
+            {
+                "name": "fw2",
+                "description": None,
+                "params": "ad.flex=10",
+                "provider": None,
+                "type": None,
+                "unlisted": False,
+            }
+        ]
     }
     assert config["channels"][0]["accountId"] == account.id == channel.uplynk_account_id
 
