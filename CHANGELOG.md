@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.27.1] - 2026-10-20
+
+### Fixed
+- **No pink text on hovered buttons.** The site-wide link hover colour
+  (magenta) won over buttons that are links, so the green ▶ Play buttons
+  (and magenta primary ones) showed pink text on hover. Their text now
+  stays white, and ghost-button links (e.g. **Advanced…**) keep their
+  normal text colour on hover.
+
 ## [3.27.0] - 2026-10-20
 
 ### Changed
