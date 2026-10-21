@@ -75,7 +75,14 @@
         </label>
     </div>
     <div class="account-section__body channel-grid">
+        {% set pinned = channels|selectattr('is_favorite')|list|length %}
         {% for ch in channels %}
+        {% if pinned and loop.index0 == pinned and pinned < channels|length %}
+        {# Pinned cards come first; a full-width rule marks where the rest start. #}
+        <div class="channel-grid__divider" role="separator" aria-label="Pinned channels above" data-pin-divider>
+            <span class="channel-grid__divider-label" title="Pinned channels above">★</span>
+        </div>
+        {% endif %}
         <article class="channel-card{% if ch.is_favorite %} channel-card--favorite{% endif %}"
                  id="channel-{{ ch.id }}"
                  data-channel
@@ -128,7 +135,7 @@
                     {% endif %}
                 </div>
                 <div class="channel-card__actions">
-                    <a class="button button--primary" href="{{ url_for('main.play_channel', channel_id=ch.id) }}"
+                    <a class="button button--play" href="{{ url_for('main.play_channel', channel_id=ch.id) }}"
                        data-play-label>{{ '▶ Play DRM' if ch.is_drm else '▶ Play HLS' }}</a>
                     <button type="button" class="btn-ghost" data-copy-url
                             data-body='{{ {"channel_id": ch.id, "manifest": "m3u8"}|tojson }}'>Copy HLS</button>

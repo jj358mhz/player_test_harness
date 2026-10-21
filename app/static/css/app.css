@@ -65,6 +65,14 @@
     --success: #22c55e;
     --info: #38bdf8;
 
+    /* Play buttons: green, easier on the eye than the magenta */
+    --play: #15803d;
+    --play-hover: #16a34a;
+
+    /* Pinned channels: star, card border and the rule after them */
+    --pin: #e3b341;
+    --pin-soft: rgba(227, 179, 65, .45);
+
     /* Radii */
     --radius-sm: 4px;
     --radius: 6px;
@@ -401,6 +409,23 @@ code {
 
 .button--primary:focus {
     outline: 2px solid var(--accent-hover);
+    outline-offset: 2px;
+}
+
+.button--play {
+    background: var(--play);
+    color: #fff;
+    letter-spacing: 0.3px;
+    padding: 12px 22px;
+    transition: background 0.15s;
+}
+
+.button--play:hover {
+    background: var(--play-hover);
+}
+
+.button--play:focus-visible {
+    outline: 2px solid var(--play-hover);
     outline-offset: 2px;
 }
 
@@ -1471,7 +1496,47 @@ form.inline {
 }
 
 .channel-card--favorite {
-    border-color: var(--accent);
+    border-color: var(--pin-soft);
+}
+
+/* Between pinned cards and the rest: a gold double rule fading out at both
+   ends, a star in the middle. Unlike the grey section header rules (with
+   their ▶ chevrons), it reads as a break inside one account. */
+.channel-grid__divider {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 6px 0;
+    color: var(--pin);
+    font-size: 12px;
+}
+
+.channel-grid__divider[hidden] {
+    display: none;
+}
+
+.channel-grid__divider::before,
+.channel-grid__divider::after {
+    content: "";
+    flex: 1;
+    height: 5px;
+    /* Two 1px lines, 3px apart, fading toward the edges. */
+    background:
+        linear-gradient(var(--pin-soft), var(--pin-soft)) top / 100% 1px no-repeat,
+        linear-gradient(var(--pin-soft), var(--pin-soft)) bottom / 100% 1px no-repeat;
+}
+
+.channel-grid__divider::before {
+    mask-image: linear-gradient(to right, transparent, #000 40%);
+}
+
+.channel-grid__divider::after {
+    mask-image: linear-gradient(to left, transparent, #000 40%);
+}
+
+.channel-grid__divider-label {
+    white-space: nowrap;
 }
 
 .channel-card__header {
@@ -1561,7 +1626,7 @@ form.inline {
 }
 
 .channel-card__star--on {
-    color: var(--accent);
+    color: var(--pin);
 }
 
 /* IDs and sparkline on the left, the buttons in a 2×2 block on the right;

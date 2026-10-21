@@ -6,7 +6,7 @@
 <div class="page-header">
     <h1>{{ channel.display_name }} <span class="page-header__meta">live-edge health</span></h1>
     <div class="page-header__controls">
-        <a class="button button--primary" href="{{ url_for('main.play_channel', channel_id=channel.id) }}">▶ Play</a>
+        <a class="button button--play" href="{{ url_for('main.play_channel', channel_id=channel.id) }}">▶ Play</a>
     </div>
 </div>
 

@@ -41,6 +41,13 @@ repo owner), reached over LAN/VPN only. Sister project and template:
 - Commits are authored as `jj358mhz@gmail.com`. Don't touch the old GitLab
   remote (`gitlab`, branch `gitlab-main` locally) — it's kept as-is.
 
+## UI conventions
+
+- Magenta (`--accent`) is the brand: header, links, primary form buttons.
+  Filled ▶ play buttons are green (`.button--play`, `--play`); pinned
+  channels are gold (`--pin`: ★, card border, the rule after them on the
+  dashboard).
+
 ## Commands
 
 ```bash
