@@ -146,7 +146,8 @@ after dependency changes.
   entry; `app/vite.py` collects CSS from imported chunks).
 - `app/admin/` — Uplynk account CRUD + sync (admin-only).
 - `app/presets.py` — saved engine presets (`EnginePreset`): a deep-link
-  query without source/rays, re-validated server-side with the
+  query without `src`/rays (an optional `channel=<id>`, checked to exist),
+  re-validated server-side with the
   deeplink.ts rules (versions go into jsDelivr URLs); `/api/presets`
   GET/POST (same name replaces)/DELETE; listed in the player's config.
   v3.23.0: `/presets` page (`main/presets.html`: list with `describe()`,
@@ -328,7 +329,10 @@ in the `player_harness_data` volume.
       **Params** box for any synced channel (`expand=` sets, `ad.*`,
       documented Uplynk params) with a grouped **+ param** menu (#57).
       **v3.25.0:** ad servers synced from `/api/v4/ads/servers` with
-      channels; dashboard health history reads plain columns. Native
+      channels; dashboard health history reads plain columns.
+      **v3.26.0:** a preset may name a channel (`channel=<id>`, optional;
+      Presets page menu, player **Include channel**; choosing it selects
+      the channel, **Open in player** plays it). Native
       verified in real Safari (2026-10-19: FairPlay, ID3 cues, PDT).
 - [~] Phase 3 — DRM. **Done (v3.2.0):** Shaka engine, Widevine/PlayReady
       over DASH from Preplay, DRM panel (key system, license timing/status,

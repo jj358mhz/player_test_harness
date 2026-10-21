@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.26.0] - 2026-10-20
+
+### Added
+- **Presets can name a channel.** Optional: the Presets page has a
+  **Channel** menu (None keeps a preset for any channel), and the player's
+  **Save as preset…** has **Include channel** (on when a synced channel is
+  selected). Choosing such a preset in the player selects its channel and
+  applies the rest; **Open in player** plays it straight away. The list
+  shows the channel first (`▶ <channel>`); a channel that has gone inactive
+  is marked. Picking another channel clears the Preset menu, like any
+  other change.
+
 ## [3.25.0] - 2026-10-20
 
 ### Added

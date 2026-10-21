@@ -16,9 +16,9 @@ from app.presets import PresetError, normalize_query
             "cmcd=1&delay=020&drm=wv&engine=shaka@5.3.0&format=dash",
             "format=dash&engine=shaka@5.3.0&drm=wv&delay=20&cmcd=1",
         ),
-        # The source and per-channel choices are dropped, not stored.
+        # A pasted source and per-load choices are dropped, not stored.
         (
-            "channel=4&src=https://x.example.com/a.m3u8&rays=fe&tab=abr&engine=native",
+            "src=https://x.example.com/a.m3u8&rays=fe&tab=abr&engine=native",
             "engine=native",
         ),
         ("?engine=dashjs&cmcd=0", "engine=dashjs"),
@@ -225,3 +225,34 @@ def test_page_heading_says_what_it_counts(auth_client):
     assert '<span class="page-header__meta">1 saved</span>' in auth_client.get("/presets").get_data(
         as_text=True
     )
+
+
+def test_preset_may_name_a_channel(auth_client, make_account, make_channel):
+    from app.models import EnginePreset, db
+    from app.presets import describe
+
+    channel = make_channel(make_account(), description="Demo channel")
+    assert normalize_query(f"engine=shaka&channel={channel.id}&rays=fe") == (
+        f"channel={channel.id}&engine=shaka"
+    )
+    for bad in ("999", "0", "x", "-1"):
+        with pytest.raises(PresetError, match="unknown channel"):
+            normalize_query(f"engine=shaka&channel={bad}")
+    d = describe(f"channel={channel.id}&engine=shaka")
+    assert d["parts"][0] == "▶ Demo channel" and d["fields"]["channel"] == str(channel.id)
+
+    # The Presets page offers channels and saves the choice; None keeps it channel-free.
+    page = auth_client.get("/presets").get_data(as_text=True)
+    assert f'<option value="{channel.id}">Demo channel</option>' in page
+    r = auth_client.post("/presets", data=_form(channel=str(channel.id)))
+    assert r.status_code == 302
+    row = db.session.query(EnginePreset).one()
+    assert row.query == f"channel={channel.id}&format=dash&engine=shaka"
+    edit = auth_client.get(f"/presets?edit={row.id}").get_data(as_text=True)
+    assert f'<option value="{channel.id}" selected>' in edit
+
+    # Gone inactive: still listed (marked) so the preset can be edited.
+    channel.is_active = False
+    db.session.commit()
+    edit = auth_client.get(f"/presets?edit={row.id}").get_data(as_text=True)
+    assert "Demo channel (inactive)" in edit
