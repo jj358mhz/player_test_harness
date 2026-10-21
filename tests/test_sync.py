@@ -130,10 +130,13 @@ def test_cli_sync_channels_exits_nonzero_on_error(app, make_account, stub_client
 
 
 def test_sync_lists_ad_servers_without_choosing_one(
-    app, auth_client, make_account, make_channel, stub_client
+    app, auth_client, make_account, make_channel, stub_client, monkeypatch
 ):
     """New names are added, hand-set params survive, unlisted rows stay."""
+    from app.main import routes
     from app.models import AdServer
+
+    monkeypatch.setattr(routes, "vite_assets", lambda entry="": {"js": "/x.js", "css": []})
 
     acct = make_account()
     make_channel(acct, "keep")
