@@ -5,9 +5,11 @@
 <div class="page-header">
     <h1>Presets <span class="page-header__meta">{{ rows|length }} saved</span></h1>
 </div>
-<p class="muted">Saved player setups: format, engine and version, DRM, delay, ads and CMCD. Pick one from
-    <strong>Preset</strong> in the <a href="{{ url_for('main.player') }}">player</a>; it applies to whichever
-    channel you load. Shared by everyone who signs in.</p>
+<p class="muted">Saved player setups: an optional channel, format, engine and version, DRM, delay, ads,
+    Uplynk params and CMCD. Pick one from <strong>Preset</strong> in the
+    <a href="{{ url_for('main.player') }}">player</a>: one with a channel selects it (and
+    <strong>Open in player</strong> plays it); one without applies to whichever channel you load.
+    Shared by everyone who signs in.</p>
 
 {% if rows %}
 <table class="data-table presets-table">
@@ -46,6 +48,20 @@
             <input id="pf-name" class="input" name="name" required maxlength="60" value="{{ form.name or '' }}"
                    placeholder="Shaka DASH Widevine">
             <p class="field__help">Saving under an existing name replaces that preset.</p>
+        </div>
+        <div class="field">
+            <label for="pf-channel">Channel</label>
+            <select id="pf-channel" class="input" name="channel">
+                <option value="">None: whichever channel is loaded</option>
+                {% for label, items in channel_groups %}
+                <optgroup label="{{ label }}">
+                    {% for id, name in items %}
+                    <option value="{{ id }}"{% if form.channel|string == id|string %} selected{% endif %}>{{ name }}</option>
+                    {% endfor %}
+                </optgroup>
+                {% endfor %}
+            </select>
+            <p class="field__help">Optional. Choosing the preset in the player selects this channel.</p>
         </div>
         <div class="field-row">
             <div class="field">

@@ -680,6 +680,18 @@ export class PlayerApp {
                 'div',
                 {class: 'pl-preset-form', hidden: true},
                 name,
+                this.ref(
+                    'presetChannelWrap',
+                    h(
+                        'label',
+                        {
+                            class: 'pl-preset-channel',
+                            title: 'Save the selected channel with the preset: choosing the preset selects it',
+                        },
+                        this.ref('presetChannel', h('input', {type: 'checkbox'})),
+                        ' Include channel',
+                    ),
+                ),
                 h(
                     'button',
                     {
@@ -714,10 +726,14 @@ export class PlayerApp {
 
     // -------------------------------------------------------------- presets
 
-    /** The load bar's settings as a preset query (no source; default versions left out). */
-    private settingsQuery(): string {
+    /**
+     * The load bar's settings as a preset query (default versions left out);
+     * `withChannel` adds the selected synced channel.
+     */
+    private settingsQuery(withChannel = false): string {
         const {engine, version} = this.chosenEngine();
         return viewQuery({
+            channel: (withChannel && this.selectedChannel()?.id) || undefined,
             format: this.format(),
             engine,
             version:
@@ -758,7 +774,13 @@ export class PlayerApp {
         form.hidden = open === undefined ? !form.hidden : !open;
         if (form.hidden) return;
         const input = this.el<HTMLInputElement>('presetName');
-        input.value = this.chosenPreset()?.name ?? '';
+        const chosen = this.chosenPreset();
+        input.value = chosen?.name ?? '';
+        // A channel to include: on by default, unless the preset being replaced has none.
+        const channel = this.selectedChannel();
+        this.el('presetChannelWrap').hidden = !channel;
+        this.el<HTMLInputElement>('presetChannel').checked =
+            !!channel && (!chosen || parseView(chosen.query).channel !== undefined);
         this.renderPresetForm();
         input.focus();
         void this.refreshPresets();
@@ -777,11 +799,15 @@ export class PlayerApp {
         }
     }
 
-    /** Apply a preset: reset what it doesn't name, then set what it does. */
+    /** Apply a preset: its channel if it names one, reset what it doesn't name, then set what it does. */
     private onPresetChosen(): void {
         const preset = this.chosenPreset();
         if (preset) {
             const view = parseView(preset.query);
+            if (view.channel && this.config.channels.some((c) => c.id === view.channel)) {
+                this.el<HTMLSelectElement>('source').value = String(view.channel);
+                this.syncSourceInput();
+            }
             this.el<HTMLSelectElement>('delay').value = '';
             this.el<HTMLSelectElement>('ad').value = '';
             this.el<HTMLInputElement>('params').value = '';
@@ -808,7 +834,8 @@ export class PlayerApp {
         // Let the control's own handler run first.
         setTimeout(() => {
             const chosen = this.chosenPreset();
-            if (chosen && chosen.query !== this.settingsQuery()) {
+            const withChannel = chosen && parseView(chosen.query).channel !== undefined;
+            if (chosen && chosen.query !== this.settingsQuery(withChannel || false)) {
                 this.el<HTMLSelectElement>('preset').value = '';
             }
             this.renderPresetForm();
@@ -825,7 +852,14 @@ export class PlayerApp {
             return;
         }
         try {
-            const {items, preset} = await savePreset(endpoint, name, this.settingsQuery());
+            const withChannel =
+                !this.el('presetChannelWrap').hidden &&
+                this.el<HTMLInputElement>('presetChannel').checked;
+            const {items, preset} = await savePreset(
+                endpoint,
+                name,
+                this.settingsQuery(withChannel),
+            );
             this.presets = items;
             this.renderPresets(preset?.id ?? null);
             what.textContent = `Saved “${name}”.`;
@@ -1648,6 +1682,15 @@ export class PlayerApp {
             const chosen = this.presets.some((p) => p.id === initialPreset) ? initialPreset : null;
             this.renderPresets(chosen ?? null);
             if (chosen !== null) this.onPresetChosen();
+            // Open in player on a preset with a channel plays it (unless the link names a source).
+            if (chosen !== null && !initialSrc && !initialChannel && this.selectedChannel()) {
+                const named = parseView(this.chosenPreset()?.query ?? '').channel;
+                if (named === this.selectedChannel()?.id) {
+                    this.renderAdOptions();
+                    void this.loadFromForm();
+                    return;
+                }
+            }
         }
         if (initialSrc) {
             source.value = PASTE;

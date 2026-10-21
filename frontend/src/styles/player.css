@@ -71,6 +71,16 @@
     flex: 1 1 220px;
     max-width: 320px;
 }
+.pl-preset-channel {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    white-space: nowrap;
+}
+.pl-preset-channel[hidden] {
+    display: none;
+}
 .pl-preset-form .pl-preset-what {
     color: var(--text-faint);
     font-size: 12px;

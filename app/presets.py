@@ -1,7 +1,8 @@
 """Saved engine presets: validation and storage.
 
-A preset is the player's deep-link query minus the source (format,
-engine@version, DRM, delay, SSAI ad server, Uplynk params, CMCD). The browser
+A preset is the player's deep-link query without a pasted source or rays:
+an optional synced channel, format, engine@version, DRM, delay, SSAI ad
+server, Uplynk params, CMCD. The browser
 builds it (`frontend/src/lib/deeplink.ts`); this re-checks every key with
 the same rules, because the engine version ends up in a jsDelivr URL.
 """
@@ -13,14 +14,14 @@ import re
 from typing import Any
 from urllib.parse import parse_qsl, unquote_plus, urlencode
 
-from app.models import EnginePreset, User, db
+from app.models import Channel, EnginePreset, User, db
 from app.uplynk.params import ParamError, check_params, is_param_key
 
 NAME_MAX = 60
 ENGINES = {"hlsjs", "shaka", "dashjs", "native"}
 VERSION_RE = re.compile(r"^\d+\.\d+\.\d+(-[\w.]+)?$")
 # Same order as the player's viewQuery(); the Uplynk params follow ad.
-_ORDER = ("format", "engine", "drm", "delay", "ad", "cmcd")
+_ORDER = ("channel", "format", "engine", "drm", "delay", "ad", "cmcd")
 AD_NAME_RE = re.compile(r"^[A-Za-z0-9_.-]{1,100}$")
 
 
@@ -35,9 +36,14 @@ def normalize_query(query: str) -> str:
     params: dict[str, str] = {}
     uplynk: list[tuple[str, str]] = []
     for key, value in parse_qsl(query.lstrip("?"), keep_blank_values=True):
-        if key in ("channel", "src", "rays", "tab"):
-            continue  # the source and per-channel choices aren't part of a preset
-        if key == "format":
+        if key in ("src", "rays", "tab"):
+            continue  # a pasted source and per-load choices aren't part of a preset
+        if key == "channel":
+            # Optional: a synced channel (our id), chosen when the preset is.
+            if not re.fullmatch(r"[1-9]\d{0,9}", value) or not db.session.get(Channel, int(value)):
+                raise PresetError(f"unknown channel {value!r}")
+            params[key] = value
+        elif key == "format":
             if value not in ("hls", "dash"):
                 raise PresetError(f"unknown format {value!r}")
             if value == "dash":
@@ -154,7 +160,8 @@ def query_from_form(form: Any) -> str:
         return (form.get(name) or "").strip()
 
     engine, version = field("engine"), field("version")
-    pairs = [("format", field("format") or "hls")]
+    pairs = [("channel", field("channel"))] if field("channel") else []
+    pairs.append(("format", field("format") or "hls"))
     pairs.append(("engine", f"{engine}@{version}" if version else engine))
     for key in ("drm", "delay", "ad"):
         if field(key):
@@ -172,7 +179,9 @@ def describe(query: str) -> dict[str, Any]:
     get = dict(params).get
     engine, _, version = (get("engine") or "").partition("@")
     uplynk = [(k, v) for k, v in params if is_param_key(k)]
+    channel = db.session.get(Channel, int(get("channel"))) if get("channel") else None
     parts = [
+        *([f"▶ {channel_label(channel)}"] if channel else []),
         "DASH" if get("format") == "dash" else "HLS",
         f"{ENGINE_LABELS.get(engine, engine)} {version or '(default version)'}",
     ]
@@ -188,6 +197,7 @@ def describe(query: str) -> dict[str, Any]:
     return {
         "parts": parts,
         "fields": {
+            "channel": get("channel") or "",
             "format": get("format") or "hls",
             "engine": engine,
             "version": version,
@@ -198,6 +208,11 @@ def describe(query: str) -> dict[str, Any]:
             "cmcd": bool(get("cmcd")),
         },
     }
+
+
+def channel_label(channel: Channel) -> str:
+    label = channel.description or channel.channel_id
+    return label if channel.is_active else f"{label} (inactive)"
 
 
 def list_presets() -> list[dict[str, object]]:

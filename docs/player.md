@@ -39,19 +39,23 @@ Uplynk stream is doing while it plays.
   token (`tc`, `exp`, `cid`, `sig`, …). Values are plain characters only.
   Links and presets carry them as themselves. Not for pasted URLs (their
   signature is fixed).
-- **Presets:** a named setup of format, engine and version, DRM, delay, ads,
-  Uplynk params and CMCD, saved on the server for everyone using the harness. Picking one
-  in **Preset** (first in the load bar) sets the rest of it (anything it
-  doesn't name goes back to the default; no DRM means the channel's
-  default) for the selected channel; press **Load**. **Save as preset…**
-  saves the current settings under a name (the same name replaces it).
-  The **Presets** page in the site menu lists them all in plain words and
-  adds, edits, renames and deletes them; **Open in player** opens the
-  player with one chosen (`/player?preset=<id>`).
+- **Presets:** a named setup of an optional channel, format, engine and
+  version, DRM, delay, ads, Uplynk params and CMCD, saved on the server for
+  everyone using the harness. Picking one in **Preset** (first in the load
+  bar) selects its channel if it names one, and sets the rest of it
+  (anything it doesn't name goes back to the default; no DRM means the
+  channel's default); press **Load**. A preset without a channel applies
+  to whichever channel is selected. **Save as preset…** saves the current
+  settings under a name (the same name replaces it); **Include channel**
+  (on by default) saves the selected channel with it. The **Presets** page
+  in the site menu lists them all in plain words and adds, edits, renames
+  and deletes them, with a **Channel** menu (None = any channel); **Open in
+  player** opens the player with one chosen (`/player?preset=<id>`) and,
+  when it names a channel, plays it.
   The default version of an engine isn't pinned, so a preset follows the
   default when Dependabot bumps it; pick an exact version to pin it.
-  Changing a setting by hand clears the Preset menu. Rays and the source
-  aren't part of a preset.
+  Changing a setting by hand (or another channel, for a preset with one)
+  clears the Preset menu. Rays and pasted URLs aren't part of a preset.
 - **Recorded sessions:** **Save session** sends what this load measured to
   the server and copies a link to `/sessions/<id>`: summary tiles, latency
   and drift over the whole session with events and ad breaks, latency

@@ -28,6 +28,7 @@ from app.presets import (
     DRM_LABELS,
     ENGINE_LABELS,
     PresetError,
+    channel_label,
     describe,
     list_presets,
     query_from_form,
@@ -301,8 +302,21 @@ def presets(form: dict | None = None, error: str | None = None, editing: int | N
             else describe("engine=hlsjs")["fields"]
         )
     ad_names = sorted({name for (name,) in db.session.query(AdServer.name).all()})
+    # Active channels, plus the one the form names even if it went inactive.
+    chosen = int(form["channel"]) if str(form.get("channel") or "").isdigit() else 0
+    channels = (
+        db.session.query(Channel)
+        .join(UplynkAccount)
+        .filter(Channel.is_active.is_(True) | (Channel.id == chosen))
+        .order_by(UplynkAccount.label, Channel.is_favorite.desc(), Channel.description)
+        .all()
+    )
     return render_template(
         "main/presets.html",
+        channel_groups=[
+            (label, [(c.id, channel_label(c)) for c in items])
+            for label, items in groupby(channels, key=lambda c: c.uplynk_account.label)
+        ],
         rows=[(r, describe(r.query)["parts"]) for r in rows],
         editing=current,
         form=form,
@@ -323,7 +337,7 @@ def save_preset_form():
         abort(404)
     form = {
         k: request.form.get(k, "")
-        for k in ("name", "format", "engine", "version", "drm", "delay", "ad", "params")
+        for k in ("name", "channel", "format", "engine", "version", "drm", "delay", "ad", "params")
     }
     form["cmcd"] = bool(request.form.get("cmcd"))
     try:
