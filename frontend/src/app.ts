@@ -6,6 +6,7 @@ import {
     fetchPresets,
     fetchSlicer,
     fetchVersions,
+    PlaybackRequestError,
     type PlaybackResponse,
     type Probe,
     requestPlayback,
@@ -99,6 +100,8 @@ interface Source {
     drm: DrmConfig | null;
     /** What program dates mean for this URL (see lib/clock.ts). */
     clock: ClockInfo;
+    /** Preplay loads: the signed request sent to Uplynk, for the log. */
+    preplayRequest?: string;
 }
 
 type Format = 'm3u8' | 'mpd';
@@ -1834,6 +1837,8 @@ export class PlayerApp {
                 ...(drm ? {mode: 'preplay' as const, drm} : {}),
             });
         } catch (err) {
+            if (err instanceof PlaybackRequestError && err.preplayRequest)
+                this.logEntry('err', 'PREPLAY', `failed request: ${err.preplayRequest}`);
             this.notice(
                 'error',
                 `Could not sign a URL for ${channel.name}: ${(err as Error).message}`,
@@ -1888,6 +1893,7 @@ export class PlayerApp {
             expiresAt: new Date(response.expires_at),
             drm: drmConfig,
             clock: clockFor(manifest, response.url, response.clock, delay, signed.pdts ?? null),
+            preplayRequest: response.preplay_request,
         };
         if (response.probe && !response.probe.ok) {
             this.probeFailed(response.probe, source);
@@ -2212,6 +2218,8 @@ export class PlayerApp {
             `${source.channel?.name ?? 'URL'} · ${engine.name} ${version}${drmText}`,
         );
         if (engine.limits) this.logEntry('info', 'ENGINE', engine.limits);
+        if (source.preplayRequest)
+            this.logEntry('info', 'PREPLAY', `request: ${source.preplayRequest}`);
         if (this.el<HTMLInputElement>('cmcd').checked) {
             if (kind === 'native') {
                 this.logEntry('info', 'CMCD', 'not sent: the native engine has no CMCD support');

@@ -117,6 +117,15 @@
         </div>
     </div>
     <p id="sign-error" class="flash flash--error" hidden></p>
+    <div id="preplay-request" class="sign-result" hidden>
+        <div class="field">
+            <label for="preplay-request-url">Preplay request <span class="muted">· the signed URL sent to Uplynk, to replay or share until the token expires</span></label>
+            <textarea id="preplay-request-url" class="input sign-result__url" readonly></textarea>
+        </div>
+        <div class="form-actions">
+            <button type="button" id="copy-preplay-request" class="btn-ghost">Copy</button>
+        </div>
+    </div>
 </div>
 {% endif %}
 {% endblock %}
@@ -170,8 +179,14 @@
                     external_id: f.external_id.value,
                 });
             }
+            const showRequest = (url) => {
+                document.getElementById('preplay-request').hidden = !url;
+                document.getElementById('preplay-request-url').value = url || '';
+            };
+            showRequest(null);
             try {
                 const data = await requestPlayback(body);
+                showRequest(data.preplay_request);
                 document.getElementById('result-url').value = data.url;
                 document.getElementById('result-expiry').textContent =
                     `· token expires ${new Date(data.expires_at).toLocaleString()}`;
@@ -196,11 +211,17 @@
                 out.hidden = true;
                 errorEl.textContent = err.message;
                 errorEl.hidden = false;
+                showRequest(err.preplayRequest);
             }
         });
 
         document.getElementById('copy-url').addEventListener('click', async (event) => {
             await navigator.clipboard.writeText(document.getElementById('result-url').value);
+            flashButton(event.target, 'Copied ✓');
+        });
+
+        document.getElementById('copy-preplay-request').addEventListener('click', async (event) => {
+            await navigator.clipboard.writeText(document.getElementById('preplay-request-url').value);
             flashButton(event.target, 'Copied ✓');
         });
     })();

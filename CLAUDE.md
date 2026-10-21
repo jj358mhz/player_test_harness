@@ -245,7 +245,10 @@ after dependency changes.
   v2 answers `500 Server error, sorry` whenever it's signed (HLS without DRM
   too), while a signed `/channel/<id>.m3u8` with the same params plays the
   preroll. Studio DRM channels need Preplay, so no prerolls there.
-  `fetch_preplay` names the signed `ad.*` params on a Preplay 5xx.
+  `fetch_preplay` names the signed `ad.*` params on a Preplay 5xx; the
+  API returns the signed request as `preplay_request` (on errors too,
+  v3.27.2: Advanced… page and the player's `PREPLAY` log line) to share
+  with Uplynk.
 - **SSAI** (docs "Ad Breaks", "Client-Side Beaconing Using Dynamic Manifest
   Markers", "Ad Verification"): Uplynk stitches ads into each session's
   manifest. DASH: each ad is a Period identified by `AssetIdentifier

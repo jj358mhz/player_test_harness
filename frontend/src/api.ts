@@ -29,6 +29,18 @@ export interface PlaybackResponse {
     } | null;
     /** Live DASH: how far the MPD's clock runs ahead of the encoder's. */
     clock?: ServerClock | null;
+    /** Preplay mode: the signed request sent to Uplynk (to share; never stored). */
+    preplay_request?: string;
+}
+
+/** A failed sign/Preplay; `preplayRequest` is the signed Preplay URL that failed. */
+export class PlaybackRequestError extends Error {
+    constructor(
+        message: string,
+        readonly preplayRequest: string | null,
+    ) {
+        super(message);
+    }
 }
 
 export interface PlaybackRequest {
@@ -58,7 +70,11 @@ export async function requestPlayback(
         body: JSON.stringify(body),
     });
     const data = await response.json().catch(() => ({error: `HTTP ${response.status}`}));
-    if (!response.ok) throw new Error(data.error ?? `HTTP ${response.status}`);
+    if (!response.ok)
+        throw new PlaybackRequestError(
+            data.error ?? `HTTP ${response.status}`,
+            data.preplay_request ?? null,
+        );
     return data as PlaybackResponse;
 }
 

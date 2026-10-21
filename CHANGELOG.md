@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.27.2] - 2026-10-21
+
+### Added
+
+- **Preplay request URL**: in Preplay mode the API returns the signed
+  request it sent to Uplynk (`preplay_request`), also when Preplay fails.
+  The **Advanced…** page shows it under *Preplay request* with **Copy**,
+  and the player logs it (`PREPLAY`), so a failing request (e.g. with
+  `ad.preroll=1`) can be handed to Uplynk to replay until the token
+  expires. Shown only: playback events still keep no signature, and saved
+  sessions redact `sig=`.
+
 ## [3.27.1] - 2026-10-20
 
 ### Fixed
