@@ -1,7 +1,7 @@
 """Saved engine presets: validation and storage.
 
 A preset is the player's deep-link query minus the source (format,
-engine@version, DRM, delay, SSAI ad server, CMCD). The browser
+engine@version, DRM, delay, SSAI ad server, Uplynk params, CMCD). The browser
 builds it (`frontend/src/lib/deeplink.ts`); this re-checks every key with
 the same rules, because the engine version ends up in a jsDelivr URL.
 """
@@ -14,22 +14,14 @@ from typing import Any
 from urllib.parse import parse_qsl, unquote_plus, urlencode
 
 from app.models import EnginePreset, User, db
+from app.uplynk.params import ParamError, check_params, is_param_key
 
 NAME_MAX = 60
 ENGINES = {"hlsjs", "shaka", "dashjs", "native"}
 VERSION_RE = re.compile(r"^\d+\.\d+\.\d+(-[\w.]+)?$")
-# Same order as the player's viewQuery(); the ad.* params follow ad.
+# Same order as the player's viewQuery(); the Uplynk params follow ad.
 _ORDER = ("format", "engine", "drm", "delay", "ad", "cmcd")
 AD_NAME_RE = re.compile(r"^[A-Za-z0-9_.-]{1,100}$")
-# Per-load ad.* params (deeplink.ts parseAdParams): same keys and characters.
-AD_PARAM_KEY = re.compile(r"^ad\.[A-Za-z0-9_.]{1,40}$")
-AD_PARAM_VALUE = re.compile(r"^[A-Za-z0-9_.,:/|\- ]{0,200}$")
-
-
-def _ad_param(key: str, value: str) -> tuple[str, str]:
-    if not AD_PARAM_KEY.match(key) or not AD_PARAM_VALUE.match(value):
-        raise PresetError(f"bad ad param {key!r}")
-    return key, value
 
 
 class PresetError(ValueError):
@@ -38,10 +30,10 @@ class PresetError(ValueError):
 
 def normalize_query(query: str) -> str:
     """The preset's query with only known keys and valid values, in order."""
-    if not isinstance(query, str) or len(query) > 300:
+    if not isinstance(query, str) or len(query) > 1000:
         raise PresetError("query must be a short string")
     params: dict[str, str] = {}
-    ad_params: list[tuple[str, str]] = []
+    uplynk: list[tuple[str, str]] = []
     for key, value in parse_qsl(query.lstrip("?"), keep_blank_values=True):
         if key in ("channel", "src", "rays", "tab"):
             continue  # the source and per-channel choices aren't part of a preset
@@ -70,11 +62,11 @@ def normalize_query(query: str) -> str:
             if not AD_NAME_RE.match(value):
                 raise PresetError(f"bad ad server name {value!r}")
             params[key] = value
-        elif key.startswith("ad."):
-            ad_params.append(_ad_param(key, value))
+        elif is_param_key(key):
+            uplynk.append((key, value))
         elif key == "adp":
-            # v3.22.0 packed them into one param; read those too.
-            ad_params += [_ad_param(k, v) for k, v in parse_qsl(value, keep_blank_values=True)]
+            # v3.22.0 packed ad.* params into one; read those too.
+            uplynk += parse_qsl(value, keep_blank_values=True)
         elif key == "cmcd":
             if value == "1":
                 params[key] = value
@@ -82,17 +74,21 @@ def normalize_query(query: str) -> str:
             raise PresetError(f"unknown setting {key!r}")
     if "engine" not in params:
         raise PresetError("a preset needs an engine")
-    if ad_params and "ad" not in params:
-        raise PresetError("ad params need an ad server")
-    if len(ad_params) > 10:
-        raise PresetError("at most 10 ad params")
+    uplynk = _checked(uplynk, "ad" in params)
     pairs: list[tuple[str, str]] = []
     for key in _ORDER:
         if key in params:
             pairs.append((key, params[key]))
         if key == "ad":
-            pairs += ad_params
+            pairs += uplynk
     return urlencode(pairs, safe="@:/")
+
+
+def _checked(pairs: list[tuple[str, str]], has_ad: bool) -> list[tuple[str, str]]:
+    try:
+        return check_params(pairs, has_ad)
+    except ParamError as e:
+        raise PresetError(str(e)) from None
 
 
 def clean_name(name: Any) -> str:
@@ -139,20 +135,15 @@ DRM_LABELS = {"wv": "Widevine", "pr": "PlayReady", "fps": "FairPlay"}
 DELAY_CHOICES = (15, 20, 30, 45, 60, 90, 120)
 
 
-def parse_ad_params(text: Any) -> list[tuple[str, str]]:
-    """`ad.lib=KOR&ad.kv=a,b` as typed (deeplink.ts parseAdParams), checked."""
+def parse_params(text: Any) -> list[tuple[str, str]]:
+    """`expand=ad_01&ad.lib=KOR` as typed (uplynkParams.ts parseParams), not yet checked."""
     text = text.strip().lstrip("?&") if isinstance(text, str) else ""
     pairs = []
-    for part in filter(None, text.split("&")):
+    for part in filter(None, (p.strip() for p in text.split("&"))):
         key, eq, value = part.partition("=")
         if not eq:
-            raise PresetError(f"{part} needs a value (ad.lib=KOR)")
-        key, value = key.strip(), unquote_plus(value).strip()
-        if key == "ad":
-            raise PresetError("choose the ad server in Ads, not as ad=")
-        if not key.startswith("ad."):
-            raise PresetError(f"only ad.* params here, not {key}")
-        pairs.append(_ad_param(key, value))
+            raise PresetError(f"{part} needs a value (ifo=1)")
+        pairs.append((key.strip(), unquote_plus(value).strip()))
     return pairs
 
 
@@ -168,8 +159,8 @@ def query_from_form(form: Any) -> str:
     for key in ("drm", "delay", "ad"):
         if field(key):
             pairs.append((key, field(key)))
-    ad_params = parse_ad_params(field("ad_params"))
-    pairs += ad_params
+    # Checked on their own first, so a typed delay= or rays= isn't read as a setting.
+    pairs += _checked(parse_params(field("params")), bool(field("ad")))
     if form.get("cmcd"):
         pairs.append(("cmcd", "1"))
     return normalize_query(urlencode(pairs))
@@ -180,7 +171,7 @@ def describe(query: str) -> dict[str, Any]:
     params = parse_qsl(query, keep_blank_values=True)
     get = dict(params).get
     engine, _, version = (get("engine") or "").partition("@")
-    ad_params = [(k, v) for k, v in params if k.startswith("ad.")]
+    uplynk = [(k, v) for k, v in params if is_param_key(k)]
     parts = [
         "DASH" if get("format") == "dash" else "HLS",
         f"{ENGINE_LABELS.get(engine, engine)} {version or '(default version)'}",
@@ -189,8 +180,9 @@ def describe(query: str) -> dict[str, Any]:
         parts.append(DRM_LABELS.get(get("drm"), get("drm")))
     if get("delay"):
         parts.append(f"delay {get('delay')} s")
-    if get("ad"):
-        parts.append(" ".join([f"ad={get('ad')}", *(f"{k}={v}" for k, v in ad_params)]))
+    signed = ([f"ad={get('ad')}"] if get("ad") else []) + [f"{k}={v}" for k, v in uplynk]
+    if signed:
+        parts.append(" ".join(signed))
     if get("cmcd"):
         parts.append("CMCD")
     return {
@@ -202,7 +194,7 @@ def describe(query: str) -> dict[str, Any]:
             "drm": get("drm") or "",
             "delay": get("delay") or "",
             "ad": get("ad") or "",
-            "ad_params": "&".join(f"{k}={v}" for k, v in ad_params),
+            "params": "&".join(f"{k}={v}" for k, v in uplynk),
             "cmcd": bool(get("cmcd")),
         },
     }

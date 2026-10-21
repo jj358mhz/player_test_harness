@@ -38,7 +38,7 @@ import {
 } from './lib/clock';
 import {type CmcdConfig, cmcdFromUrl, contentIdFor, describeCmcd, newSessionId} from './lib/cmcd';
 import type {PaneSnapshot} from './lib/compare';
-import {isVersion, parseAdParams, parseView, type View, viewQuery} from './lib/deeplink';
+import {isVersion, parseView, type View, viewQuery} from './lib/deeplink';
 import {
     mpdAdAssets,
     mpdAdPeriods,
@@ -64,6 +64,7 @@ import {
 import {decodeScte35, describeScte35, hexToBytes, type SpliceInfo} from './lib/scte35';
 import {describeSlicerWallclock, id3Reason, type SlicerSettings} from './lib/slicer';
 import {type Point, RunningStats, Series} from './lib/stats';
+import {PARAM_GROUPS, paramInfo, parseParams} from './lib/uplynkParams';
 import {fromResourceTiming, requestDetail, requestKey, requestState} from './lib/waterfall';
 import {
     type AdBreak,
@@ -514,7 +515,6 @@ export class PlayerApp {
                         title: "SSAI: the ad configuration signed as ad=<name>, from the account's Ad servers list. None plays without ads. Synced channels only",
                         onchange: () => {
                             this.pendingAd = null;
-                            this.syncAdParams();
                         },
                     }),
                 ),
@@ -561,20 +561,47 @@ export class PlayerApp {
                         ),
                     ),
                     this.ref(
-                        'adParamsWrap',
+                        'paramsWrap',
                         h(
-                            'label',
-                            {class: 'pl-extra', hidden: true},
-                            h('span', {class: 'pl-label'}, 'Ad params'),
+                            'div',
+                            {class: 'pl-extra pl-extra--params'},
+                            h('label', {class: 'pl-label', for: 'pl-params'}, 'Params'),
                             this.ref(
-                                'adParams',
+                                'params',
                                 h('input', {
+                                    id: 'pl-params',
                                     class: 'pl-control mono',
-                                    placeholder: 'ad.lib=KOR',
-                                    'aria-label': 'Ad params for this load',
-                                    title: "This load's ad.* params, e.g. ad.lib=KOR or ad.lib=JPN&ad.kv=…; signed on top of the ad server's own params",
+                                    placeholder: 'expand=ad_01&ad.lib=KOR',
+                                    title: "Uplynk params signed into this load: expand= sets, ad.* (on top of the ad server's own), ifo=1, … Pick from + param. Synced channels only",
                                 }),
                             ),
+                            this.ref(
+                                'paramPick',
+                                h(
+                                    'select',
+                                    {
+                                        class: 'pl-control pl-param-pick',
+                                        'aria-label': 'Add an Uplynk param',
+                                        title: 'Add a documented Uplynk param to the box',
+                                        onchange: () => this.addParam(),
+                                    },
+                                    h('option', {value: ''}, '+ param'),
+                                    ...PARAM_GROUPS.map((g) =>
+                                        h(
+                                            'optgroup',
+                                            {label: g.label},
+                                            ...g.params.map((q) =>
+                                                h(
+                                                    'option',
+                                                    {value: q.key, title: q.help},
+                                                    `${q.key} · ${q.help}`,
+                                                ),
+                                            ),
+                                        ),
+                                    ),
+                                ),
+                            ),
+                            this.ref('paramHint', h('span', {class: 'pl-extra__hint'})),
                         ),
                     ),
                 ),
@@ -698,7 +725,7 @@ export class PlayerApp {
             drm: this.autoDrm ? undefined : (this.drm() ?? undefined),
             delay: this.delay() ?? undefined,
             ad: this.el<HTMLSelectElement>('ad').value || undefined,
-            adParams: this.adParamsQuery() || undefined,
+            params: this.paramsQuery() || undefined,
             cmcd: this.el<HTMLInputElement>('cmcd').checked || undefined,
         });
     }
@@ -757,7 +784,7 @@ export class PlayerApp {
             const view = parseView(preset.query);
             this.el<HTMLSelectElement>('delay').value = '';
             this.el<HTMLSelectElement>('ad').value = '';
-            this.el<HTMLInputElement>('adParams').value = '';
+            this.el<HTMLInputElement>('params').value = '';
             this.pendingAd = null;
             this.el<HTMLInputElement>('cmcd').checked = false;
             if (!view.drm) {
@@ -1366,6 +1393,7 @@ export class PlayerApp {
         if (paste) url.focus();
         // delay= is signed in; a pasted URL's signature is fixed.
         this.el<HTMLSelectElement>('delay').disabled = paste;
+        this.el('paramsWrap').hidden = paste;
         this.applyChannelDrm(paste ? null : this.selectedChannel());
         this.renderAdOptions();
     }
@@ -1397,19 +1425,37 @@ export class PlayerApp {
             select.value = want;
             this.pendingAd = null;
         }
-        this.syncAdParams();
     }
 
-    /** The ad params box shows only while an ad server is chosen. */
-    private syncAdParams(): void {
-        this.el('adParamsWrap').hidden = !this.el<HTMLSelectElement>('ad').value;
-    }
-
-    /** The typed ad params, normalized; '' when none or no ad server is chosen. */
-    private adParamsQuery(): string {
-        if (!this.el<HTMLSelectElement>('ad').value) return '';
-        const parsed = parseAdParams(this.el<HTMLInputElement>('adParams').value);
+    /** The typed params, checked; '' when none or not valid. */
+    private paramsQuery(): string {
+        const parsed = this.typedParams();
         return 'query' in parsed ? parsed.query : '';
+    }
+
+    private typedParams(): ReturnType<typeof parseParams> {
+        return parseParams(
+            this.el<HTMLInputElement>('params').value,
+            Boolean(this.el<HTMLSelectElement>('ad').value),
+        );
+    }
+
+    /** + param: append `key=value` (or go to the key if it's there) and say what it does. */
+    private addParam(): void {
+        const pick = this.el<HTMLSelectElement>('paramPick');
+        const info = paramInfo(pick.value);
+        pick.value = '';
+        if (!info) return;
+        const input = this.el<HTMLInputElement>('params');
+        const text = input.value.trim().replace(/&+$/, '');
+        // Where the key starts in text, if it's there already.
+        const at = `&${text}`.indexOf(`&${info.key}=`);
+        input.value = at < 0 ? `${text ? `${text}&` : ''}${info.key}=${info.value}` : text;
+        input.focus();
+        const next = at < 0 ? -1 : input.value.indexOf('&', at);
+        const end = next < 0 ? input.value.length : next;
+        input.setSelectionRange(end, end);
+        this.el('paramHint').textContent = `${info.key}: ${info.help}`;
     }
 
     private adServer(): AdServerOption | null {
@@ -1644,13 +1690,13 @@ export class PlayerApp {
         if (view.delay !== undefined) this.setDelay(view.delay);
         if (view.ad) {
             this.pendingAd = view.ad;
+            this.renderAdOptions();
+        }
+        if (view.params !== undefined) {
             // As typed: values can't hold & or =, so they read fine unencoded.
-            this.el<HTMLInputElement>('adParams').value = [
-                ...new URLSearchParams(view.adParams ?? ''),
-            ]
+            this.el<HTMLInputElement>('params').value = [...new URLSearchParams(view.params)]
                 .map(([k, v]) => `${k}=${v}`)
                 .join('&');
-            this.renderAdOptions();
         }
         if (view.cmcd) this.el<HTMLInputElement>('cmcd').checked = true;
     }
@@ -1705,9 +1751,9 @@ export class PlayerApp {
         const manifest = this.format();
         const delay = this.delay();
         const ad = this.adServer();
-        const typed = ad ? parseAdParams(this.el<HTMLInputElement>('adParams').value) : null;
-        if (typed && 'error' in typed) {
-            this.notice('error', `Ad params: ${typed.error}.`);
+        const typed = this.typedParams();
+        if ('error' in typed) {
+            this.notice('error', `Params: ${typed.error}.`);
             return;
         }
         this.updateQuery({
@@ -1715,7 +1761,7 @@ export class PlayerApp {
             rays: params.rays,
             delay: delay ?? undefined,
             ad: ad?.name,
-            adParams: typed?.query || undefined,
+            params: typed.query || undefined,
         });
         // Encoder-time program dates make HLS latency real; DASH ignores pdts
         // (the server measures its clock offset instead).
@@ -1723,15 +1769,10 @@ export class PlayerApp {
             ...params,
             ...(manifest === 'm3u8' ? {pdts: 'latency'} : {}),
             ...(delay !== null ? {delay: String(delay)} : {}),
-            // SSAI: the ad configuration, then its own ad.* params.
-            // The account's ad.* defaults, then this load's (which win on a clash).
-            ...(ad
-                ? {
-                      ad: ad.name,
-                      ...Object.fromEntries(new URLSearchParams(ad.params)),
-                      ...Object.fromEntries(typed && 'pairs' in typed ? typed.pairs : []),
-                  }
-                : {}),
+            // SSAI: the ad configuration and its own ad.* params, then this
+            // load's params (which win on a clash).
+            ...(ad ? {ad: ad.name, ...Object.fromEntries(new URLSearchParams(ad.params))} : {}),
+            ...Object.fromEntries(typed.pairs),
         };
         let response: PlaybackResponse;
         try {
@@ -1833,7 +1874,7 @@ export class PlayerApp {
         rays?: string;
         delay?: number;
         ad?: string;
-        adParams?: string;
+        params?: string;
     }): void {
         const {engine, version} = this.chosenEngine();
         const query = viewQuery({

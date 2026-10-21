@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {isVersion, parseAdParams, parseView, viewQuery} from '../src/lib/deeplink';
+import {isVersion, parseView, viewQuery} from '../src/lib/deeplink';
 
 describe('deep links', () => {
     it('reads a full view', () => {
@@ -29,14 +29,20 @@ describe('deep links', () => {
     });
     it('carries per-load ad params with an ad server', () => {
         const view = parseView('?channel=3&ad=fw2&ad.lib=KOR&ad.kv=a,b&cmcd=1');
-        expect(view.adParams).toBe('ad.lib=KOR&ad.kv=a%2Cb');
+        expect(view.params).toBe('ad.lib=KOR&ad.kv=a%2Cb');
         expect(viewQuery(view)).toBe('channel=3&ad=fw2&ad.lib=KOR&ad.kv=a%2Cb&cmcd=1');
         // v3.22.0 links packed them into adp=; they still load, and are rewritten plainly.
         const old = parseView('?channel=3&ad=fw2&adp=ad.lib%3DKOR');
         expect(viewQuery(old)).toBe('channel=3&ad=fw2&ad.lib=KOR');
-        // Without an ad server, or with bad values, they're dropped.
-        expect(parseView('?channel=3&ad.lib=KOR').adParams).toBeUndefined();
-        expect(parseView('?channel=3&ad=fw2&ad.lib=%3Cx%3E').adParams).toBeUndefined();
+        // Without an ad server (or expand set), or with bad values, they're dropped.
+        expect(parseView('?channel=3&ad.lib=KOR').params).toBeUndefined();
+        expect(parseView('?channel=3&ad=fw2&ad.lib=%3Cx%3E').params).toBeUndefined();
+    });
+    it('carries expand= and other Uplynk params without an ad server', () => {
+        const view = parseView('?channel=3&expand=ad_01,pb_01&ad.lib=KOR&ifo=1&embed=1&x=1');
+        expect(view.params).toBe('expand=ad_01%2Cpb_01&ad.lib=KOR&ifo=1');
+        expect(viewQuery(view)).toBe('channel=3&expand=ad_01%2Cpb_01&ad.lib=KOR&ifo=1');
+        expect(viewQuery({src: 'https://h/x.m3u8', params: 'ifo=1'})).not.toContain('ifo');
     });
     it('accepts long engine names and a missing version', () => {
         expect(parseView('?engine=hls.js')).toEqual({engine: 'hls.js'});
@@ -80,30 +86,5 @@ describe('deep links', () => {
         expect(query).not.toContain('channel=');
         expect(query).not.toContain('rays=');
         expect(parseView(`?${query}`)).toEqual({src, engine: 'hls.js', version: '1.7.3'});
-    });
-});
-
-describe('parseAdParams', () => {
-    it('normalizes ad.* params', () => {
-        expect(parseAdParams('')).toEqual({query: '', pairs: []});
-        expect(parseAdParams(' ?ad.lib=KOR ')).toEqual({
-            query: 'ad.lib=KOR',
-            pairs: [['ad.lib', 'KOR']],
-        });
-        expect(parseAdParams('ad.lib=JPN&ad.kv=a,b')).toEqual({
-            query: 'ad.lib=JPN&ad.kv=a%2Cb',
-            pairs: [
-                ['ad.lib', 'JPN'],
-                ['ad.kv', 'a,b'],
-            ],
-        });
-    });
-    it('says what is wrong', () => {
-        for (const bad of ['ad.lib', 'delay=20', 'ad=fw2', 'ad.lib=<x>', 'ad.lib=%E0%A4%A']) {
-            expect(parseAdParams(bad)).toHaveProperty('error');
-        }
-        expect(parseAdParams('ad=fw2')).toEqual({
-            error: 'choose the ad server in the Ads menu, not as ad=',
-        });
     });
 });

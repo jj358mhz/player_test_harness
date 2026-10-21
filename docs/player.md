@@ -8,8 +8,8 @@ Uplynk stream is doing while it plays.
 
 - **Load bar:** preset, channel or pasted URL, format (HLS or DASH), player
   engine and version, DRM, delay, ads, CMCD, Load. The second row holds the
-  boxes a choice asks for (**Engine version** for Custom, **Ad params** once
-  an ad server is chosen) on the left, and **Copy link**, **Save session**,
+  boxes a choice asks for (**Engine version** for Custom, **Params** for a
+  synced channel) on the left, and **Copy link**, **Save session**,
   **Save as preset…** on the right, so the first row never changes height.
 - **Ads (SSAI):** Uplynk inserts ads only when the playback URL names an ad
   configuration (`ad=<name>`); without it there are no ads, and a name the
@@ -17,15 +17,28 @@ Uplynk stream is doing while it plays.
   so an admin adds each account's names (and any default `ad.*` params) under
   **Uplynk Accounts → Edit → Ad servers**. **Ads** in the load bar then offers
   the selected channel's account's names and signs `ad=<name>` with its
-  params. With one chosen, **Ad params** (second row) takes this load's own `ad.*`
-  params (e.g. `ad.lib=KOR`, or `ad.lib=JPN&ad.kv=…`): only `ad.*` keys and
-  plain values, signed on top of the account's defaults (yours win on a
-  clash). Deep links and presets carry both as they are signed
-  (`ad=fw2&ad.lib=KOR&ad.kv=genre:news`), so each variant can be a saved
-  preset; a preset's ad server applies only on
-  channels whose account has that name.
-- **Presets:** a named setup of format, engine and version, DRM, delay, ads
-  and CMCD, saved on the server for everyone using the harness. Picking one
+  params. This load's own `ad.*` params (e.g. `ad.lib=KOR`, or
+  `ad.lib=JPN&ad.kv=…`) go in **Params**, signed on top of the account's
+  defaults (yours win on a clash). Deep links and presets carry both as
+  they are signed (`ad=fw2&ad.lib=KOR&ad.kv=genre:news`), so each variant
+  can be a saved preset; a preset's ad server applies only on channels
+  whose account has that name.
+- **Params:** Uplynk customization params signed into this load, joined
+  with `&` (`expand=ad_01,playback_01&ifo=1`). **+ param** lists the
+  documented ones for live channels, grouped (General, Ads, Studio DRM) with
+  a line on each; picking one adds `key=` (with a typical value) and says
+  what it does. `expand=` names parameter expansion sets from the CMS
+  (**Parameter Expansion** page; no API lists them), which Uplynk expands
+  server-side. Accepted keys: the menu's, plus any `ad.*`, `fp.*`
+  (FairPlay, e.g. `fp.hd.hdcp`), `rmp.*` (Widevine) and `pr.*` (PlayReady).
+  `ad.*` needs an ad server in **Ads** or an `expand=` set (which can carry
+  `ad=`). Keys the player sets itself are refused with where to set them:
+  `ad` (Ads), `rays` (ABR tab), `delay` (Delay), `pdts`, CMCD, `ak` and the
+  token (`tc`, `exp`, `cid`, `sig`, …). Values are plain characters only.
+  Links and presets carry them as themselves. Not for pasted URLs (their
+  signature is fixed).
+- **Presets:** a named setup of format, engine and version, DRM, delay, ads,
+  Uplynk params and CMCD, saved on the server for everyone using the harness. Picking one
   in **Preset** (first in the load bar) sets the rest of it (anything it
   doesn't name goes back to the default; no DRM means the channel's
   default) for the selected channel; press **Load**. **Save as preset…**
