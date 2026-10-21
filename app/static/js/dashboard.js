@@ -25,6 +25,19 @@
             });
             section.hidden = shown === 0;
             section.querySelector('[data-section-count]').textContent = shown;
+            // The pinned rule only where pinned cards show above it and others below.
+            const rule = section.querySelector('[data-pin-divider]');
+            if (rule) {
+                const visible = (card) => card.matches('[data-channel]') && !card.hidden;
+                const before = [];
+                const after = [];
+                let past = false;
+                for (const el of rule.parentElement.children) {
+                    if (el === rule) past = true;
+                    else if (visible(el)) (past ? after : before).push(el);
+                }
+                rule.hidden = !before.length || !after.length;
+            }
         });
         syncSelection();
     });

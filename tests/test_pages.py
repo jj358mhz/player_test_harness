@@ -379,3 +379,19 @@ def test_hidden_attribute_beats_component_display():
 
     css = (Path(__file__).parent.parent / "app/static/css/app.css").read_text()
     assert "\n[hidden] {\n    display: none !important;" in css  # global, not .x[hidden]
+
+
+def test_dashboard_pinned_divider_and_play_buttons(auth_client, make_account, make_channel):
+    account = make_account()
+    make_channel(account, "chan0001", description="A pinned", is_favorite=True)
+    make_channel(account, "chan0002", description="B other")
+    page = auth_client.get("/").get_data(as_text=True)
+    assert page.count("data-pin-divider") == 1
+    assert page.index("A pinned") < page.index("data-pin-divider") < page.index("B other")
+    assert 'class="button button--play"' in page
+
+    # No rule when every card is pinned (or none is).
+    other = make_account(label="other", workspace_id="owner456")
+    make_channel(other, "chan0003", description="C pinned", is_favorite=True)
+    page = auth_client.get("/").get_data(as_text=True)
+    assert page.count("data-pin-divider") == 1

@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.27.0] - 2026-10-20
+
+### Changed
+- **Pinned channels stand apart.** On the dashboard, a gold double rule
+  with a ★, fading at both ends, separates each account's pinned cards
+  from the rest. It looks nothing like the grey section header rule with
+  its ▶ chevron, and it hides while the filter leaves no pinned card above
+  it or none below. Pins are gold throughout: the ★ and the pinned card's
+  border (they were magenta).
+- **Green Play buttons.** The filled ▶ buttons (Play HLS/DRM on the
+  dashboard, ▶ Play on a channel's health page, ▶ Open in player on Sign
+  URL) are green instead of magenta (`.button--play`, `--play`).
+
 ## [3.26.1] - 2026-10-20
 
 ### Fixed
