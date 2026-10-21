@@ -13,11 +13,13 @@ Uplynk stream is doing while it plays.
   **Save as preset…** on the right, so the first row never changes height.
 - **Ads (SSAI):** Uplynk inserts ads only when the playback URL names an ad
   configuration (`ad=<name>`); without it there are no ads, and a name the
-  workspace doesn't have stops playback. Uplynk has no API that lists them,
-  so an admin adds each account's names (and any default `ad.*` params) under
-  **Uplynk Accounts → Edit → Ad servers**. **Ads** in the load bar then offers
-  the selected channel's account's names and signs `ad=<name>` with its
-  params. This load's own `ad.*` params (e.g. `ad.lib=KOR`, or
+  workspace doesn't have stops playback. Channel sync lists each account's
+  ad configurations from Uplynk (`/api/v4/ads/servers`, undocumented), and
+  an admin can add others and default `ad.*` params under **Uplynk Accounts
+  → Edit → Ad servers** (params survive syncs; a name Uplynk stops listing
+  is kept and marked). **Ads** in the load bar then offers the selected
+  channel's account's names (with their type) and signs `ad=<name>` with its
+  params. It starts at **None**: nothing picks an ad server for a channel. This load's own `ad.*` params (e.g. `ad.lib=KOR`, or
   `ad.lib=JPN&ad.kv=…`) go in **Params**, signed on top of the account's
   defaults (yours win on a clash). Deep links and presets carry both as
   they are signed (`ad=fw2&ad.lib=KOR&ad.kv=genre:news`), so each variant

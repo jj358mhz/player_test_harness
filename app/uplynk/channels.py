@@ -2,6 +2,13 @@
 
 GET /api/v4/channels — https://docs.uplynk.com/reference/get-all-live-channels
 Uses the scoped key (JWT) when one is configured, otherwise classic auth.
+
+GET /api/v4/ads/servers — undocumented (pointed out by an Uplynk dev,
+2026-10-20): the workspace's ad configurations, `items` of
+`{name, type, provider}` paged like channels. `name` is the `ad=` value;
+`/api/v4/ads/servers/<name>` returns the same fields. Each item's `@id`
+is just the collection path. Always classic auth: a scoped key is issued
+for channels:read.
 """
 
 from __future__ import annotations
@@ -44,6 +51,21 @@ class DiscoveredChannel:
 
 
 @dataclass(frozen=True)
+class DiscoveredAdServer:
+    name: str
+    type: str | None
+    provider: str | None
+
+    @classmethod
+    def from_api(cls, item: dict[str, Any]) -> DiscoveredAdServer:
+        return cls(
+            name=item["name"],
+            type=item.get("type") or None,
+            provider=item.get("provider") or None,
+        )
+
+
+@dataclass(frozen=True)
 class ScopedCredentials:
     kid: str
     sub: str
@@ -76,11 +98,11 @@ class UplynkChannelsClient:
     def auth_mode(self) -> str:
         return "scoped" if self.scoped else "classic"
 
-    def _auth(self) -> tuple[dict[str, str], dict[str, str]]:
+    def _auth(self, classic: bool = False) -> tuple[dict[str, str], dict[str, str]]:
         """Return (headers, params) for one request."""
         headers = {"Accept": "application/json"}
         try:
-            if self.scoped:
+            if self.scoped and not (classic and self.api_key):
                 headers["X-Auth-Uplynk-Jwt"] = build_jwt(
                     self.scoped.kid, self.scoped.sub, self.scoped.private_b64, self.scoped.scp
                 )
@@ -119,19 +141,40 @@ class UplynkChannelsClient:
             )
         return list(channels.values())
 
-    def _get_page(self, page: int) -> dict:
-        headers, params = self._auth()
+    AD_SERVERS_ENDPOINT = "/api/v4/ads/servers"
+
+    def list_ad_servers(self) -> list[DiscoveredAdServer]:
+        servers: dict[str, DiscoveredAdServer] = {}
+        for page in range(1, self.MAX_PAGES + 1):
+            payload = self._get_page(page, self.AD_SERVERS_ENDPOINT, classic=True)
+            items = payload["items"]
+            try:
+                for item in items:
+                    server = DiscoveredAdServer.from_api(item)
+                    servers.setdefault(server.name, server)
+            except (KeyError, TypeError) as e:
+                raise UplynkAPIError(f"Uplynk ad server item missing a name: {e}") from e
+            total = payload.get("total_items")
+            if not items or (isinstance(total, int) and len(servers) >= total):
+                break
+        return list(servers.values())
+
+    def _get_page(self, page: int, endpoint: str = LIST_ENDPOINT, classic: bool = False) -> dict:
+        headers, params = self._auth(classic)
         params = {**params, "page": page}
-        url = f"{self.api_base}{self.LIST_ENDPOINT}"
+        url = f"{self.api_base}{endpoint}"
         try:
             response = self._session.get(url, headers=headers, params=params, timeout=self.timeout)
         except requests.RequestException as e:
             raise UplynkAPIError(f"Request to Uplynk failed: {e}") from e
 
+        scoped = "X-Auth-Uplynk-Jwt" in headers
         if response.status_code == 401:
-            hint = "KID/SUB/PRIVATE_B64" if self.scoped else "workspace ID / API key"
+            hint = "KID/SUB/PRIVATE_B64" if scoped else "workspace ID / API key"
             raise UplynkAPIError(f"Uplynk API rejected the credentials (401) — check {hint}")
         if response.status_code == 403:
+            if endpoint != self.LIST_ENDPOINT:
+                raise UplynkAPIError(f"Uplynk API refused {endpoint} (403)")
             raise UplynkAPIError(f"Credentials lack the required scope ({CHANNELS_READ_SCOPE})")
         if response.status_code != 200:
             raise UplynkAPIError(

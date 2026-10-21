@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 
 from flask import current_app
 
+from app.ads import AdSyncResult, sync_ad_servers
 from app.crypto import decrypt
 from app.models import Channel, UplynkAccount, db
 from app.uplynk.channels import (
@@ -28,15 +29,28 @@ class SyncResult:
     updated: int = 0
     deactivated: int = 0
     error: str | None = None
+    ad_servers: AdSyncResult | None = None
+    ad_error: str | None = None
 
     @property
     def summary(self) -> str:
         if self.error:
             return f"Sync failed for '{self.account_label}': {self.error}"
-        return (
+        text = (
             f"Synced '{self.account_label}' ({self.auth_mode} auth): "
             f"{self.created} new, {self.updated} updated, {self.deactivated} deactivated"
         )
+        if self.ad_error:
+            return f"{text}; ad servers not synced: {self.ad_error}"
+        ads = self.ad_servers
+        if ads and (ads.added or ads.unlisted or ads.skipped):
+            parts = [f"{ads.added} new"] if ads.added else []
+            if ads.unlisted:
+                parts.append(f"{ads.unlisted} no longer listed")
+            if ads.skipped:
+                parts.append(f"{ads.skipped} skipped (name not usable as ad=)")
+            text += f"; ad servers: {', '.join(parts)}"
+        return text
 
 
 def build_client(account: UplynkAccount) -> UplynkChannelsClient:
@@ -63,6 +77,7 @@ def sync_account(account: UplynkAccount) -> SyncResult:
     - New channel IDs are created.
     - Existing channels have their metadata refreshed (favorites are kept).
     - Channels missing from this response are marked inactive.
+    - The account's ad servers are listed too (`app.ads.sync_ad_servers`).
     """
     result = SyncResult(account_id=account.id, account_label=account.label)
 
@@ -81,6 +96,12 @@ def sync_account(account: UplynkAccount) -> SyncResult:
         return result
 
     _apply_sync(account, discovered, result)
+    # Ad servers ride along; their failure doesn't fail the channel sync.
+    try:
+        result.ad_servers = sync_ad_servers(account, client.list_ad_servers())
+    except UplynkAPIError as e:
+        result.ad_error = str(e)
+        current_app.logger.warning("Ad server sync failed for %s: %s", account.label, e)
     account.last_synced_at = datetime.now(UTC)
     account.last_sync_error = None
     db.session.commit()

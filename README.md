@@ -96,7 +96,7 @@ latency, drift, ABR, DRM keys, ID3/SCTE-35, captions and more.
 | `channels`        | Synced live channels (plus favorite flag, encryption, health) |
 | `channel_health_checks` | Every health check, kept `HEALTH_HISTORY_DAYS`          |
 | `engine_presets`  | Saved player setups (format, engine@version, DRM, delay, ads, CMCD) |
-| `ad_servers`      | SSAI ad configuration names per account (`ad=`), entered by hand |
+| `ad_servers`      | SSAI ad configuration names per account (`ad=`), from channel sync or entered by hand |
 | `playback_sessions` | Recorded player sessions (redacted)                         |
 | `playback_events` | Every signing / Preplay request (no signatures stored)        |
 | `admin_events`    | Account CRUD and sync history                                 |

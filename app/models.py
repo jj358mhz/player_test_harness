@@ -20,6 +20,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    false,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -341,9 +342,12 @@ class ChannelHealthCheck(Base):
 class AdServer(Base):
     """An ad configuration name for an account's SSAI playback (`ad=<name>`).
 
-    Uplynk has no API that lists them, so they're entered by hand.
-    `params` are extra `ad.*` query params signed along with it
-    (normalized by `app.ads`).
+    Channel sync fills them from Uplynk's undocumented
+    `/api/v4/ads/servers` (`ad_type`, `provider`, `last_seen_at`); names can
+    also be entered by hand. `params` are extra `ad.*` query params signed
+    along with it (normalized by `app.ads`), always set by hand. A row the
+    API stops listing is kept (with its params) and marked `is_listed=False`.
+    Nothing ever picks one for a channel: the player's Ads menu starts at None.
     """
 
     __tablename__ = "ad_servers"
@@ -355,6 +359,13 @@ class AdServer(Base):
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     description: Mapped[str | None] = mapped_column(String(200), nullable=True)
     params: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    ad_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    provider: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    # When the API last listed it (None = only ever entered by hand).
+    last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    is_listed: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=false(), nullable=False
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
     )
@@ -364,4 +375,12 @@ class AdServer(Base):
     __table_args__ = (UniqueConstraint("uplynk_account_id", "name", name="uq_account_ad_server"),)
 
     def as_dict(self) -> dict[str, object]:
-        return {"name": self.name, "description": self.description, "params": self.params or ""}
+        return {
+            "name": self.name,
+            "description": self.description,
+            "params": self.params or "",
+            "provider": self.provider,
+            "type": self.ad_type,
+            # Synced once, but the API no longer lists it.
+            "unlisted": self.last_seen_at is not None and not self.is_listed,
+        }

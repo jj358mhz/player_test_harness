@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 from markupsafe import Markup
+from sqlalchemy import select
 
 from app.models import ChannelHealthCheck, db
 from app.uplynk.health import BEHIND_AFTER_S, STALE_AFTER_S
@@ -42,17 +43,16 @@ def history(channel_ids: list[int], since: datetime) -> dict[int, list[Point]]:
     out: dict[int, list[Point]] = {cid: [] for cid in channel_ids}
     if not channel_ids:
         return out
-    rows = (
-        db.session.query(ChannelHealthCheck)
-        .filter(
-            ChannelHealthCheck.channel_id.in_(channel_ids),
-            ChannelHealthCheck.checked_at >= since,
-        )
-        .order_by(ChannelHealthCheck.checked_at)
-        .all()
+    # Plain columns, not ORM rows: the dashboard reads ~144 checks per channel
+    # on every view, and building objects was most of its time.
+    check = ChannelHealthCheck
+    rows = db.session.execute(
+        select(check.channel_id, check.checked_at, check.status, check.edge_s)
+        .where(check.channel_id.in_(channel_ids), check.checked_at >= since)
+        .order_by(check.checked_at)
     )
-    for row in rows:
-        out[row.channel_id].append(Point(utc(row.checked_at), row.status, row.edge_s))
+    for channel_id, checked_at, status, edge_s in rows:
+        out[channel_id].append(Point(utc(checked_at), status, edge_s))
     return out
 
 

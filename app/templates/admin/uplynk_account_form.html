@@ -53,9 +53,11 @@
 {% if mode == 'edit' %}
 <div class="card card--narrow" id="ad-servers">
     <h2>Ad servers</h2>
-    <p class="muted">The ad configuration names this workspace uses for server-side ad insertion
-        (the <code>ad=</code> playback param, e.g. <code>fw2</code>). Uplynk has no API that lists them,
-        so add them here; the player's <strong>Ads</strong> menu offers them for this account's channels.
+    <p class="muted">The ad configurations this workspace uses for server-side ad insertion
+        (the <code>ad=</code> playback param: the CMS's Ad Configuration Name). <strong>Sync</strong>
+        lists them from Uplynk (an undocumented API); add any it doesn't list here. Extra params are
+        yours and survive syncs. The player's <strong>Ads</strong> menu offers them for this
+        account's channels and starts at None: nothing picks one for a channel.
         A name that doesn't exist in the workspace stops playback.</p>
     {% if account.ad_servers %}
     <table class="data-table ad-servers">
@@ -63,7 +65,10 @@
         <tbody>
         {% for s in account.ad_servers %}
         <tr>
-            <td><span class="mono">{{ s.name }}</span>{% if s.description %}<br><span class="muted">{{ s.description }}</span>{% endif %}</td>
+            <td><span class="mono">{{ s.name }}</span>
+                {% if s.is_listed %}<span class="badge badge--active" title="Listed by Uplynk at the last sync{% if s.provider %} · provider {{ s.provider }}{% endif %}">synced</span>
+                {% elif s.last_seen_at %}<span class="badge badge--health--behind" title="Uplynk listed it once but not at the last sync; kept with its params">not listed</span>{% endif %}
+                {% if s.ad_type or s.description %}<br><span class="muted">{{ s.description or s.ad_type }}</span>{% endif %}</td>
             {# Break long param lists after each &, not mid-word. #}
             <td class="mono">{% for part in (s.params or '—').split('&') %}{{ part }}{% if not loop.last %}&amp;<wbr>{% endif %}{% endfor %}</td>
             <td>
