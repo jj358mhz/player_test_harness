@@ -135,7 +135,13 @@ def create_playback(req: PlaybackRequest) -> dict[str, Any]:
             "expires_at": event.expires_at.isoformat(),
         }
         if req.mode == "preplay":
-            preplay = fetch_preplay(signed.url)
+            # The signed request itself, to share with Uplynk (not stored).
+            result["preplay_request"] = signed.url
+            try:
+                preplay = fetch_preplay(signed.url)
+            except PlaybackError as e:
+                e.preplay_request = signed.url
+                raise
             event.status_code = 200
             if req.channel and (preplay.drm or {}).get("required"):
                 record_encryption(req.channel, "drm")

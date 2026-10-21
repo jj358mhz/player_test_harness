@@ -271,3 +271,41 @@ def test_check_encryption_signs_and_records(app, make_account, make_channel, mon
     assert all(".m3u8?" in u and "&sig=" in u for u in probed)
     assert (clear.encryption, drm.encryption) == ("none", "drm")
     assert db.session.query(PlaybackEvent).count() == 0
+
+
+def test_preplay_returns_the_signed_request(auth_client, make_account, make_channel, monkeypatch):
+    ch = make_channel(make_account(), "abc")
+    seen = {}
+
+    def fake_fetch(url):
+        seen["url"] = url
+        return PreplayResult(
+            play_url="https://x.example.com/preplay2/x.m3u8",
+            prefix=None,
+            sid=None,
+            drm=None,
+            raw={},
+        )
+
+    monkeypatch.setattr(service, "fetch_preplay", fake_fetch)
+    body = {"channel_id": ch.id, "mode": "preplay", "params": {"ad": "fw2", "ad.preroll": "1"}}
+    data = _post(auth_client, body).get_json()
+    assert data["preplay_request"] == seen["url"]
+    assert "ad.preroll=1" in seen["url"] and "&sig=" in seen["url"]
+
+    # A failed Preplay still hands back the request, to replay with Uplynk; it isn't stored.
+    def failing(url):
+        seen["url"] = url
+        raise PlaybackError("Preplay returned HTTP 500: Server error, sorry")
+
+    monkeypatch.setattr(service, "fetch_preplay", failing)
+    response = _post(auth_client, body)
+    assert response.status_code == 400
+    data = response.get_json()
+    assert data["error"].startswith("Preplay returned HTTP 500")
+    assert data["preplay_request"] == seen["url"]
+    event = db.session.query(PlaybackEvent).order_by(PlaybackEvent.id.desc()).first()
+    assert "sig=" not in event.base_url and "sig" not in (event.params or {})
+
+    # Plain signed URLs have no Preplay request.
+    assert "preplay_request" not in _post(auth_client, {"channel_id": ch.id}).get_json()

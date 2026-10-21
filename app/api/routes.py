@@ -28,7 +28,10 @@ def playback():
     try:
         result = create_playback(parse_request(data))
     except PlaybackError as e:
-        return jsonify(error=str(e)), 400
+        body = {"error": str(e)}
+        if e.preplay_request:
+            body["preplay_request"] = e.preplay_request
+        return jsonify(body), 400
     return jsonify(result)
 
 

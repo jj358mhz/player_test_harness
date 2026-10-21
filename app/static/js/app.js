@@ -9,7 +9,12 @@ async function requestPlayback(body) {
         body: JSON.stringify(body),
     });
     const data = await response.json().catch(() => ({error: `HTTP ${response.status}`}));
-    if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+    if (!response.ok) {
+        const err = new Error(data.error || `HTTP ${response.status}`);
+        // A failed Preplay: the signed request, to share with Uplynk.
+        err.preplayRequest = data.preplay_request || null;
+        throw err;
+    }
     return data;
 }
 

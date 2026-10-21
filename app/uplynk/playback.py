@@ -40,7 +40,13 @@ MAX_TTL_SECONDS = 7 * 24 * 3600
 
 
 class PlaybackError(ValueError):
-    """Raised for invalid playback requests or Preplay failures."""
+    """Raised for invalid playback requests or Preplay failures.
+
+    `preplay_request`: the signed Preplay URL that failed, so it can be
+    handed to Uplynk to replay (shown, never stored).
+    """
+
+    preplay_request: str | None = None
 
 
 @dataclass(frozen=True)
