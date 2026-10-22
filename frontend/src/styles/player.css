@@ -5,10 +5,10 @@
     --warn: #f59e0b;
     --scte: #a78bfa;
     --inset: #0d0d0f;
-    --band-awesome: #22c55e;
-    --band-good: #84cc16;
-    --band-average: #f59e0b;
-    --band-above: #f97316;
+    --band-goat: #22c55e;
+    --band-awesome: #84cc16;
+    --band-good: #f59e0b;
+    --band-average: #f97316;
     --band-yuk: #e05252;
     --drift: #2dd4bf;
 }
@@ -338,6 +338,9 @@
 .state-bad {
     --state: var(--error);
 }
+.band-goat {
+    --state: var(--band-goat);
+}
 .band-awesome {
     --state: var(--band-awesome);
 }
@@ -346,9 +349,6 @@
 }
 .band-average {
     --state: var(--band-average);
-}
-.band-above {
-    --state: var(--band-above);
 }
 .band-yuk {
     --state: var(--band-yuk);
@@ -991,7 +991,7 @@
     background: var(--warn);
 }
 .pl-wf--slow {
-    background: var(--band-above);
+    background: var(--band-average);
 }
 .pl-wf--err {
     background: var(--error);

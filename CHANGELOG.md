@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.28.0] - 2026-10-22
+
+### Changed
+
+- **Latency bands renamed, top band moved to 45 s**: GOAT <10 s, Awesome
+  10–19 s, Good 19–25 s, Average 25–45 s, Yuk >45 s (were Awesome, Good,
+  Average, Above avg 25–40, Yuk >40). Same five colours in the same
+  order, on the tiles, the legend, the latency chart, `/compare` and
+  recorded sessions.
+
 ## [3.27.4] - 2026-10-22
 
 ### Fixed

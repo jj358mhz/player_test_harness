@@ -133,7 +133,7 @@ All three are measured at the playhead, once a second:
 
 The headline number is the encoder wallclock (ID3 or prft) when the stream has it, otherwise PDT. The
 Current / Average / Max / Min tiles run from load and use these bands:
-Awesome <10 s, Good 10–19 s, Average 19–25 s, Above avg 25–40 s, Yuk >40 s.
+GOAT <10 s, Awesome 10–19 s, Good 19–25 s, Average 25–45 s, Yuk >45 s.
 
 ### Which clock
 

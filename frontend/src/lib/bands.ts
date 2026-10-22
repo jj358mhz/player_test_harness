@@ -1,6 +1,6 @@
-// Latency bands carried over from the original player.
+// Latency bands (seconds): GOAT, Awesome, Good, Average, Yuk.
 
-export type BandKey = 'awesome' | 'good' | 'average' | 'above' | 'yuk';
+export type BandKey = 'goat' | 'awesome' | 'good' | 'average' | 'yuk';
 
 export interface Band {
     key: BandKey;
@@ -10,10 +10,10 @@ export interface Band {
 }
 
 export const BANDS: readonly Band[] = [
-    {key: 'awesome', label: 'Awesome', below: 10},
-    {key: 'good', label: 'Good', below: 19},
-    {key: 'average', label: 'Average', below: 25},
-    {key: 'above', label: 'Above avg', below: 40},
+    {key: 'goat', label: 'GOAT', below: 10},
+    {key: 'awesome', label: 'Awesome', below: 19},
+    {key: 'good', label: 'Good', below: 25},
+    {key: 'average', label: 'Average', below: 45},
     {key: 'yuk', label: 'Yuk', below: Number.POSITIVE_INFINITY},
 ];
 
