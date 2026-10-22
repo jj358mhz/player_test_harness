@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.27.4] - 2026-10-22
+
+### Fixed
+
+- **Studio DRM channels whose HLS lists AES-128 keys** were taken for
+  ordinary AES-128 channels: no 🔒 badge, **▶ Play HLS**, and hls.js
+  failed with `keyLoadError (HTTP 400)` once the content (not the ads)
+  played. Uplynk's key server refuses their content keys with `400 DRM
+  disallows raw key request`. When a check finds AES-128 on content, it
+  now asks for that one key: a refusal naming DRM marks the channel DRM,
+  so the card reads **▶ Play DRM** and the player uses Widevine DASH.
+
 ## [3.27.3] - 2026-10-22
 
 ### Fixed

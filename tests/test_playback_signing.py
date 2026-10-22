@@ -266,7 +266,8 @@ def test_first_variant_url_resolves_relative():
     ("media", "expected"), [(FAIRPLAY, "drm"), (AES, "aes-128"), (CLEAR, "none")]
 )
 def test_probe_follows_first_variant_for_encryption(media, expected):
-    session = FakeSession([FakeResponse(200, text=MASTER), FakeResponse(200, text=media)])
+    key = FakeResponse(200, text="k" * 16)  # AES-128: the content key is fetched once
+    session = FakeSession([FakeResponse(200, text=MASTER), FakeResponse(200, text=media), key])
     result = probe_manifest("https://content.example.com/x.m3u8", session=session)
     assert result.ok and result.encryption == expected
     assert session.calls[1][0].endswith("/a.m3u8?pbs=x")
@@ -283,3 +284,44 @@ def test_probe_dash_has_no_encryption_verdict():
     session = FakeSession(FakeResponse(200, text="<MPD/>"))
     result = probe_manifest("https://u/x.mpd", session=session)
     assert result.ok and result.encryption is None and len(session.calls) == 1
+
+
+DRM_REFUSED = FakeResponse(400, text="<html><body>DRM disallows raw key request</body></html>")
+
+
+@pytest.mark.parametrize(
+    ("key", "expected"),
+    [
+        (DRM_REFUSED, "drm"),
+        (FakeResponse(200, text="k" * 16), "aes-128"),
+        (FakeResponse(403, text="nope"), "aes-128"),
+        (requests.ConnectionError("down"), "aes-128"),
+    ],
+)
+def test_probe_asks_for_a_content_key(key, expected):
+    # Studio DRM channels can list AES-128 keys; only the key server tells.
+    session = FakeSession(
+        [FakeResponse(200, text=MASTER), FakeResponse(200, text=AD_THEN_AES), key]
+    )
+    result = probe_manifest("https://content.example.com/x.m3u8", session=session)
+    assert result.encryption == expected
+    # The content segment's key, not the ad's.
+    assert session.calls[2][0] == "https://k.example/check2?x"
+
+
+def test_content_key_uri_skips_ads():
+    from app.uplynk.playback import content_key_uri
+
+    assert content_key_uri(AD_BREAK) is None
+    assert content_key_uri(AD_THEN_FAIRPLAY) is None  # not AES-128
+    content = (
+        AD_BREAK
+        + '#UPLYNK-SEGMENT:a1,a0,segment\n#EXT-X-KEY:METHOD=AES-128,URI="https://k.example/c"\n#EXTINF:4,\ne1.ts\n'
+    )
+    assert content_key_uri(content) == "https://k.example/c"
+
+
+def test_probe_ad_break_fetches_no_key():
+    session = FakeSession([FakeResponse(200, text=MASTER), FakeResponse(200, text=AD_BREAK)])
+    result = probe_manifest("https://content.example.com/x.m3u8", session=session)
+    assert result.encryption is None and len(session.calls) == 2
