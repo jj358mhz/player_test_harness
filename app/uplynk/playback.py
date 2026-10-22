@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import logging
 import random
 import re
 import time
@@ -22,6 +23,8 @@ from typing import Any
 from urllib.parse import parse_qsl, quote, urlencode, urljoin, urlsplit
 
 import requests
+
+log = logging.getLogger(__name__)
 
 # ct values from the token spec.
 CONTENT_TYPES = {
@@ -162,7 +165,7 @@ def fetch_preplay(
     """GET a signed Preplay v2 URL and parse the response."""
     http = session or requests
     try:
-        response = http.get(signed_url, timeout=timeout, headers={"Accept": "application/json"})
+        response = _get(http, signed_url, timeout=timeout, headers={"Accept": "application/json"})
     except requests.RequestException as e:
         raise PlaybackError(f"Preplay request failed: {e}") from e
     if response.status_code != 200:
@@ -228,7 +231,7 @@ def probe_manifest(
     http = session or requests
     start = time.monotonic()
     try:
-        response = http.get(url, timeout=timeout)
+        response = _get(http, url, timeout=timeout)
     except requests.RequestException as e:
         return ProbeResult(False, None, f"Request failed: {e}", _ms_since(start))
     elapsed = _ms_since(start)
@@ -331,7 +334,7 @@ def fetch_media_playlist(
     """Text of the first media playlist behind a signed HLS URL, or None."""
     http = session or requests
     try:
-        response = http.get(url, timeout=timeout)
+        response = _get(http, url, timeout=timeout)
     except requests.RequestException:
         return None
     if response.status_code != 200 or not (response.text or "").lstrip().startswith("#EXTM3U"):
@@ -352,6 +355,34 @@ def _media_playlist(body: str, url: str, timeout: int, http: Any) -> str | None:
     if response.status_code != 200 or not (response.text or "").lstrip().startswith("#EXTM3U"):
         return None
     return response.text
+
+
+def _get(http: Any, url: str, **kwargs: Any) -> Any:
+    """GET, retrying once when no connection was made (DNS lookup, connect).
+
+    A blip in the Pi's resolver once failed a Preplay outright (2026-10-22).
+    Both failures are logged, without the query: it holds the signature.
+    Read timeouts and HTTP errors aren't retried: Uplynk got the request.
+    """
+    for attempt in (1, 2):
+        try:
+            return http.get(url, **kwargs)
+        except requests.ConnectionError as e:  # not ReadTimeout: that's a Timeout
+            where = urlsplit(url)
+            log.warning(
+                "Uplynk %s%s: connection failed (attempt %d of 2): %s",
+                where.netloc,
+                where.path,
+                attempt,
+                _no_query(str(e)),
+            )
+            if attempt == 2:
+                raise
+    raise AssertionError("unreachable")
+
+
+def _no_query(text: str) -> str:
+    return re.sub(r"\?[^\s'\"]*", "?…", text)
 
 
 def _ms_since(start: float) -> int:

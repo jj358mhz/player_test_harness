@@ -87,7 +87,9 @@ after dependency changes.
     **max 40 per page** (`page_size` is ignored above 40); walk `page=1..`
     until `total_items`. Allowed params: after, include_deleted, order,
     page, page_size, search, type (+ msg/sig).
-  - `playback.py` — URL templates, token signing, Preplay v2 fetch.
+  - `playback.py` — URL templates, token signing, Preplay v2 fetch. `_get`
+    retries once on a connection/DNS failure and logs it without the query
+    (v3.29.1); requests' "Max retries exceeded" text doesn't mean it retried.
   - `params.py` — customization params a load may sign (the Params box).
   - `clock.py` — DASH clock offset: matches MPD `$Number$` slices (per
     Period `AssetIdentifier`) to `pdts=latency` HLS `#UPLYNK-SEGMENT`
