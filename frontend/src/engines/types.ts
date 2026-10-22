@@ -115,6 +115,8 @@ export interface EngineEvents {
         error: string | null;
     };
     keystatus: {statuses: Record<string, string>};
+    /** The engine skipped a gap in the buffer or nudged past a stall (Shaka says so). */
+    gap: {note: string};
     /** A DASH video segment's prft: the wall clock at its presentation start. */
     prft: {start: number; wallMs: number; type: string};
     /** DASH in-band event (emsg) the UI doesn't otherwise understand. */

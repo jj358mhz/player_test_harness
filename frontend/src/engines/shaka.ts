@@ -196,6 +196,13 @@ export class ShakaEngine implements PlayerEngine {
         player.addEventListener('keystatuschanged', () =>
             this.events.emit('keystatus', {statuses: player.getKeyStatuses()}),
         );
+        // The app sees the seek itself; these say it was Shaka's doing.
+        player.addEventListener('gapjumped', () =>
+            this.events.emit('gap', {note: 'Shaka jumped a gap'}),
+        );
+        player.addEventListener('stalldetected', () =>
+            this.events.emit('gap', {note: 'Shaka detected a stall'}),
+        );
         player.addEventListener('emsg', (event) => {
             const detail = (
                 event as unknown as {

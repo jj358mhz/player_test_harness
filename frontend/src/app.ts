@@ -49,6 +49,7 @@ import {
     toHex,
     type UplynkSlice,
 } from './lib/id3';
+import {describeJump} from './lib/jumps';
 import {Id3Clock} from './lib/latency';
 import {raysParam} from './lib/rays';
 import {
@@ -166,6 +167,12 @@ class Session {
     rebuffers = 0;
     stalledMs = 0;
     stallStart: number | null = null;
+    /** Last playhead position seen while playing, for labelling jumps. */
+    playhead: number | null = null;
+    /** When (performance.now) and what the engine last said about a gap. */
+    engineGap: {at: number; note: string} | null = null;
+    /** When the app last asked the engine to jump to live. */
+    liveJumpAt: number | null = null;
     errors = 0;
     errorsHttp = 0;
     segments = {count: 0, ms: 0, bytes: 0, last: null as EngineEvents['segment'] | null};
@@ -1114,7 +1121,7 @@ export class PlayerApp {
                     {
                         type: 'button',
                         class: 'pl-btn-ghost',
-                        onclick: () => this.engine?.jumpToLive(),
+                        onclick: () => this.jumpToLive(),
                     },
                     'Jump to live',
                 ),
@@ -2256,6 +2263,9 @@ export class PlayerApp {
 
     private wire(engine: PlayerEngine): void {
         const s = () => this.session;
+        engine.on('gap', ({note}) => {
+            s().engineGap = {at: performance.now(), note};
+        });
         engine.on('manifest', ({renditions, master, live}) => {
             s().renditions = renditions;
             s().master = master;
@@ -2645,6 +2655,13 @@ export class PlayerApp {
         }).observe({type: 'resource', buffered: false});
     }
 
+    /** Jump to live, remembered so the seek it causes is labelled as such. */
+    private jumpToLive(): void {
+        if (!this.engine) return;
+        this.session.liveJumpAt = performance.now();
+        this.engine.jumpToLive();
+    }
+
     private watchVideo(): void {
         let started = false;
         this.video.addEventListener('playing', () => {
@@ -2655,9 +2672,35 @@ export class PlayerApp {
                 this.logEntry('info', 'STARTUP', `first frame ${s.startupMs} ms after load`);
             }
             if (s.stallStart !== null) {
-                s.stalledMs += performance.now() - s.stallStart;
+                const stalled = performance.now() - s.stallStart;
+                s.stalledMs += stalled;
                 s.stallStart = null;
+                this.logEntry(
+                    'info',
+                    'RESUMED',
+                    `at ${this.video.currentTime.toFixed(1)} s after ${(stalled / 1000).toFixed(1)} s stalled`,
+                );
             }
+        });
+        this.video.addEventListener('timeupdate', () => {
+            if (!this.video.seeking) this.session.playhead = this.video.currentTime;
+        });
+        this.video.addEventListener('seeking', () => {
+            const s = this.session;
+            if (!started || s.playhead === null) return;
+            const now = performance.now();
+            const entry = describeJump({
+                from: s.playhead,
+                to: this.video.currentTime,
+                stalledMs: s.stallStart === null ? null : now - s.stallStart,
+                engineGapAgoMs: s.engineGap ? now - s.engineGap.at : null,
+                engineNote: s.engineGap?.note ?? null,
+                liveJumpAgoMs: s.liveJumpAt === null ? null : now - s.liveJumpAt,
+            });
+            s.playhead = this.video.currentTime;
+            if (!entry) return;
+            this.logEntry(entry.kind, entry.label, entry.text);
+            if (entry.label === 'GAP JUMP') this.mark('err', 'Gap jump');
         });
         this.video.addEventListener('waiting', () => {
             if (!started || this.video.seeking) return;
@@ -2692,7 +2735,7 @@ export class PlayerApp {
             const drift = this.engine.liveEdgeDrift();
             const limit = Number(this.el<HTMLInputElement>('autosyncSecs').value) || 30;
             if (drift !== null && drift > limit) {
-                this.engine.jumpToLive();
+                this.jumpToLive();
                 this.logEntry(
                     'info',
                     'TAB RETURN',
@@ -2786,7 +2829,7 @@ export class PlayerApp {
             now - s.lastSync > 10000
         ) {
             s.lastSync = now;
-            engine.jumpToLive();
+            this.jumpToLive();
             this.logEntry(
                 'info',
                 'AUTO-SYNC',

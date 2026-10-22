@@ -17,6 +17,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   order, on the tiles, the legend, the latency chart, `/compare` and
   recorded sessions.
 
+### Added
+
+- **Gap jumps and stalls in the Log.** A jump of the playhead out of a
+  stall logs `GAP JUMP 3566.1 → 3683.5 s (+117.4 s) · after 148.4 s
+  stalled · 117.4 s of content skipped` and marks the timeline; Shaka's
+  own `gapjumped`/`stalldetected` events are named with it. The end of a
+  stall logs `RESUMED … after N s stalled`; Jump to live / auto-sync /
+  tab return log `JUMP TO LIVE`, other moves `SEEK`. Seen with Shaka on a
+  Studio DRM channel: the playhead stalled 2.7 s into the second of three
+  SSAI ads and later skipped both remaining ads without a word.
+
 ## [3.27.4] - 2026-10-22
 
 ### Fixed
