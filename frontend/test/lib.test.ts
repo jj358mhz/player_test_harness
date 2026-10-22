@@ -34,12 +34,13 @@ function id3Tag(frames: [string, Uint8Array][]): Uint8Array {
 
 describe('bands', () => {
     it.each([
-        [3, 'awesome'],
-        [10, 'good'],
-        [18.9, 'good'],
-        [19, 'average'],
-        [30, 'above'],
-        [40, 'yuk'],
+        [3, 'goat'],
+        [10, 'awesome'],
+        [18.9, 'awesome'],
+        [19, 'good'],
+        [25, 'average'],
+        [44.9, 'average'],
+        [45, 'yuk'],
     ])('%s s is %s', (s, key) => {
         expect(bandFor(s).key).toBe(key);
     });

@@ -85,6 +85,13 @@ Uplynk stream is doing while it plays.
   the lane below. Ad breaks are shaded. Latency rising *with* drift means
   the player is falling behind the edge; rising while drift stays flat means
   the stream itself is arriving late.
+- **Stalls and jumps** in the Log: `REBUFFER` when the buffer runs dry,
+  `RESUMED` with how long it stalled, and any time the playhead moves
+  without playing through: `GAP JUMP` (out of a stall, or Shaka's
+  `gapjumped`/`stalldetected`; also marked on the timeline) with the seconds
+  of content skipped, `JUMP TO LIVE` (Jump to live, auto-sync, tab return)
+  or `SEEK`. dash.js and hls.js jump gaps silently, so the label comes from
+  watching the video element (`lib/jumps.ts`).
 - **Inspector tabs** (deep-link with `#latency`, `#abr`, `#keys`, `#meta`,
   `#tracks`, `#manifest`, `#network`, `#log`).
 
@@ -133,7 +140,7 @@ All three are measured at the playhead, once a second:
 
 The headline number is the encoder wallclock (ID3 or prft) when the stream has it, otherwise PDT. The
 Current / Average / Max / Min tiles run from load and use these bands:
-Awesome <10 s, Good 10–19 s, Average 19–25 s, Above avg 25–40 s, Yuk >40 s.
+GOAT <10 s, Awesome 10–19 s, Good 19–25 s, Average 25–45 s, Yuk >45 s.
 
 ### Which clock
 

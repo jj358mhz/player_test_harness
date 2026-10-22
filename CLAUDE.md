@@ -132,6 +132,7 @@ after dependency changes.
     `mp4.ts` (prft/tfdt/mdhd from DASH segments → encoder-time anchors
     for the same clock ID3 uses; emsg payload preview),
     `waterfall.ts` (request detail; first byte from the engine or Resource Timing),
+    `jumps.ts` (labels playhead jumps: GAP JUMP / JUMP TO LIVE / SEEK, v3.28.0),
     `uplynkParams.ts` (the Params box: + param menu, accepted keys/families,
     refused keys; `app/uplynk/params.py` mirrors it for presets and
     `tests/test_uplynk_params.py` checks they match),
