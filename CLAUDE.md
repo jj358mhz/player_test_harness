@@ -199,7 +199,11 @@ after dependency changes.
   window of only `#UPLYNK-SEGMENT` kind `ad` gives no verdict, and `drm`
   is sticky: only `flask check-encryption` downgrades it (v3.27.3).
   Preplay's `drm.required` was `false` on those DRM channels, so it's no
-  signal.
+  signal. **Some Studio DRM channels list AES-128 keys, not FairPlay**
+  (`/check2?b,c,pbs,r,v`): ad keys are served, content keys get `400 DRM
+  disallows raw key request` (server or browser alike). `probe_manifest`
+  fetches the newest content segment's key when it sees AES-128
+  (`content_key_uri`, v3.27.4) and calls that refusal `drm`.
 - Studio DRM channels: plain signed HLS is FairPlay (`METHOD=SAMPLE-AES`,
   `skd://…/fp-spc/`, `KEYFORMAT="com.apple.streamingkeydelivery"`), Safari
   only. In Chrome use Preplay `manifest=mpd&rmt=wv`: CENC DASH whose license

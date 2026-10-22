@@ -240,6 +240,8 @@ def probe_manifest(
             # Keys only appear in media playlists, so follow the first variant.
             media = _media_playlist(body, url, timeout, http)
             encryption = None if media is None else classify_hls_encryption(media)
+            if encryption == "aes-128":
+                encryption = _raw_key_verdict(media, timeout, http)
         return ProbeResult(True, 200, None, elapsed, encryption, body, fetched_at, media)
     detail = _strip_html(body) or "response is not a manifest"
     return ProbeResult(
@@ -275,6 +277,41 @@ def classify_hls_encryption(playlist: str) -> str | None:
     if any("METHOD=SAMPLE-AES" in k for k in keys):
         return "sample-aes"
     return "none"
+
+
+def content_key_uri(playlist: str) -> str | None:
+    """URI of the AES-128 key for the newest non-ad segment, or None."""
+    key = kind = None
+    found = None
+    for line in playlist.splitlines():
+        if line.startswith("#EXT-X-KEY"):
+            match = re.search(r'URI="([^"]+)"', line)
+            key = match.group(1) if match and "METHOD=AES-128" in line else None
+        elif line.startswith("#UPLYNK-SEGMENT:"):
+            kind = line.rsplit(",", 1)[-1].strip()
+        elif line.strip() and not line.startswith("#") and kind != "ad" and key:
+            found = key
+    return found
+
+
+def _raw_key_verdict(media: str, timeout: int, http: Any) -> str:
+    """``drm`` if Uplynk refuses the content's AES-128 key, else ``aes-128``.
+
+    Some Studio DRM channels list plain AES-128 keys in HLS (no FairPlay),
+    but the key server answers ``400 DRM disallows raw key request`` for
+    their content (ad keys still work). Fetching one key from the server
+    is the only way to tell them from ordinary AES-128 channels.
+    """
+    uri = content_key_uri(media)
+    if uri is None:
+        return "aes-128"
+    try:
+        response = http.get(uri, timeout=timeout)
+    except requests.RequestException:
+        return "aes-128"
+    if response.status_code == 400 and "DRM" in (response.text or ""):
+        return "drm"
+    return "aes-128"
 
 
 def first_variant_url(master: str, base_url: str) -> str | None:
