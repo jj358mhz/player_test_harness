@@ -51,6 +51,7 @@ import {
 } from './lib/id3';
 import {describeJump} from './lib/jumps';
 import {Id3Clock} from './lib/latency';
+import {describeTail, mpdTail} from './lib/mpdTail';
 import {raysParam} from './lib/rays';
 import {
     capPush,
@@ -173,6 +174,8 @@ class Session {
     engineGap: {at: number; note: string} | null = null;
     /** When the app last asked the engine to jump to live. */
     liveJumpAt: number | null = null;
+    /** The MPD tail last logged during this stall, so refreshes log only changes. */
+    stallTail: string | null = null;
     errors = 0;
     errorsHttp = 0;
     segments = {count: 0, ms: 0, bytes: 0, last: null as EngineEvents['segment'] | null};
@@ -2390,6 +2393,8 @@ export class PlayerApp {
         engine.on('playlist', (info) => {
             const before = mpdAdPeriods(s().playlist?.text).length;
             s().playlist = info;
+            // Stalled on DASH: say each time a refresh changes the end of the timeline.
+            if (s().stallStart !== null && info.format === 'dash') this.logStallTail('refresh');
             // SSAI: say when the MPD gains ad Periods (Uplynk stitches one per ad).
             const periods = info.format === 'dash' ? mpdAdPeriods(info.text) : [];
             if (periods.length > before) {
@@ -2655,6 +2660,23 @@ export class PlayerApp {
         }).observe({type: 'resource', buffered: false});
     }
 
+    /**
+     * The end of the MPD's timeline against the stalled playhead: whether the
+     * engine is waiting on segments Uplynk hasn't listed yet, or has them.
+     */
+    private logStallTail(when: 'stall' | 'refresh'): void {
+        const s = this.session;
+        const tail = mpdTail(s.playlist?.text);
+        const key = JSON.stringify(tail);
+        if (when === 'refresh' && key === s.stallTail) return;
+        s.stallTail = key;
+        const ago =
+            when === 'refresh' && s.stallStart !== null
+                ? `${((performance.now() - s.stallStart) / 1000).toFixed(0)} s into the stall, MPD now: `
+                : '';
+        this.logEntry('info', 'MPD @ STALL', ago + describeTail(tail, this.video.currentTime));
+    }
+
     /** Jump to live, remembered so the seek it causes is labelled as such. */
     private jumpToLive(): void {
         if (!this.engine) return;
@@ -2711,6 +2733,8 @@ export class PlayerApp {
                 'REBUFFER',
                 `buffer empty at ${this.video.currentTime.toFixed(1)} s`,
             );
+            this.session.stallTail = null;
+            if (this.session.playlist?.format === 'dash') this.logStallTail('stall');
         });
         this.video.addEventListener('emptied', () => {
             started = false;
