@@ -1533,6 +1533,8 @@ export class PlayerApp {
 
     /** Remember a probe's verdict for this page and relabel the picker. */
     private noteEncryption(channel: ChannelOption, encryption: string): void {
+        // Like the server: one window without FairPlay keys doesn't undo DRM.
+        if (channel.encryption === 'drm' && encryption !== 'drm') return;
         channel.encryption = encryption;
         const option = this.el<HTMLSelectElement>('source').querySelector<HTMLOptionElement>(
             `option[value="${channel.id}"]`,

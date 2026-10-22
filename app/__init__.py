@@ -92,7 +92,11 @@ def _register_cli(app: Flask) -> None:
     @app.cli.command("check-encryption")
     @click.option("--account", "label", help="Only check the account with this label.")
     def check_encryption_cmd(label: str | None) -> None:
-        """Probe each active channel's HLS and record its encryption (DRM badge)."""
+        """Probe each active channel's HLS and record its encryption (DRM badge).
+
+        The one place a channel marked DRM can lose the badge (e.g. Studio DRM
+        turned off); the player and the health check never downgrade it.
+        """
         from app.api.service import check_encryption
         from app.models import Channel, UplynkAccount
 

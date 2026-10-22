@@ -223,6 +223,14 @@ FAIRPLAY = (
 )
 AES = '#EXTM3U\n#EXT-X-KEY:METHOD=AES-128,URI="https://k.example/key?r=e"\n#EXTINF:4,\ne1.ts\n'
 CLEAR = "#EXTM3U\n#EXT-X-TARGETDURATION:4\n#EXTINF:4,\ne1.ts\n"
+# Live windows as Uplynk writes them: #UPLYNK-SEGMENT <asset>,<slice>,<kind>.
+AD_KEY = '#EXT-X-KEY:METHOD=AES-128,URI="https://k.example/check2?x"\n'
+FP_KEY = '#EXT-X-KEY:METHOD=SAMPLE-AES,URI="skd://k.example/fp-spc/abc"\n'
+AD_BREAK = f"#EXTM3U\n#UPLYNK-SEGMENT:ad0001,00000001,ad\n{AD_KEY}#EXTINF:4,\na1.ts\n"
+AD_THEN_FAIRPLAY = (
+    AD_BREAK + f"#UPLYNK-SEGMENT:asset0001,000000a0,segment\n{FP_KEY}#EXTINF:4,\nFP_E1.ts\n"
+)
+AD_THEN_AES = AD_BREAK + f"#UPLYNK-SEGMENT:asset0001,000000a0,segment\n{AD_KEY}#EXTINF:4,\ne1.ts\n"
 MASTER = (
     "#EXTM3U\n#UPLYNK-MEDIA0:416x234x30,baseline-13,2x48000\n"
     "#EXT-X-STREAM-INF:BANDWIDTH=300000\nchannel/chan0001/a.m3u8?pbs=x\n"
@@ -238,6 +246,10 @@ MASTER = (
         ('#EXTM3U\n#EXT-X-KEY:METHOD=SAMPLE-AES,URI="https://k.example/k"\n', "sample-aes"),
         ("#EXTM3U\n#EXT-X-KEY:METHOD=NONE\n", "none"),
         (CLEAR, "none"),
+        # An ad break is AES-128 even on Studio DRM channels: no verdict.
+        (AD_BREAK, None),
+        (AD_THEN_FAIRPLAY, "drm"),
+        (AD_THEN_AES, "aes-128"),
     ],
 )
 def test_classify_hls_encryption(playlist, expected):

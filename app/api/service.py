@@ -195,8 +195,15 @@ def measure_dash_clock(req: PlaybackRequest, probe: ProbeResult, api_key: str) -
     return clock.as_dict() if clock else None
 
 
-def record_encryption(channel: Channel, encryption: str) -> None:
-    """Remember how a channel is protected, for the dashboard badge."""
+def record_encryption(channel: Channel, encryption: str, downgrade: bool = False) -> None:
+    """Remember how a channel is protected, for the dashboard badge.
+
+    A live window can hold no FairPlay keys while a DRM channel airs
+    something unprotected (slate, ads Uplynk didn't tag), so once a channel
+    is `drm` only an explicit `flask check-encryption` (`downgrade`) clears it.
+    """
+    if channel.encryption == "drm" and encryption != "drm" and not downgrade:
+        return
     channel.encryption = encryption
     channel.encryption_checked_at = datetime.now(UTC)
 
@@ -224,7 +231,7 @@ def check_encryption(
         probes = list(pool.map(probe_manifest, urls))
     for channel, probe in zip(channels, probes, strict=True):
         if probe.encryption:
-            record_encryption(channel, probe.encryption)
+            record_encryption(channel, probe.encryption, downgrade=True)
     db.session.commit()
     return list(zip(channels, probes, strict=True))
 
