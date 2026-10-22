@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.29.1] - 2026-10-22
+
+### Fixed
+
+- **A failed DNS lookup no longer fails a Load.** Preplay, the manifest
+  probe and the health check's playlist fetch retry once when no
+  connection was made (name resolution or connect error), and log each
+  failure (`Uplynk <host><path>: connection failed (attempt n of 2)`,
+  query left out, so no signature) so `docker logs` shows how often it
+  happens. Read timeouts and HTTP errors aren't retried: Uplynk got the
+  request. (A resolver blip on the Pi had failed a Preplay with
+  `Max retries exceeded … Temporary failure in name resolution`.)
+
 ## [3.29.0] - 2026-10-22
 
 ### Added

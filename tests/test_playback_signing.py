@@ -325,3 +325,41 @@ def test_probe_ad_break_fetches_no_key():
     session = FakeSession([FakeResponse(200, text=MASTER), FakeResponse(200, text=AD_BREAK)])
     result = probe_manifest("https://content.example.com/x.m3u8", session=session)
     assert result.encryption is None and len(session.calls) == 2
+
+
+NO_DNS = requests.ConnectionError(
+    "HTTPSConnectionPool(host='content.example.com', port=443): Max retries exceeded with url: "
+    "/preplay/channel/chan0001.json?tc=1&sig=deadbeef (Caused by NameResolutionError(...))"
+)
+
+
+def test_fetch_preplay_retries_once_after_a_failed_lookup(caplog):
+    payload = {"playURL": "https://content.example.com/p.m3u8", "sid": "s"}
+    session = FakeSession([NO_DNS, FakeResponse(200, payload)])
+    url = "https://content.example.com/preplay/channel/chan0001.json?tc=1&sig=deadbeef"
+    assert fetch_preplay(url, session=session).sid == "s"
+    assert len(session.calls) == 2
+    assert "content.example.com/preplay/channel/chan0001.json" in caplog.text
+    assert "attempt 1 of 2" in caplog.text
+    # The signature never reaches the log.
+    assert "deadbeef" not in caplog.text
+
+
+def test_fetch_preplay_gives_up_after_two_failed_connections(caplog):
+    session = FakeSession([NO_DNS, NO_DNS])
+    with pytest.raises(PlaybackError, match="Preplay request failed: .*NameResolutionError"):
+        fetch_preplay("https://content.example.com/p.json?sig=deadbeef", session=session)
+    assert len(session.calls) == 2
+    assert "attempt 2 of 2" in caplog.text
+
+
+@pytest.mark.parametrize("failure", [requests.ReadTimeout("slow"), FakeResponse(503, text="busy")])
+def test_no_retry_once_uplynk_has_the_request(failure):
+    session = FakeSession([failure, FakeResponse(200, text=CLEAR)])
+    assert not probe_manifest("https://u", session=session).ok
+    assert len(session.calls) == 1
+
+
+def test_probe_retries_a_failed_connection():
+    session = FakeSession([NO_DNS, FakeResponse(200, text=CLEAR)])
+    assert probe_manifest("https://u", session=session).ok
