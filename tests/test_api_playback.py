@@ -253,6 +253,21 @@ def test_unknown_encryption_keeps_previous(auth_client, make_account, make_chann
     assert ch.encryption == "aes-128"
 
 
+def test_drm_is_not_undone_by_one_window(auth_client, make_account, make_channel, probe_calls):
+    # A DRM channel airing something unprotected keeps its badge...
+    ch = make_channel(make_account(), encryption="drm")
+    probe_calls.result = ProbeResult(True, 200, None, 5, "aes-128")
+    _post(auth_client, {"channel_id": ch.id})
+    db.session.refresh(ch)
+    assert ch.encryption == "drm"
+
+    # ...through the health check too; only check-encryption clears it.
+    service.check_health([ch])
+    assert ch.encryption == "drm"
+    service.check_encryption([ch])
+    assert ch.encryption == "aes-128"
+
+
 def test_check_encryption_signs_and_records(app, make_account, make_channel, monkeypatch):
     account = make_account()
     clear = make_channel(account, "chan0001")

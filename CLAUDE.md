@@ -195,6 +195,11 @@ after dependency changes.
 - Encryption shows only in **media** playlists, not the master: the probe
   follows the first variant. Nearly every Uplynk channel is `AES-128`
   (the default, so no badge); Studio DRM ones carry FairPlay keys.
+  **Ad slices are AES-128 even on Studio DRM channels** (2026-10-22): a
+  window of only `#UPLYNK-SEGMENT` kind `ad` gives no verdict, and `drm`
+  is sticky: only `flask check-encryption` downgrades it (v3.27.3).
+  Preplay's `drm.required` was `false` on those DRM channels, so it's no
+  signal.
 - Studio DRM channels: plain signed HLS is FairPlay (`METHOD=SAMPLE-AES`,
   `skd://…/fp-spc/`, `KEYFORMAT="com.apple.streamingkeydelivery"`), Safari
   only. In Chrome use Preplay `manifest=mpd&rmt=wv`: CENC DASH whose license

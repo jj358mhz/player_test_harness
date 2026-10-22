@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.27.3] - 2026-10-22
+
+### Fixed
+
+- **DRM channels lost their 🔒 badge during ad breaks.** Ads are AES-128
+  even on Studio DRM channels, so a health check (or a Play) during a break
+  saw no FairPlay keys and recorded `aes-128`: the card went back to
+  **▶ Play HLS** and the player didn't switch to Widevine DASH. A window
+  of only ad slices (`#UPLYNK-SEGMENT` kind `ad`) now gives no verdict,
+  and once a channel is DRM only `flask check-encryption` can clear it
+  (the player and the health check never downgrade it). Channels already
+  flipped get the badge back at the first check that sees their content.
+
 ## [3.27.2] - 2026-10-21
 
 ### Added

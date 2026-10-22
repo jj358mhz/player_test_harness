@@ -247,7 +247,7 @@ def probe_manifest(
     )
 
 
-def classify_hls_encryption(playlist: str) -> str:
+def classify_hls_encryption(playlist: str) -> str | None:
     """How an HLS media playlist is protected.
 
     - ``drm``: Studio DRM. Uplynk's HLS flavour is FairPlay
@@ -255,8 +255,19 @@ def classify_hls_encryption(playlist: str) -> str:
     - ``aes-128``: clear-key AES-128 (``METHOD=AES-128``).
     - ``sample-aes``: SAMPLE-AES without FairPlay keys.
     - ``none``: no ``EXT-X-KEY`` (or ``METHOD=NONE``).
+    - None: the window is all ad slices (``#UPLYNK-SEGMENT`` kind ``ad``).
+      Ads are AES-128 even on Studio DRM channels, so they say nothing
+      about the channel.
     """
-    keys = [line for line in playlist.splitlines() if line.startswith("#EXT-X-KEY")]
+    lines = playlist.splitlines()
+    kinds = [
+        line.split(":", 1)[1].split(",")[2].strip()
+        for line in lines
+        if line.startswith("#UPLYNK-SEGMENT:") and line.count(",") >= 2
+    ]
+    if kinds and all(kind == "ad" for kind in kinds):
+        return None
+    keys = [line for line in lines if line.startswith("#EXT-X-KEY")]
     if any("com.apple.streamingkeydelivery" in k or "skd://" in k for k in keys):
         return "drm"
     if any("METHOD=AES-128" in k for k in keys):
