@@ -91,7 +91,10 @@ Uplynk stream is doing while it plays.
   `gapjumped`/`stalldetected`; also marked on the timeline) with the seconds
   of content skipped, `JUMP TO LIVE` (Jump to live, auto-sync, tab return)
   or `SEEK`. dash.js and hls.js jump gaps silently, so the label comes from
-  watching the video element (`lib/jumps.ts`).
+  watching the video element (`lib/jumps.ts`). On DASH a stall also logs
+  `MPD @ STALL`: the newest two Periods, how far their listed video
+  segments reach, and the playhead against that; repeated whenever a
+  refresh changes it during the stall (`lib/mpdTail.ts`).
 - **Inspector tabs** (deep-link with `#latency`, `#abr`, `#keys`, `#meta`,
   `#tracks`, `#manifest`, `#network`, `#log`).
 

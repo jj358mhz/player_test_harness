@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.29.0] - 2026-10-22
+
+### Added
+
+- **MPD snapshot at DASH stalls** (`MPD @ STALL` in the Log): on each
+  `REBUFFER` the newest two Periods (ad or content, start–end, how many
+  video segments are listed and where they end) and whether the playhead
+  has run past the last listed segment; while the stall lasts, again each
+  time an MPD refresh changes that. Shaka has twice stalled in whichever
+  SSAI ad Period was newest in the MPD; this shows whether it is waiting
+  for segments Uplynk hasn't listed or ignoring ones it has.
+
 ## [3.28.0] - 2026-10-22
 
 ### Changed

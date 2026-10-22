@@ -8,6 +8,7 @@ import type {CmcdConfig} from '../lib/cmcd';
 import {videoProfile} from '../lib/codecs';
 import {isId3Tag, parseId3} from '../lib/id3';
 import {PrftReader, payloadPreview} from '../lib/mp4';
+import {isoSeconds} from '../lib/mpdTail';
 import {
     type AudioTrack,
     type CencDrmConfig,
@@ -474,12 +475,4 @@ export function mpdInfo(mpd: string): MediaPlaylistInfo {
     };
 }
 
-/** ISO 8601 duration (PT1H2M3.5S) → seconds. */
-export function isoSeconds(value: string | null): number | null {
-    const m = value && /^P(?:(\d+)D)?T?(?:(\d+)H)?(?:(\d+)M)?(?:([\d.]+)S)?$/.exec(value);
-    if (!m) return null;
-    const [, d, h, min, sec] = m;
-    return (
-        Number(d ?? 0) * 86400 + Number(h ?? 0) * 3600 + Number(min ?? 0) * 60 + Number(sec ?? 0)
-    );
-}
+export {isoSeconds} from '../lib/mpdTail';

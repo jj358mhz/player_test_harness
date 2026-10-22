@@ -133,6 +133,7 @@ after dependency changes.
     for the same clock ID3 uses; emsg payload preview),
     `waterfall.ts` (request detail; first byte from the engine or Resource Timing),
     `jumps.ts` (labels playhead jumps: GAP JUMP / JUMP TO LIVE / SEEK, v3.28.0),
+    `mpdTail.ts` (newest Periods vs the playhead, logged at DASH stalls, v3.29.0),
     `uplynkParams.ts` (the Params box: + param menu, accepted keys/families,
     refused keys; `app/uplynk/params.py` mirrors it for presets and
     `tests/test_uplynk_params.py` checks they match),
