@@ -551,7 +551,18 @@
         display: grid;
         visibility: hidden;
     }
-    .pl-inspector .pl-log--tall {
+    /* Each tab's last list (log, playlist) takes the height left and scrolls
+       itself; everything above it keeps its size. */
+    .pl-inspector .pl-tabpanel:not(#pl-panel-latency) {
+        display: flex;
+        flex-direction: column;
+    }
+    .pl-inspector .pl-tabpanel:not(#pl-panel-latency) > * {
+        flex-shrink: 0;
+    }
+    .pl-inspector .pl-tabpanel > .pl-fill {
+        flex: 1 1 0;
+        min-height: 160px;
         max-height: none;
     }
 }
