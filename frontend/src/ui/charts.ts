@@ -345,6 +345,144 @@ export function drawTimeline(
     }
 }
 
+export interface Span {
+    start: number; // ms since epoch
+    end: number | null;
+}
+
+export interface BufferSeries {
+    buffer: Point[]; // seconds of forward buffer
+    bandwidth: Point[]; // the engine's ABR estimate, bits/s
+    stalls: Span[];
+}
+
+/**
+ * Forward buffer (filled, left scale in seconds) and the engine's bandwidth
+ * estimate (line, scaled to its own peak) under the timeline. Same x scale
+ * and margins as drawTimeline so the two read as one strip; stalls shaded.
+ * Height follows the element, which takes the panel's spare room.
+ */
+export function drawBufferChart(
+    el: SVGSVGElement,
+    series: BufferSeries,
+    breaks: AdBreak[],
+    windowMs: number,
+): void {
+    el.textContent = '';
+    const W = Math.max(320, Math.round(el.clientWidth || 800));
+    const H = Math.max(80, Math.round(el.clientHeight || 110));
+    el.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    const L = 52;
+    const R = 64;
+    const top = 6;
+    const bottom = H - 4;
+    const now = Date.now();
+    const x = (t: number) => L + (1 - (now - t) / windowMs) * (W - L - R);
+    const visible = (points: Point[]) => points.filter((p) => now - p.t <= windowMs);
+
+    const shade = (spans: Span[], fill: string, opacity: number, name: string) => {
+        for (const b of spans) {
+            const x1 = Math.max(L, x(b.start));
+            const x2 = Math.min(W - R, x(b.end ?? now));
+            if (x2 <= L) continue;
+            const rect = svg(
+                'rect',
+                {
+                    x: x1,
+                    y: top,
+                    width: Math.max(2, x2 - x1),
+                    height: bottom - top,
+                    fill,
+                    'fill-opacity': opacity,
+                },
+                el,
+            );
+            svg('title', {}, rect).textContent =
+                `${name} · ${(((b.end ?? now) - b.start) / 1000).toFixed(1)} s`;
+        }
+    };
+    shade(breaks, 'var(--scte)', 0.12, 'Ad break');
+    shade(series.stalls, 'var(--error)', 0.22, 'Stalled');
+
+    const buffer = visible(series.buffer);
+    const maxB = Math.max(10, ...buffer.map((p) => p.v)) * 1.1;
+    const step = niceStep(maxB / 3);
+    const topB = Math.ceil(maxB / step) * step;
+    const y = (v: number) => top + (1 - v / topB) * (bottom - top);
+    for (let v = 0; v <= topB; v += step) {
+        svg('line', {x1: L, x2: W - R, y1: y(v), y2: y(v), stroke: css('--border')}, el);
+        svg(
+            'text',
+            {x: L - 6, y: y(v) + 3.5, 'text-anchor': 'end', class: 'chart-label'},
+            el,
+        ).textContent = `${v}s`;
+    }
+
+    const labels: {y: number; text: string; color: string}[] = [];
+    if (buffer.length > 1) {
+        const pts = buffer.map((p) => `${x(p.t).toFixed(1)},${y(p.v).toFixed(1)}`).join(' ');
+        const first = buffer[0] as Point;
+        const last = buffer[buffer.length - 1] as Point;
+        svg(
+            'polygon',
+            {
+                points: `${x(first.t).toFixed(1)},${y(0)} ${pts} ${x(last.t).toFixed(1)},${y(0)}`,
+                fill: 'var(--buffer)',
+                'fill-opacity': 0.18,
+            },
+            el,
+        );
+        svg(
+            'polyline',
+            {points: pts, fill: 'none', stroke: 'var(--buffer)', 'stroke-width': 1.5},
+            el,
+        );
+    }
+    const lastB = series.buffer[series.buffer.length - 1];
+    if (lastB)
+        labels.push({y: y(lastB.v), text: `${lastB.v.toFixed(1)} s`, color: 'var(--buffer)'});
+
+    const bandwidth = visible(series.bandwidth);
+    const peak = Math.max(1, ...bandwidth.map((p) => p.v)) * 1.1;
+    const yBw = (v: number) => top + (1 - v / peak) * (bottom - top);
+    if (bandwidth.length > 1) {
+        svg(
+            'polyline',
+            {
+                points: bandwidth
+                    .map((p) => `${x(p.t).toFixed(1)},${yBw(p.v).toFixed(1)}`)
+                    .join(' '),
+                fill: 'none',
+                stroke: 'var(--bandwidth)',
+                'stroke-width': 1.5,
+                'stroke-linejoin': 'round',
+            },
+            el,
+        );
+    }
+    const lastBw = series.bandwidth[series.bandwidth.length - 1];
+    if (lastBw)
+        labels.push({
+            y: yBw(lastBw.v),
+            text: `${(lastBw.v / 1e6).toFixed(1)} Mb/s`,
+            color: 'var(--bandwidth)',
+        });
+
+    labels.sort((a, b) => a.y - b.y);
+    for (let i = 1; i < labels.length; i++) {
+        const prev = labels[i - 1] as (typeof labels)[number];
+        const cur = labels[i] as (typeof labels)[number];
+        if (cur.y - prev.y < 12) cur.y = prev.y + 12;
+    }
+    for (const lab of labels) {
+        svg(
+            'text',
+            {x: W - R + 8, y: Math.min(bottom, lab.y + 4), class: 'chart-value', fill: lab.color},
+            el,
+        ).textContent = lab.text;
+    }
+}
+
 /** Minutes between time ticks so a range of `minutes` gets about eight. */
 export function tickMinutes(minutes: number): number {
     for (const step of [1, 2, 5, 10, 15, 30, 60, 120, 240]) if (minutes / step <= 8) return step;

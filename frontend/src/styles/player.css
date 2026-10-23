@@ -11,6 +11,8 @@
     --band-average: #f97316;
     --band-yuk: #e05252;
     --drift: #2dd4bf;
+    --buffer: #60a5fa;
+    --bandwidth: #d4d4d8;
 }
 
 .pl {
@@ -398,6 +400,44 @@
     width: 100%;
     height: 132px;
     display: block;
+}
+.pl-timeline-panel {
+    display: flex;
+    flex-direction: column;
+}
+.pl-panel__head--sub {
+    margin: 10px 0 4px;
+}
+/* Takes the panel's spare height when the inspector makes the row taller. */
+.pl-bufchart {
+    display: block;
+    width: 100%;
+    flex: 1 1 110px;
+    min-height: 110px;
+}
+.pl-now {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 10px;
+    margin-top: 8px;
+    padding: 6px 10px;
+    background: var(--inset);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 12.5px;
+}
+.pl-now[hidden] {
+    display: none;
+}
+.pl-now__label {
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+}
+.pl-now b {
+    font: 600 12px var(--font-mono);
 }
 .pl-legend {
     display: flex;

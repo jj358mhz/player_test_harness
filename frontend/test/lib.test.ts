@@ -236,6 +236,46 @@ describe('chart scale', async () => {
     });
 });
 
+describe('drawBufferChart', async () => {
+    const {drawBufferChart} = await import('../src/ui/charts');
+    const now = Date.now();
+    const el = () => document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+
+    it('draws buffer, bandwidth, stalls and current values', () => {
+        const svg = el();
+        drawBufferChart(
+            svg,
+            {
+                buffer: [
+                    {t: now - 20000, v: 12},
+                    {t: now - 10000, v: 0},
+                    {t: now, v: 8.25},
+                ],
+                bandwidth: [
+                    {t: now - 20000, v: 6e6},
+                    {t: now, v: 4.5e6},
+                ],
+                stalls: [{start: now - 12000, end: now - 9000}],
+            },
+            [{start: now - 30000, end: null, planned: null, label: 'ad'}],
+            5 * 60 * 1000,
+        );
+        const titles = [...svg.querySelectorAll('title')].map((t) => t.textContent);
+        expect(titles).toContain('Stalled · 3.0 s');
+        expect(titles.some((t) => t?.startsWith('Ad break'))).toBe(true);
+        const values = [...svg.querySelectorAll('.chart-value')].map((t) => t.textContent);
+        expect(values).toEqual(expect.arrayContaining(['8.3 s', '4.5 Mb/s']));
+        expect(svg.querySelectorAll('polyline')).toHaveLength(2);
+    });
+
+    it('draws only the grid with no samples', () => {
+        const svg = el();
+        drawBufferChart(svg, {buffer: [], bandwidth: [], stalls: []}, [], 5 * 60 * 1000);
+        expect(svg.querySelectorAll('polyline')).toHaveLength(0);
+        expect(svg.querySelectorAll('.chart-label').length).toBeGreaterThan(1);
+    });
+});
+
 describe('videoProfile', async () => {
     const {videoProfile} = await import('../src/lib/codecs');
     it.each([

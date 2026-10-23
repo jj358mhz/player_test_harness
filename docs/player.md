@@ -85,6 +85,16 @@ Uplynk stream is doing while it plays.
   the lane below. Ad breaks are shaded. Latency rising *with* drift means
   the player is falling behind the edge; rising while drift stays flat means
   the stream itself is arriving late.
+- **Buffer & bandwidth** (under the timeline, same time axis): forward
+  buffer in seconds (filled) and the engine's ABR bandwidth estimate (line,
+  scaled to its own peak), with current values at the right. Stalls are
+  shaded red and ad breaks purple, so a buffer draining into a `REBUFFER`
+  (segments not arriving) reads differently from a stall with buffer left
+  (the player not moving on). It takes any spare height in the panel.
+- **Now** strip: the Uplynk asset on screen (`AD`/`CONTENT`, first 8 hex),
+  how long it has been playing, which ad of the break it is and how far
+  into the break. Shown once an asset is known (HLS `#UPLYNK-SEGMENT`, DASH
+  emsg ID3).
 - **Stalls and jumps** in the Log: `REBUFFER` when the buffer runs dry,
   `RESUMED` with how long it stalled, and any time the playhead moves
   without playing through: `GAP JUMP` (out of a stall, or Shaka's

@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.30.0] - 2026-10-22
+
+### Added
+
+- **Buffer & bandwidth chart** under the timeline (same 5-minute axis and
+  margins): forward buffer in seconds, filled, and the engine's ABR
+  bandwidth estimate, scaled to its own peak, with current values at the
+  right; stalls shaded red (epoch-ms spans kept per session), ad breaks
+  purple. It fills the panel's spare height, which v3.29.3 left empty
+  when the Latency tab sets the row height.
+- **Now** strip: the Uplynk asset on screen (`AD`/`CONTENT`), time on
+  that asset, which ad of the break, and break elapsed/planned.
+
 ## [3.29.3] - 2026-10-22
 
 ### Changed
