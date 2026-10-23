@@ -268,6 +268,27 @@ describe('drawBufferChart', async () => {
         expect(svg.querySelectorAll('polyline')).toHaveLength(2);
     });
 
+    it('draws a replay range ending at the recording end', () => {
+        const svg = el();
+        const end = now - 3_600_000;
+        drawBufferChart(
+            svg,
+            {
+                buffer: [
+                    {t: end - 60_000, v: 5},
+                    {t: end, v: 9},
+                ],
+                bandwidth: [],
+                stalls: [],
+            },
+            [],
+            10 * 60 * 1000,
+            {end},
+        );
+        // An hour old, yet inside the replay window: drawn, not filtered out.
+        expect(svg.querySelectorAll('polyline')).toHaveLength(1);
+    });
+
     it('draws only the grid with no samples', () => {
         const svg = el();
         drawBufferChart(svg, {buffer: [], bandwidth: [], stalls: []}, [], 5 * 60 * 1000);

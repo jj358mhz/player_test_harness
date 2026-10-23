@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.31.0] - 2026-10-22
+
+### Added
+
+- **Recordings keep buffer, bandwidth and stalls**: `series.buffer`,
+  `series.bandwidth` (bits/s) and `stalls` (epoch-ms spans), capped like
+  the other series. The replay page draws a **Buffer & bandwidth** panel
+  under the whole-session timeline, on the same time range. Older
+  recordings, which lack them, show no panel; the format version is
+  unchanged (the fields are optional).
+
 ## [3.30.0] - 2026-10-22
 
 ### Added

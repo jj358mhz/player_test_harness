@@ -367,6 +367,7 @@ export function drawBufferChart(
     series: BufferSeries,
     breaks: AdBreak[],
     windowMs: number,
+    range?: ChartRange,
 ): void {
     el.textContent = '';
     const W = Math.max(320, Math.round(el.clientWidth || 800));
@@ -376,7 +377,7 @@ export function drawBufferChart(
     const R = 64;
     const top = 6;
     const bottom = H - 4;
-    const now = Date.now();
+    const now = range?.end ?? Date.now();
     const x = (t: number) => L + (1 - (now - t) / windowMs) * (W - L - R);
     const visible = (points: Point[]) => points.filter((p) => now - p.t <= windowMs);
 

@@ -6,7 +6,7 @@ import './styles/player.css';
 import {bandFor} from './lib/bands';
 import {CLOCK_LABELS} from './lib/clock';
 import type {Recording, StatsSummary} from './lib/recording';
-import {drawLatencyChart, drawTimeline} from './ui/charts';
+import {drawBufferChart, drawLatencyChart, drawTimeline} from './ui/charts';
 import {clock, h, kbps, resLabel, secs} from './ui/dom';
 
 const KIND_ORDER = ['manifest', 'playlist', 'init', 'segment', 'key', 'license'];
@@ -74,6 +74,12 @@ export function renderRecording(root: HTMLElement, r: Recording): void {
     timeline.setAttribute('class', 'pl-timeline');
     timeline.setAttribute('role', 'img');
     timeline.setAttribute('aria-label', 'Latency, drift and events over the session');
+    // Buffer and bandwidth: recordings from v3.31.0 on.
+    const hasBuffer = Boolean(r.series.buffer?.length || r.series.bandwidth?.length);
+    const buffer = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    buffer.setAttribute('class', 'pl-bufchart pl-bufchart--fixed');
+    buffer.setAttribute('role', 'img');
+    buffer.setAttribute('aria-label', 'Forward buffer and bandwidth estimate over the session');
     const chart = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     chart.setAttribute('class', 'pl-chart');
     chart.setAttribute('role', 'img');
@@ -182,6 +188,13 @@ export function renderRecording(root: HTMLElement, r: Recording): void {
                     ),
                 ),
             ),
+            hasBuffer
+                ? panel(
+                      'Buffer & bandwidth',
+                      'forward buffer (s) · ABR estimate, scaled to its peak · stalls red',
+                      buffer,
+                  )
+                : null,
             h(
                 'div',
                 {class: 'pl-rec-grid'},
@@ -323,6 +336,18 @@ export function renderRecording(root: HTMLElement, r: Recording): void {
             span,
             {end: r.endedAt},
         );
+        if (hasBuffer)
+            drawBufferChart(
+                buffer,
+                {
+                    buffer: r.series.buffer ?? [],
+                    bandwidth: r.series.bandwidth ?? [],
+                    stalls: r.stalls ?? [],
+                },
+                r.breaks,
+                span,
+                {end: r.endedAt},
+            );
         drawLatencyChart(chart, r.series.latency, span, {end: r.endedAt});
     };
     draw();
