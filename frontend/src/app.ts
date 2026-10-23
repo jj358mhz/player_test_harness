@@ -71,6 +71,7 @@ import {PARAM_GROUPS, paramInfo, parseParams} from './lib/uplynkParams';
 import {fromResourceTiming, requestDetail, requestKey, requestState} from './lib/waterfall';
 import {
     type AdBreak,
+    drawBufferChart,
     drawLatencyChart,
     drawTimeline,
     type TimelineEvent,
@@ -159,6 +160,11 @@ class Session {
     latency = {id3: new RunningStats(), pdt: new RunningStats(), drift: new RunningStats()};
     series = new Series(WINDOW_MS);
     driftSeries = new Series(WINDOW_MS);
+    bufferSeries = new Series(WINDOW_MS);
+    /** The engine's ABR bandwidth estimate, bits/s. */
+    bandwidthSeries = new Series(WINDOW_MS);
+    /** Rebuffers, epoch ms (stallStart is performance.now for durations). */
+    stalls: {start: number; end: number | null}[] = [];
     timeline: TimelineEvent[] = [];
     log: LogEntry[] = [];
     renditions: Rendition[] = [];
@@ -197,6 +203,9 @@ class Session {
     playlist: MediaPlaylistInfo | null = null;
     audio: {tracks: AudioTrack[]; current: number} = {tracks: [], current: -1};
     asset: {assetId: string; kind: string} | null = null;
+    /** When the playhead entered `asset`, and which ad of the current break it is. */
+    assetSince: number | null = null;
+    breakAd = 0;
     /** DASH: the slice on screen, from the asset TXXX in each segment's ID3. */
     slice: UplynkSlice | null = null;
     pending: number[] = []; // timers to cancel on reload
@@ -240,7 +249,7 @@ export class PlayerApp {
     private loadToken = 0;
     private readonly video: HTMLVideoElement;
     private readonly refs: Record<string, HTMLElement> = {};
-    private readonly svgs: Record<'chart' | 'timeline', SVGSVGElement>;
+    private readonly svgs: Record<'chart' | 'timeline' | 'buffer', SVGSVGElement>;
 
     constructor(
         private root: HTMLElement,
@@ -251,6 +260,7 @@ export class PlayerApp {
         this.svgs = {
             chart: document.createElementNS('http://www.w3.org/2000/svg', 'svg'),
             timeline: document.createElementNS('http://www.w3.org/2000/svg', 'svg'),
+            buffer: document.createElementNS('http://www.w3.org/2000/svg', 'svg'),
         };
         this.svgs.chart.setAttribute('class', 'pl-chart');
         this.svgs.timeline.setAttribute('class', 'pl-timeline');
@@ -258,6 +268,12 @@ export class PlayerApp {
         this.svgs.chart.setAttribute('aria-label', 'Latency over the last five minutes');
         this.svgs.timeline.setAttribute('role', 'img');
         this.svgs.timeline.setAttribute('aria-label', 'Events over the last five minutes');
+        this.svgs.buffer.setAttribute('class', 'pl-bufchart');
+        this.svgs.buffer.setAttribute('role', 'img');
+        this.svgs.buffer.setAttribute(
+            'aria-label',
+            'Forward buffer and bandwidth estimate over the last five minutes',
+        );
         this.root.append(this.build());
         this.watchVideo();
         this.watchCmcd();
@@ -324,7 +340,7 @@ export class PlayerApp {
                     this.buildVitals(),
                     h(
                         'section',
-                        {class: 'pl-panel', 'aria-label': 'Event timeline'},
+                        {class: 'pl-panel pl-timeline-panel', 'aria-label': 'Event timeline'},
                         h(
                             'div',
                             {class: 'pl-panel__head'},
@@ -332,6 +348,18 @@ export class PlayerApp {
                             h('span', {class: 'pl-muted'}, 'seconds behind live · events below'),
                         ),
                         this.svgs.timeline,
+                        h(
+                            'div',
+                            {class: 'pl-panel__head pl-panel__head--sub'},
+                            h('span', {class: 'pl-panel__title'}, 'Buffer & bandwidth'),
+                            h(
+                                'span',
+                                {class: 'pl-muted'},
+                                'forward buffer (s) · ABR estimate, scaled to its peak',
+                            ),
+                        ),
+                        this.svgs.buffer,
+                        this.ref('nowPlaying', h('div', {class: 'pl-now', hidden: true})),
                         h(
                             'div',
                             {class: 'pl-legend'},
@@ -357,6 +385,8 @@ export class PlayerApp {
                                     ['scte', 'SCTE-35'],
                                     ['text-dim', 'Discontinuity'],
                                     ['error', 'Error'],
+                                    ['buffer', 'Buffer'],
+                                    ['bandwidth', 'Bandwidth'],
                                 ] as const
                             ).map(([c, label]) =>
                                 h('span', {}, h('i', {style: `background:var(--${c})`}), label),
@@ -2565,7 +2595,9 @@ export class PlayerApp {
         const s = this.session;
         const previous = s.asset;
         s.asset = asset;
+        s.assetSince = Date.now();
         const ad = asset.kind === 'ad';
+        s.breakAd = ad ? (previous?.kind === 'ad' ? s.breakAd + 1 : 1) : 0;
         this.logEntry(
             ad ? 'scte' : 'info',
             ad ? 'AD ASSET' : 'ASSET',
@@ -2702,6 +2734,10 @@ export class PlayerApp {
                 const stalled = performance.now() - s.stallStart;
                 s.stalledMs += stalled;
                 s.stallStart = null;
+                const open = s.stalls.find((x) => x.end === null);
+                if (open) open.end = Date.now();
+                while (s.stalls.length && (s.stalls[0]?.end ?? Date.now()) < Date.now() - WINDOW_MS)
+                    s.stalls.shift();
                 this.logEntry(
                     'info',
                     'RESUMED',
@@ -2733,6 +2769,7 @@ export class PlayerApp {
             if (!started || this.video.seeking) return;
             this.session.rebuffers += 1;
             this.session.stallStart = performance.now();
+            this.session.stalls.push({start: Date.now(), end: null});
             this.logEntry(
                 'err',
                 'REBUFFER',
@@ -2821,7 +2858,41 @@ export class PlayerApp {
             this.session.breaks,
             WINDOW_MS,
         );
+        drawBufferChart(
+            this.svgs.buffer,
+            {
+                buffer: this.session.bufferSeries.points,
+                bandwidth: this.session.bandwidthSeries.points,
+                stalls: this.session.stalls,
+            },
+            this.session.breaks,
+            WINDOW_MS,
+        );
+        this.renderNowPlaying();
         drawLatencyChart(this.svgs.chart, this.session.series.points, WINDOW_MS);
+    }
+
+    /** The strip under the buffer chart: which Uplynk asset is on screen, and for how long. */
+    private renderNowPlaying(): void {
+        const s = this.session;
+        const el = this.el('nowPlaying');
+        el.hidden = !s.asset;
+        if (!s.asset) return;
+        const now = Date.now();
+        const ad = s.asset.kind === 'ad';
+        const parts = [`${duration(now - (s.assetSince ?? now))} on this asset`];
+        const open = s.breaks.find((b) => b.end === null);
+        if (ad) parts.push(`ad ${s.breakAd} of this break`);
+        if (open)
+            parts.push(
+                `break ${duration(now - open.start)}${open.planned ? ` of ${duration(open.planned * 1000)}` : ''}`,
+            );
+        el.replaceChildren(
+            h('span', {class: 'pl-now__label'}, 'Now'),
+            h('b', {class: ad ? 't-scte' : 't-info'}, ad ? 'AD' : s.asset.kind.toUpperCase()),
+            h('span', {class: 'mono', title: s.asset.assetId}, `${s.asset.assetId.slice(0, 8)}…`),
+            h('span', {class: 'pl-muted'}, parts.join(' · ')),
+        );
     }
 
     private measure(engine: PlayerEngine): void {
@@ -2845,6 +2916,10 @@ export class PlayerApp {
             s.series.push(headline, now);
             capPush(s.history.latency, {t: now, v: headline}, LIMITS.points);
         }
+        const buffer = bufferAhead(this.video);
+        if (buffer !== null) s.bufferSeries.push(buffer, now);
+        const bandwidth = engine.bandwidthEstimate();
+        if (bandwidth) s.bandwidthSeries.push(bandwidth, now);
         if (drift !== null) {
             s.driftSeries.push(drift, now);
             capPush(s.history.drift, {t: now, v: drift}, LIMITS.points);
@@ -3849,6 +3924,15 @@ function bufferAhead(video: HTMLVideoElement): number | null {
             return video.buffered.end(i) - t;
     }
     return video.buffered.length ? 0 : null;
+}
+
+/** m:ss (h:mm:ss past an hour). */
+function duration(ms: number): string {
+    const total = Math.max(0, Math.floor(ms / 1000));
+    const h = Math.floor(total / 3600);
+    const m = Math.floor((total % 3600) / 60);
+    const sec = String(total % 60).padStart(2, '0');
+    return h ? `${h}:${String(m).padStart(2, '0')}:${sec}` : `${m}:${sec}`;
 }
 
 function stalledSeconds(s: Session): number {
