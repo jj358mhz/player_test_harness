@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.29.2] - 2026-10-22
+
+### Changed
+
+- **The inspector matches the stage's height** in the two-column layout:
+  the tabs box ends level with the timeline and scrolls inside, so the
+  Log fills it instead of stopping at a fixed 560 px (and longer tabs no
+  longer push past the timeline). One-column layouts are unchanged.
+
 ## [3.29.1] - 2026-10-22
 
 ### Fixed
