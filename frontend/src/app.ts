@@ -1230,7 +1230,7 @@ export class PlayerApp {
                 ),
             ),
             this.ref('abrKv', h('dl', {class: 'pl-kv'})),
-            this.ref('abrLog', h('div', {class: 'pl-log'})),
+            this.ref('abrLog', h('div', {class: 'pl-log pl-fill'})),
         );
     }
 
@@ -1241,7 +1241,7 @@ export class PlayerApp {
             this.ref('drmKv', h('dl', {class: 'pl-kv', hidden: true})),
             this.ref('keyStatuses', h('div', {class: 'pl-keystatus', hidden: true})),
             this.ref('keysKv', h('dl', {class: 'pl-kv'})),
-            this.ref('keysLog', h('div', {class: 'pl-log'})),
+            this.ref('keysLog', h('div', {class: 'pl-log pl-fill'})),
         );
     }
 
@@ -1251,7 +1251,7 @@ export class PlayerApp {
             {},
             this.ref('metaKv', h('dl', {class: 'pl-kv'})),
             this.ref('scteLast', h('div', {class: 'pl-scte', hidden: true})),
-            this.ref('metaLog', h('div', {class: 'pl-log'})),
+            this.ref('metaLog', h('div', {class: 'pl-log pl-fill'})),
         );
     }
 
@@ -1272,7 +1272,7 @@ export class PlayerApp {
                 this.ref('textTracks', h('div', {class: 'pl-row pl-row--flush'})),
                 this.ref('lastCue', h('p', {class: 'pl-cue', hidden: true})),
             ),
-            this.ref('cueLog', h('div', {class: 'pl-log'})),
+            this.ref('cueLog', h('div', {class: 'pl-log pl-fill'})),
             h(
                 'div',
                 {},
@@ -1433,7 +1433,7 @@ export class PlayerApp {
             ),
             this.ref(
                 'manifestRaw',
-                h('pre', {class: 'pl-code'}, 'Load a stream to see its master playlist.'),
+                h('pre', {class: 'pl-code pl-fill'}, 'Load a stream to see its master playlist.'),
             ),
         );
     }
@@ -1461,12 +1461,12 @@ export class PlayerApp {
                 ),
                 this.ref('wfDetail', h('div', {class: 'pl-wf-detail', hidden: true})),
             ),
-            this.ref('netLog', h('div', {class: 'pl-log'})),
+            this.ref('netLog', h('div', {class: 'pl-log pl-fill'})),
         );
     }
 
     private buildLogPanel(): HTMLElement {
-        return h('div', {}, this.ref('allLog', h('div', {class: 'pl-log pl-log--tall'})));
+        return h('div', {}, this.ref('allLog', h('div', {class: 'pl-log pl-log--tall pl-fill'})));
     }
 
     // -------------------------------------------------------------- load bar

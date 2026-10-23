@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.31.1] - 2026-10-22
+
+### Changed
+
+- **Every inspector tab fills the box** (two-column layout), not just the
+  Log: each tab's last list takes the height left under its summary and
+  scrolls itself: ABR, DRM & keys, Metadata and Network logs, the
+  Tracks caption log, the Manifest playlist. They kept their old fixed
+  caps (300–320 px), which left the lower part of the box empty.
+
 ## [3.31.0] - 2026-10-22
 
 ### Added
