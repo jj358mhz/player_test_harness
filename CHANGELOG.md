@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.29.3] - 2026-10-22
+
+### Changed
+
+- **Both player columns end on the same line** (two-column layout): the
+  row is as tall as the stage or the Latency tab, whichever is taller, so
+  the Latency tab (the longest fixed one) shows Jump to live and both
+  auto-sync options without scrolling. The timeline panel takes the slack
+  on the left; the other tabs keep that height and scroll inside. The
+  Latency panel is hidden with a class (not `hidden`) so it keeps sizing
+  the box whichever tab is open.
+
 ## [3.29.2] - 2026-10-22
 
 ### Changed

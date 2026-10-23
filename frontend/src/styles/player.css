@@ -474,27 +474,39 @@
 .pl-tabpanel[hidden] {
     display: none;
 }
-/* Two columns: the inspector ends where the stage (video, vitals, timeline)
-   ends and scrolls inside, instead of growing past it or stopping short.
-   height: 0 keeps it from setting the row's height; min-height fills it. */
+.pl-tabpanel--off {
+    display: none;
+}
+/* Two columns: both columns end on the same line. The row is as tall as
+   the stage or the Latency tab, whichever is taller; the timeline panel
+   takes any slack on the left. The other tabs don't size the box (height:
+   0, min-height fills it) and scroll inside it. */
 @media (min-width: 1101px) {
     .pl-main {
         align-items: stretch;
     }
     .pl-stage {
-        align-self: start;
+        grid-template-rows: auto auto 1fr;
     }
     .pl-inspector {
-        height: 0;
-        min-height: 100%;
-        display: flex;
-        flex-direction: column;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: auto 1fr;
     }
     .pl-inspector .pl-tabpanel {
-        flex: 1;
+        grid-area: 2 / 1;
         min-height: 0;
         overflow: auto;
         align-content: start;
+    }
+    .pl-inspector .pl-tabpanel:not(#pl-panel-latency) {
+        height: 0;
+        min-height: 100%;
+    }
+    /* Hidden, Latency still holds its space so switching tabs doesn't resize. */
+    .pl-tabpanel--off {
+        display: grid;
+        visibility: hidden;
     }
     .pl-inspector .pl-log--tall {
         max-height: none;
