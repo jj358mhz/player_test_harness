@@ -1445,7 +1445,7 @@ export class PlayerApp {
             this.ref('netKv', h('dl', {class: 'pl-kv'})),
             h(
                 'div',
-                {},
+                {class: 'pl-wf-wrap pl-fill'},
                 h(
                     'p',
                     {class: 'pl-subhead'},
@@ -1461,7 +1461,7 @@ export class PlayerApp {
                 ),
                 this.ref('wfDetail', h('div', {class: 'pl-wf-detail', hidden: true})),
             ),
-            this.ref('netLog', h('div', {class: 'pl-log pl-fill'})),
+            this.ref('netLog', h('div', {class: 'pl-log'})),
         );
     }
 
