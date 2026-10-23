@@ -53,7 +53,10 @@ export interface Recording {
     cmcd?: CmcdConfig | null;
     stats: {latency: StatsSummary; id3: StatsSummary; pdt: StatsSummary; drift: StatsSummary};
     counters: Record<string, number | null>;
-    series: {latency: Point[]; drift: Point[]};
+    /** buffer (s) and bandwidth (bits/s) from v3.31.0; older recordings lack them. */
+    series: {latency: Point[]; drift: Point[]; buffer?: Point[]; bandwidth?: Point[]};
+    /** Rebuffers, epoch ms (v3.31.0). */
+    stalls?: {start: number; end: number | null}[];
     events: {t: number; kind: string; label: string}[];
     breaks: {start: number; end: number | null; planned: number | null; label: string}[];
     log: {t: number; kind: string; label: string; text: string}[];

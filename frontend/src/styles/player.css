@@ -415,6 +415,9 @@
     flex: 1 1 110px;
     min-height: 110px;
 }
+.pl-bufchart--fixed {
+    height: 120px;
+}
 .pl-now {
     display: flex;
     flex-wrap: wrap;

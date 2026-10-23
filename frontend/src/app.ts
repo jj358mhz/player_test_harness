@@ -152,6 +152,9 @@ class Session {
     history = {
         latency: [] as Point[],
         drift: [] as Point[],
+        buffer: [] as Point[],
+        bandwidth: [] as Point[],
+        stalls: [] as {start: number; end: number | null}[],
         events: [] as TimelineEvent[],
         log: [] as LogEntry[],
         requests: [] as RequestTiming[],
@@ -2063,7 +2066,13 @@ export class PlayerApp {
                 scte35: s.scteCount,
                 adBreaks: s.breaks.length,
             },
-            series: {latency: s.history.latency, drift: s.history.drift},
+            series: {
+                latency: s.history.latency,
+                drift: s.history.drift,
+                buffer: s.history.buffer,
+                bandwidth: s.history.bandwidth,
+            },
+            stalls: s.history.stalls,
             events: s.history.events,
             breaks: s.breaks.slice(-LIMITS.breaks),
             log: s.history.log.map((e) => ({
@@ -2769,7 +2778,10 @@ export class PlayerApp {
             if (!started || this.video.seeking) return;
             this.session.rebuffers += 1;
             this.session.stallStart = performance.now();
-            this.session.stalls.push({start: Date.now(), end: null});
+            // One object in both lists, so closing it closes the recorded one too.
+            const stall = {start: Date.now(), end: null};
+            this.session.stalls.push(stall);
+            capPush(this.session.history.stalls, stall, LIMITS.breaks);
             this.logEntry(
                 'err',
                 'REBUFFER',
@@ -2917,9 +2929,15 @@ export class PlayerApp {
             capPush(s.history.latency, {t: now, v: headline}, LIMITS.points);
         }
         const buffer = bufferAhead(this.video);
-        if (buffer !== null) s.bufferSeries.push(buffer, now);
+        if (buffer !== null) {
+            s.bufferSeries.push(buffer, now);
+            capPush(s.history.buffer, {t: now, v: buffer}, LIMITS.points);
+        }
         const bandwidth = engine.bandwidthEstimate();
-        if (bandwidth) s.bandwidthSeries.push(bandwidth, now);
+        if (bandwidth) {
+            s.bandwidthSeries.push(bandwidth, now);
+            capPush(s.history.bandwidth, {t: now, v: bandwidth}, LIMITS.points);
+        }
         if (drift !== null) {
             s.driftSeries.push(drift, now);
             capPush(s.history.drift, {t: now, v: drift}, LIMITS.points);

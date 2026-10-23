@@ -91,6 +91,7 @@ Uplynk stream is doing while it plays.
   shaded red and ad breaks purple, so a buffer draining into a `REBUFFER`
   (segments not arriving) reads differently from a stall with buffer left
   (the player not moving on). It takes any spare height in the panel.
+  Saved sessions keep it (v3.31.0) and the replay page draws it.
 - **Now** strip: the Uplynk asset on screen (`AD`/`CONTENT`, first 8 hex),
   how long it has been playing, which ad of the break it is and how far
   into the break. Shown once an asset is known (HLS `#UPLYNK-SEGMENT`, DASH
