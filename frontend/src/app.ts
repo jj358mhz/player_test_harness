@@ -932,7 +932,12 @@ export class PlayerApp {
                 const on = i === index;
                 b.setAttribute('aria-selected', String(on));
                 b.tabIndex = on ? 0 : -1;
-                (panels[i] as HTMLElement).hidden = !on;
+                const panel = panels[i] as HTMLElement;
+                if (tabs[i]?.[0] === 'latency') {
+                    // Not `hidden`: in two columns it keeps sizing the box (player.css).
+                    panel.classList.toggle('pl-tabpanel--off', !on);
+                    panel.inert = !on;
+                } else panel.hidden = !on;
             });
             if (focus) buttons[index]?.focus();
             const key = tabs[index]?.[0];
