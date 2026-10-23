@@ -551,6 +551,19 @@
         display: grid;
         visibility: hidden;
     }
+    /* Network: the waterfall is the part that grows (its log is often empty). */
+    .pl-inspector .pl-wf-wrap {
+        display: flex;
+        flex-direction: column;
+    }
+    .pl-inspector .pl-wf-wrap > * {
+        flex-shrink: 0;
+    }
+    .pl-inspector .pl-wf-wrap > .pl-waterfall {
+        flex: 1 1 0;
+        min-height: 0;
+        max-height: none;
+    }
     /* Each tab's last list (log, playlist) takes the height left and scrolls
        itself; everything above it keeps its size. */
     .pl-inspector .pl-tabpanel:not(#pl-panel-latency) {

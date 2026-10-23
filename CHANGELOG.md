@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.31.2] - 2026-10-22
+
+### Fixed
+
+- **Network tab fills the box**: the request waterfall is the part that
+  grows (v3.31.1 stretched the Network log, which is usually empty and
+  then hidden, so the waterfall stayed at 320 px).
+
 ## [3.31.1] - 2026-10-22
 
 ### Changed
