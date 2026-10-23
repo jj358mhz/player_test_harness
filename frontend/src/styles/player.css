@@ -474,6 +474,32 @@
 .pl-tabpanel[hidden] {
     display: none;
 }
+/* Two columns: the inspector ends where the stage (video, vitals, timeline)
+   ends and scrolls inside, instead of growing past it or stopping short.
+   height: 0 keeps it from setting the row's height; min-height fills it. */
+@media (min-width: 1101px) {
+    .pl-main {
+        align-items: stretch;
+    }
+    .pl-stage {
+        align-self: start;
+    }
+    .pl-inspector {
+        height: 0;
+        min-height: 100%;
+        display: flex;
+        flex-direction: column;
+    }
+    .pl-inspector .pl-tabpanel {
+        flex: 1;
+        min-height: 0;
+        overflow: auto;
+        align-content: start;
+    }
+    .pl-inspector .pl-log--tall {
+        max-height: none;
+    }
+}
 .pl-subhead {
     font-size: 11px;
     letter-spacing: 0.06em;
