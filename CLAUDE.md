@@ -99,7 +99,7 @@ after dependency changes.
   writes `PlaybackEvent`, records `Channel.encryption` from the probe
   (`check_encryption()` backs `flask check-encryption`; `check_health()`
   backs `flask check-health`, **Check health** on the dashboard and the
-  background check: `pdts=latency` HLS → `app/uplynk/health.py` edge age). Both the JSON API and `/channels/<id>/play` use it.
+  background check: `pdts=latency` HLS → `app/uplynk/health.py` edge age; bulk probes go through `probe_all`: one `requests.Session` per thread, since a session-less check of ~180 channels got the Pi DNS-rate-limited by Pi-hole, v3.32.3). Both the JSON API and `/channels/<id>/play` use it.
 - `app/main/` — pages: channels dashboard, `/player`, `/compare`, `/sign`, `/activity`.
   `/channels/by-slicer/<slicer>` is csl-slicer-console's way in; we link
   to its `/slicers/by-id/<slicer>` when `CSL_BASE_URL` is set (console

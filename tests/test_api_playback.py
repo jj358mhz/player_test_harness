@@ -275,7 +275,7 @@ def test_check_encryption_signs_and_records(app, make_account, make_channel, mon
     answers = {"chan0001": "none", "chan0002": "drm"}
     probed = []
 
-    def fake(url):
+    def fake(url, session=None):
         probed.append(url)
         cid = dict(parse_qsl(urlsplit(url).query))["cid"]
         return ProbeResult(True, 200, None, 5, answers[cid])
@@ -286,6 +286,26 @@ def test_check_encryption_signs_and_records(app, make_account, make_channel, mon
     assert all(".m3u8?" in u and "&sig=" in u for u in probed)
     assert (clear.encryption, drm.encryption) == ("none", "drm")
     assert db.session.query(PlaybackEvent).count() == 0
+
+
+def test_bulk_probes_reuse_a_session_per_thread(app, make_account, make_channel, monkeypatch):
+    # One pooled session per worker thread: a fresh connection (and DNS
+    # lookup) per request got the Pi rate-limited by Pi-hole.
+    account = make_account()
+    channels = [make_channel(account, f"chan000{i}") for i in range(5)]
+    seen = []
+
+    def fake(url, session=None):
+        seen.append(session)
+        return ProbeResult(True, 200, None, 5, "none")
+
+    monkeypatch.setattr(service, "probe_manifest", fake)
+    closed = []
+    monkeypatch.setattr(service.requests.Session, "close", lambda self: closed.append(self))
+    service.check_health(channels, workers=1)
+    assert len(seen) == 5 and len(set(map(id, seen))) == 1
+    assert isinstance(seen[0], service.requests.Session)
+    assert closed == [seen[0]]
 
 
 def test_preplay_returns_the_signed_request(auth_client, make_account, make_channel, monkeypatch):
