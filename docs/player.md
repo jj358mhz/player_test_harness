@@ -294,6 +294,8 @@ timeline.
 Live/VOD, rays, container (TS or fMP4), target duration, window, media
 sequence range and whether there's program date-time. Raw text of the
 master and the current media playlist, with `sig=`/`pbs=` values hidden.
+For DASH the MPD (served on one line) is shown indented, one element per
+line.
 
 ## Network
 
