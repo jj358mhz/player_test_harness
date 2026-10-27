@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.32.3] - 2026-10-26
+
+### Fixed
+
+- **Health check no longer floods DNS.** Each probe (master, media
+  playlist, AES-128 key) opened a new connection and looked its host up
+  again, so a check of ~180 channels sent over 1000 DNS queries in under
+  a minute and Pi-hole rate-limited the Pi (1000 queries / 60 s), failing
+  lookups for everything on it. `check_health` and `check_encryption` now
+  probe through one kept-alive `requests.Session` per worker thread
+  (`service.probe_all`).
+
 ## [3.32.1] - 2026-10-26
 
 ### Changed

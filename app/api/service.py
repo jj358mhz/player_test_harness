@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+import requests
 from flask import current_app
 from flask_login import current_user
 
@@ -208,6 +210,33 @@ def record_encryption(channel: Channel, encryption: str, downgrade: bool = False
     channel.encryption_checked_at = datetime.now(UTC)
 
 
+def probe_all(urls: list[str], workers: int) -> list[ProbeResult]:
+    """Probe many signed manifests in a thread pool, one `requests.Session` per thread.
+
+    Without a session every request opened a new connection and looked up
+    its host again: a health check of ~180 channels (master, media playlist,
+    key) sent over 1000 DNS queries in a burst, enough for Pi-hole's rate
+    limit (1000/60 s) to refuse the Pi (2026-10-26). Kept-alive connections
+    resolve each host once per thread.
+    """
+    local = threading.local()
+    sessions: list[requests.Session] = []
+
+    def probe(url: str) -> ProbeResult:
+        session = getattr(local, "session", None)
+        if session is None:
+            session = local.session = requests.Session()
+            sessions.append(session)
+        return probe_manifest(url, session=session)
+
+    try:
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            return list(pool.map(probe, urls))
+    finally:
+        for session in sessions:
+            session.close()
+
+
 def check_encryption(
     channels: list[Channel], workers: int = 4
 ) -> list[tuple[Channel, ProbeResult]]:
@@ -227,8 +256,7 @@ def check_encryption(
         target = PlaybackTarget(content_type="c", content_id=channel.channel_id)
         base_url = manifest_base_url(content_base, target, "m3u8")
         urls.append(sign_url(base_url, target, keys[account.id], ttl).url)
-    with ThreadPoolExecutor(max_workers=workers) as pool:
-        probes = list(pool.map(probe_manifest, urls))
+    probes = probe_all(urls, workers)
     for channel, probe in zip(channels, probes, strict=True):
         if probe.encryption:
             record_encryption(channel, probe.encryption, downgrade=True)
@@ -256,8 +284,7 @@ def check_health(
         base_url = manifest_base_url(content_base, target, "m3u8")
         signed = sign_url(base_url, target, keys[account.id], ttl, [("pdts", "latency")])
         urls.append(signed.url)
-    with ThreadPoolExecutor(max_workers=workers) as pool:
-        probes = list(pool.map(probe_manifest, urls))
+    probes = probe_all(urls, workers)
     checked_at = datetime.now(UTC)
     results = []
     for channel, probe in zip(channels, probes, strict=True):
