@@ -23,9 +23,16 @@ def bootstrap_admin(app: Flask) -> None:
             return
 
         if db.session.query(User).count() > 0:
+            # Only an empty DB uses BOOTSTRAP_ADMIN_*; say so, since editing
+            # .env after the first start otherwise looks like a bad login.
+            app.logger.info(
+                "Users exist — BOOTSTRAP_ADMIN_EMAIL/PASSWORD ignored "
+                "(use `flask set-password` to change a password)"
+            )
             return
 
-        email = app.config.get("BOOTSTRAP_ADMIN_EMAIL")
+        # The login form lowercases what's typed; store it the same way.
+        email = (app.config.get("BOOTSTRAP_ADMIN_EMAIL") or "").lower().strip()
         password = app.config.get("BOOTSTRAP_ADMIN_PASSWORD")
 
         if not email or not password:
