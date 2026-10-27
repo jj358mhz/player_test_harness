@@ -69,6 +69,7 @@ import {describeSlicerWallclock, id3Reason, type SlicerSettings} from './lib/sli
 import {type Point, RunningStats, Series} from './lib/stats';
 import {PARAM_GROUPS, paramInfo, parseParams} from './lib/uplynkParams';
 import {fromResourceTiming, requestDetail, requestKey, requestState} from './lib/waterfall';
+import {prettyXml} from './lib/xml';
 import {
     type AdBreak,
     drawBufferChart,
@@ -3571,7 +3572,7 @@ export class PlayerApp {
         }
         const raw = this.el('manifestRaw');
         if (dash && pl?.text) {
-            raw.textContent = redactSignatures(pl.text);
+            raw.textContent = prettyXml(redactSignatures(pl.text));
             return;
         }
         if (this.manifestView === 'media') {

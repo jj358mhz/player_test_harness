@@ -136,6 +136,7 @@ after dependency changes.
     `waterfall.ts` (request detail; first byte from the engine or Resource Timing),
     `jumps.ts` (labels playhead jumps: GAP JUMP / JUMP TO LIVE / SEEK, v3.28.0),
     `mpdTail.ts` (newest Periods vs the playhead, logged at DASH stalls, v3.29.0),
+    `xml.ts` (`prettyXml`: the MPD indented in the Manifest tab, v3.32.0),
     (`ui/charts.ts` `drawBufferChart`: buffer/bandwidth/stalls under the timeline, v3.30.0),
     `uplynkParams.ts` (the Params box: + param menu, accepted keys/families,
     refused keys; `app/uplynk/params.py` mirrors it for presets and

@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.32.0] - 2026-10-26
+
+### Added
+
+- **Readable MPD**: the Manifest tab shows a DASH MPD indented, one
+  element per line, instead of Uplynk's single line (`lib/xml.ts`
+  `prettyXml`; tags, attributes and Event bodies kept as served, `sig=`
+  still hidden).
+
 ## [3.31.2] - 2026-10-22
 
 ### Fixed
