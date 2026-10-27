@@ -55,7 +55,7 @@ def probe_calls(monkeypatch):
 
     calls = ProbeCalls(ProbeResult(True, 200, None, 5))
 
-    def fake(url):
+    def fake(url, session=None):
         calls.append(url)
         return calls.result
 
