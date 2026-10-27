@@ -200,6 +200,22 @@ docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
 Sign in at `http://localhost:5051`, add an Uplynk account, then **Sync**.
 DRM playback needs a secure context (HTTPS or `localhost`).
 
+**The bootstrap admin is created once, on the first start with an empty
+database.** The database lives in a Docker volume that survives rebuilds,
+so editing `BOOTSTRAP_ADMIN_EMAIL`/`PASSWORD` later changes nothing (the
+log says `BOOTSTRAP_ADMIN_EMAIL/PASSWORD ignored`). If the login says
+*Invalid email or password*:
+
+```bash
+docker logs player-test-harness 2>&1 | grep -i bootstrap     # created, skipped or ignored?
+docker exec player-test-harness python -c "from app import create_app; from app.models import User, db; a=create_app(); a.app_context().push(); print([u.email for u in db.session.query(User)])"
+docker exec -it player-test-harness flask --app 'app:create_app()' set-password <email>
+```
+
+or start over, deleting the database volume:
+`docker compose -f docker-compose.yml -f docker-compose.local.yml down -v`.
+In `.env`, write a `$` in the password as `$$` (Compose expands `$`).
+
 ## 🚢 Production deployment
 
 Runs on the homelab Utility Pi exactly like

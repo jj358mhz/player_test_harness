@@ -36,3 +36,31 @@ def test_bootstrap_tolerates_concurrent_insert(app, monkeypatch):
     monkeypatch.undo()
     with app.app_context():
         assert db.session.query(User).filter_by(email="test@example.com").count() == 1
+
+
+def test_bootstrap_lowercases_email(app, monkeypatch):
+    """Login lowercases the email, so a mixed-case bootstrap must too."""
+    from app.bootstrap import bootstrap_admin
+
+    with app.app_context():
+        db.session.query(User).delete()
+        db.session.commit()
+    monkeypatch.setitem(app.config, "BOOTSTRAP_ADMIN_EMAIL", "  Jane.Doe@Example.com ")
+    bootstrap_admin(app)
+    with app.app_context():
+        assert [u.email for u in db.session.query(User)] == ["jane.doe@example.com"]
+
+    client = app.test_client()
+    resp = client.post(
+        "/auth/login",
+        data={"email": "Jane.Doe@Example.com", "password": "test-password-123"},
+    )
+    assert resp.status_code == 302
+
+
+def test_bootstrap_logs_when_users_exist(app, caplog):
+    from app.bootstrap import bootstrap_admin
+
+    with caplog.at_level("INFO"):
+        bootstrap_admin(app)
+    assert "BOOTSTRAP_ADMIN_EMAIL/PASSWORD ignored" in caplog.text

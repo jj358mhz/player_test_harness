@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.32.2] - 2026-10-26
+
+### Fixed
+
+- **Bootstrap admin with a mixed-case email couldn't log in**: login
+  looks the email up lowercased, but `BOOTSTRAP_ADMIN_EMAIL` was stored
+  as typed. It's now stored lowercased, and a migration lowercases
+  existing users' emails (skipping one whose lowercase form is taken).
+- The log now says `BOOTSTRAP_ADMIN_EMAIL/PASSWORD ignored` when users
+  already exist: they're only read on the first start with an empty
+  database. README "Running your own instance" has the troubleshooting
+  steps (`docker logs`, list users, `flask set-password`, `down -v`);
+  `.env.example` notes that `$` must be written `$$`.
+
 ## [3.32.1] - 2026-10-26
 
 ### Changed
