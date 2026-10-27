@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.32.1] - 2026-10-26
+
+### Changed
+
+- **Shaka 5.3.1** is the default Shaka engine version (was 5.3.0, #80).
+- Frontend tooling: Biome 2.6.2, Vite 8.3.5 (#81).
+
 ## [3.32.0] - 2026-10-26
 
 ### Added
