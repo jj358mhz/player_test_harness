@@ -100,7 +100,11 @@ def _register_cli(app: Flask) -> None:
         from app.api.service import check_encryption
         from app.models import Channel, UplynkAccount
 
-        query = db.session.query(Channel).filter_by(is_active=True).join(UplynkAccount)
+        query = (
+            db.session.query(Channel)
+            .filter(Channel.is_active.is_(True), Channel.checkable())
+            .join(UplynkAccount)
+        )
         if label:
             query = query.filter(UplynkAccount.label == label)
         channels = query.order_by(UplynkAccount.label, Channel.description).all()
@@ -122,7 +126,11 @@ def _register_cli(app: Flask) -> None:
         from app.models import Channel, UplynkAccount
         from app.uplynk.health import fmt_age
 
-        query = db.session.query(Channel).filter_by(is_active=True).join(UplynkAccount)
+        query = (
+            db.session.query(Channel)
+            .filter(Channel.is_active.is_(True), Channel.checkable())
+            .join(UplynkAccount)
+        )
         if label:
             query = query.filter(UplynkAccount.label == label)
         channels = query.order_by(UplynkAccount.label, Channel.description).all()

@@ -56,6 +56,8 @@ def channels():
                 "account": c.uplynk_account.label,
                 "favorite": c.is_favorite,
                 "encryption": c.encryption,
+                "kind": c.kind,
+                "event_phase": c.event_phase,
             }
             for c in rows
         ]
@@ -178,7 +180,10 @@ def health_by_slicer():
         return jsonify(error="unauthorized"), 401
     rows = (
         db.session.query(Channel)
-        .filter(Channel.is_active.is_(True), Channel.slicer_id.isnot(None))
+        # Channels only: an event's slicer comes and goes (console contract unchanged).
+        .filter(
+            Channel.is_active.is_(True), Channel.kind == "channel", Channel.slicer_id.isnot(None)
+        )
         .order_by(Channel.slicer_id, Channel.id)
         .all()
     )

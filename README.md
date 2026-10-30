@@ -45,6 +45,12 @@ latency, drift, ABR, DRM keys, ID3/SCTE-35, captions and more.
   sparkline and links to the channel's history page (`HEALTH_HISTORY_DAYS`,
   default 7: charts and status changes). **Check health** runs it now;
   `flask check-health` from the CLI.
+- 🎟️ **Live events** — accounts with **Sync live events** also list their
+  Live Events (`/api2/liveevents2/list`) on each sync: those expected to
+  start from `EVENT_SYNC_PAST_HOURS` ago (default 24) to
+  `EVENT_SYNC_AHEAD_DAYS` ahead (default 7). They get their own **Events**
+  tab on the dashboard (per account, pre-event / live / ended, schedule)
+  and their own group in the player, and play from `/event/<id>.{m3u8,mpd}`.
 - ▶️ **One-click play** — each channel card signs a fresh HLS URL and opens
   the monitoring player with it. Copy HLS/DASH buttons for use in other players.
 - 📊 **Monitoring player** — video first, with latency (ID3, PDT and
@@ -238,6 +244,8 @@ a Docker Compose stack on the shared `auth-net` network, fronted by Caddy at
 | `CHANNEL_SYNC_INTERVAL`    | Background channel sync, minutes (default 60; 0 = off)        |
 | `CHANNEL_HEALTH_INTERVAL`  | Background channel health check, minutes (default 10; 0 = off) |
 | `HEALTH_HISTORY_DAYS`      | Days of health checks kept for charts (default 7)              |
+| `EVENT_SYNC_PAST_HOURS`    | Live events sync: from this many hours ago (default 24)        |
+| `EVENT_SYNC_AHEAD_DAYS`    | Live events sync: to this many days ahead (default 7)          |
 | `MAX_RECORDING_BYTES`      | Largest recorded session accepted (default 8 MiB)             |
 | `CSL_BASE_URL`             | csl-slicer-console URL for slicer links (optional)            |
 | `CSL_API_TOKEN`            | The console's `PLAYER_API_TOKEN`: show slicer wallclock (optional) |

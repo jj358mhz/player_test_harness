@@ -1,9 +1,18 @@
 {% extends "base.html" %}
-{% block title_suffix %} — Channels{% endblock %}
+{% block title_suffix %} — {{ 'Events' if tab == 'events' else 'Channels' }}{% endblock %}
 
 {% block content %}
 <div class="page-header">
+    {% if show_events %}
+    <h1 class="dashboard-tabs" role="tablist">
+        <a href="{{ url_for('main.index') }}" role="tab" aria-selected="{{ 'true' if tab == 'channels' else 'false' }}"
+           class="dashboard-tabs__tab{% if tab == 'channels' %} dashboard-tabs__tab--on{% endif %}">Channels <span class="page-header__meta">{{ channel_count }}</span></a>
+        <a href="{{ url_for('main.index', tab='events') }}" role="tab" aria-selected="{{ 'true' if tab == 'events' else 'false' }}"
+           class="dashboard-tabs__tab{% if tab == 'events' %} dashboard-tabs__tab--on{% endif %}">Events <span class="page-header__meta">{{ event_count }}</span></a>
+    </h1>
+    {% else %}
     <h1>Channels <span class="page-header__meta">{{ total }} active</span></h1>
+    {% endif %}
     <div class="page-header__controls">
         {% if total %}
         <input type="search" id="channel-filter" class="input channel-filter"
@@ -43,6 +52,12 @@
     </p>
     <p class="muted">You can still open the <a href="{{ url_for('main.player') }}">player</a> with any HLS URL.</p>
 </div>
+{% elif not total and tab == 'events' %}
+<div class="card">
+    <p class="muted">No live events in the sync window (expected to start from {{ config.EVENT_SYNC_PAST_HOURS }} h ago
+        to {{ config.EVENT_SYNC_AHEAD_DAYS }} days ahead). Accounts with <strong>Sync live events</strong> on the
+        <a href="{{ url_for('admin.list_accounts') }}">Uplynk Accounts</a> page list theirs on each sync.</p>
+</div>
 {% elif not total %}
 <div class="card">
     <p class="muted">No channels synced yet. Use <strong>Sync all</strong> above, or Sync per account on the
@@ -62,7 +77,7 @@
 
 {% for label, channels in groups %}
 {% set section = 'section-' ~ loop.index %}
-<section class="account-section" id="{{ section }}" data-account-section data-section="{{ label }}">
+<section class="account-section" id="{{ section }}" data-account-section data-section="{{ 'events:' if tab == 'events' }}{{ label }}">
     <div class="account-section__header">
         <h2 class="account-section__title">
             <span class="account-section__chevron" aria-hidden="true">▶</span>
@@ -86,7 +101,7 @@
         <article class="channel-card{% if ch.is_favorite %} channel-card--favorite{% endif %}"
                  id="channel-{{ ch.id }}"
                  data-channel
-                 data-search="{{ [ch.description, ch.channel_id, ch.external_id, ch.slicer_id, 'drm' if ch.is_drm else None, ch.health_status, 'attention' if ch.needs_attention else None]|select|join(' ')|lower }}">
+                 data-search="{{ [ch.description, ch.channel_id, ch.external_id, ch.slicer_id, 'drm' if ch.is_drm else None, ch.health_status, 'attention' if ch.needs_attention else None, ch.event_phase, ch.event_state]|select|join(' ')|lower }}">
             <div class="channel-card__header">
                 <label class="channel-card__select">
                     <input type="checkbox" class="channel-checkbox" value="{{ ch.id }}"
@@ -100,6 +115,12 @@
                     <span class="badge badge--drm" data-drm-badge
                           title="Studio DRM: FairPlay over HLS (Safari only); Chrome plays DASH with Widevine"
                           {% if not ch.is_drm %}hidden{% endif %}>🔒 DRM</span>
+                    {% if ch.is_event %}
+                    <span class="badge badge--event badge--event--{{ ch.event_phase }}"
+                          title="Live event{% if ch.event_state %} · Uplynk state: {{ ch.event_state }}{% endif %}">
+                        {{- {'pre': 'Pre-event', 'live': '● Live', 'ended': 'Ended'}[ch.event_phase] -}}
+                    </span>
+                    {% endif %}
                     {% if ch.health_status %}
                     {% set age = ch.health_edge_s|age if ch.health_edge_s is not none else None %}
                     <span class="badge badge--health badge--health--{{ ch.health_status }}"
@@ -124,6 +145,12 @@
                     <dl class="channel-card__ids">
                         <dt>ID</dt><dd class="mono" title="{{ ch.channel_id }}">{{ ch.channel_id }}</dd>
                         {% if ch.external_id %}<dt>Ext</dt><dd class="mono" title="{{ ch.external_id }}">{{ ch.external_id }}</dd>{% endif %}
+                        {% if ch.is_event %}
+                        {% for name, scheduled, actual in [('Start', ch.expected_start, ch.actual_start), ('Stop', ch.expected_stop, ch.actual_stop)] %}
+                        {% set when = actual or scheduled %}
+                        {% if when %}<dt>{{ name }}</dt><dd title="{{ 'Actual' if actual else 'Scheduled' }}"><time datetime="{{ when.strftime('%Y-%m-%dT%H:%M:%SZ') }}" data-local="date">{{ when.strftime('%Y-%m-%d %H:%M') }} UTC</time>{% if not actual %} <span class="muted">(scheduled)</span>{% endif %}</dd>{% endif %}
+                        {% endfor %}
+                        {% endif %}
                         {% if ch.slicer_id %}<dt>Slicer</dt><dd class="mono" title="{{ ch.slicer_id }}">{% if csl_base_url %}<a href="{{ csl_base_url }}/slicers/by-id/{{ ch.slicer_id|urlencode }}" target="_blank" rel="noopener" title="Open {{ ch.slicer_id }} in the slicer console">{{ ch.slicer_id }} ↗</a>{% else %}{{ ch.slicer_id }}{% endif %}</dd>{% endif %}
                     </dl>
                     {% if sparks.get(ch.id) %}

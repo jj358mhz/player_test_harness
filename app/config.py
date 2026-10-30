@@ -45,6 +45,10 @@ class Config:
         self.CHANNEL_SYNC_INTERVAL = int(os.getenv("CHANNEL_SYNC_INTERVAL", "60"))
         # Background health check of every active channel, minutes (0 = off).
         self.CHANNEL_HEALTH_INTERVAL = int(os.getenv("CHANNEL_HEALTH_INTERVAL", "10"))
+        # Live Events sync window (accounts with "Sync live events"): events
+        # expected to start from this many hours ago to this many days ahead.
+        self.EVENT_SYNC_PAST_HOURS = int(os.getenv("EVENT_SYNC_PAST_HOURS", "24"))
+        self.EVENT_SYNC_AHEAD_DAYS = int(os.getenv("EVENT_SYNC_AHEAD_DAYS", "7"))
         # Days of health checks to keep for the history charts.
         self.HEALTH_HISTORY_DAYS = int(os.getenv("HEALTH_HISTORY_DAYS", "7"))
         # csl-slicer-console, for links from a channel to its slicer (empty = no links).

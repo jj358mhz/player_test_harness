@@ -62,7 +62,9 @@ def run_health(app: Flask, last: datetime | None, now: datetime | None = None) -
     from app.api.service import check_health
 
     with app.app_context():
-        channels = db.session.query(Channel).filter_by(is_active=True).all()
+        channels = (
+            db.session.query(Channel).filter(Channel.is_active.is_(True), Channel.checkable()).all()
+        )
         if channels:
             results = check_health(channels)
             bad = sum(1 for _, h in results if h.needs_attention)

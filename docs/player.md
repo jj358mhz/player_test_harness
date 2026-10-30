@@ -11,6 +11,13 @@ Uplynk stream is doing while it plays.
   boxes a choice asks for (**Engine version** for Custom, **Params** for a
   synced channel) on the left, and **Copy link**, **Save session**,
   **Save as preset…** on the right, so the first row never changes height.
+- **Live events:** accounts with **Sync live events** list their events
+  in the source menu after their channels, as "<account> · Events", with
+  the phase (pre-event, live, ended). They play from `/event/<id>.{m3u8,mpd}`
+  (token `ct=e`). Preplay doesn't serve events, so with **Widevine** or
+  **PlayReady** an event signs its own MPD and uses Uplynk's license host
+  (`content.uplynk.com/wv`, `/pr`; the MPD names it too). FairPlay needs
+  Preplay's certificate URL, so it can't play an event.
 - **Ads (SSAI):** Uplynk inserts ads only when the playback URL names an ad
   configuration (`ad=<name>`); without it there are no ads, and a name the
   workspace doesn't have stops playback. Channel sync lists each account's

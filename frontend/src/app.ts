@@ -15,6 +15,7 @@ import {
     saveRecording,
 } from './api';
 import type {AdServerOption, ChannelOption, PlayerConfig, Preset} from './config';
+import {channelGroups, channelLabel} from './config';
 import {DashJsEngine, DEFAULT_DASHJS_VERSION, loadDashJs} from './engines/dashjs';
 import {DEFAULT_HLS_VERSION, HlsJsEngine, loadHlsJs} from './engines/hlsjs';
 import {NATIVE_VERSION, NativeEngine, nativeHlsSupported} from './engines/native';
@@ -404,16 +405,12 @@ export class PlayerApp {
     }
 
     private buildLoadBar(): HTMLElement {
-        const groups = new Map<string, ChannelOption[]>();
-        for (const c of this.config.channels) {
-            groups.set(c.account, [...(groups.get(c.account) ?? []), c]);
-        }
         const source = this.ref(
             'source',
             h(
                 'select',
                 {id: 'pl-source', class: 'pl-control', onchange: () => this.syncSourceInput()},
-                ...[...groups].map(([account, channels]) =>
+                ...channelGroups(this.config.channels).map(([account, channels]) =>
                     h(
                         'optgroup',
                         {label: account},
@@ -1565,11 +1562,14 @@ export class PlayerApp {
      * Studio DRM channels play as FairPlay (HLS, Native) in Safari and as
      * DASH + Widevine elsewhere. Set that for DRM channels and undo it when
      * moving to a clear one, unless the user picked the DRM setting themselves.
+     * Events always get Widevine: FairPlay's certificate comes from Preplay,
+     * which doesn't serve events.
      */
     private applyChannelDrm(channel: ChannelOption | null): void {
         if (channel?.encryption === 'drm') {
             if (this.drm()) return;
-            this.el<HTMLSelectElement>('drm').value = fairplaySupported() ? 'fps' : 'wv';
+            const fps = fairplaySupported() && channel.kind !== 'event';
+            this.el<HTMLSelectElement>('drm').value = fps ? 'fps' : 'wv';
             this.syncDrm();
             this.autoDrm = true;
         } else if (this.autoDrm) {
@@ -1852,6 +1852,17 @@ export class PlayerApp {
         const channel = this.config.channels.find((c) => String(c.id) === value) ?? null;
         if (!channel) return;
         const drm = this.drm();
+        // Preplay serves channels and assets, not events: an event signs its
+        // own /event/<id> URL, and Widevine/PlayReady use the license host
+        // (the MPD names it too).
+        const isEvent = channel.kind === 'event';
+        if (isEvent && drm === 'fps') {
+            this.notice(
+                'error',
+                'FairPlay needs Preplay for its certificate URL, and Preplay does not serve live events. Play the event as DASH with Widevine.',
+            );
+            return;
+        }
         const manifest = this.format();
         const delay = this.delay();
         const ad = this.adServer();
@@ -1885,7 +1896,7 @@ export class PlayerApp {
                 manifest,
                 params: signed,
                 // DRM needs Preplay: it returns the session URL and license servers.
-                ...(drm ? {mode: 'preplay' as const, drm} : {}),
+                ...(drm && !isEvent ? {mode: 'preplay' as const, drm} : {}),
             });
         } catch (err) {
             if (err instanceof PlaybackRequestError && err.preplayRequest)
@@ -1924,6 +1935,11 @@ export class PlayerApp {
                 return;
             }
             drmConfig = {keySystem: KEY_SYSTEMS.fps, certificateUrl};
+        } else if (drm && isEvent) {
+            drmConfig = {
+                keySystem: KEY_SYSTEMS[drm],
+                licenseUrl: defaultLicenseUrl(response.url, drm),
+            };
         } else if (drm) {
             const licenseUrl =
                 drm === 'wv'
@@ -4024,10 +4040,8 @@ function shortUrlFull(url: string): string {
     }
 }
 
-/** Picker text: 🔒 for Studio DRM, ★ for pinned. */
-export function channelLabel(c: ChannelOption): string {
-    return `${c.encryption === 'drm' ? '🔒 ' : ''}${c.favorite ? '★ ' : ''}${c.name}`;
-}
+// Re-exported for tests that import it from here.
+export {channelLabel};
 
 function isSafari(): boolean {
     const ua = navigator.userAgent;

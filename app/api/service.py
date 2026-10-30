@@ -53,7 +53,7 @@ def parse_request(data: dict[str, Any]) -> PlaybackRequest:
         if channel is None:
             raise PlaybackError("Unknown channel")
         account = channel.uplynk_account
-        target = PlaybackTarget(content_type="c", content_id=channel.channel_id)
+        target = PlaybackTarget(content_type=channel.content_type, content_id=channel.channel_id)
     else:
         account = db.session.get(UplynkAccount, _int(data.get("account_id"), "account_id"))
         if account is None:
@@ -253,7 +253,7 @@ def check_encryption(
         account = channel.uplynk_account
         if account.id not in keys:
             keys[account.id] = decrypt(account.api_key_encrypted)
-        target = PlaybackTarget(content_type="c", content_id=channel.channel_id)
+        target = PlaybackTarget(content_type=channel.content_type, content_id=channel.channel_id)
         base_url = manifest_base_url(content_base, target, "m3u8")
         urls.append(sign_url(base_url, target, keys[account.id], ttl).url)
     probes = probe_all(urls, workers)
@@ -280,7 +280,7 @@ def check_health(
         account = channel.uplynk_account
         if account.id not in keys:
             keys[account.id] = decrypt(account.api_key_encrypted)
-        target = PlaybackTarget(content_type="c", content_id=channel.channel_id)
+        target = PlaybackTarget(content_type=channel.content_type, content_id=channel.channel_id)
         base_url = manifest_base_url(content_base, target, "m3u8")
         signed = sign_url(base_url, target, keys[account.id], ttl, [("pdts", "latency")])
         urls.append(signed.url)

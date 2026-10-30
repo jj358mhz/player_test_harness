@@ -84,6 +84,11 @@ class UplynkAccount(Base):
     scoped_private_b64_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
     scoped_scp: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    # Also sync the workspace's Live Events (api2 liveevents2) as playable rows.
+    sync_events: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=false(), nullable=False
+    )
+
     last_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_sync_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
@@ -116,7 +121,12 @@ class UplynkAccount(Base):
 
 
 class Channel(Base):
-    """A live channel as returned by GET /api/v4/channels."""
+    """A live channel (GET /api/v4/channels) or, with `kind` 'event', a Live Event.
+
+    Events (GET /api2/liveevents2/list, accounts with `sync_events`) share
+    the table so the dashboard, player, presets and deep links treat them
+    alike; they play from `/event/<id>.*` (token `ct=e`).
+    """
 
     __tablename__ = "channels"
 
@@ -126,7 +136,11 @@ class Channel(Base):
         nullable=False,
         index=True,
     )
-    # System-defined channel GUID.
+    # 'channel' or 'event'.
+    kind: Mapped[str] = mapped_column(
+        String(10), default="channel", server_default="channel", nullable=False
+    )
+    # System-defined channel (or event) GUID.
     channel_id: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
     external_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -135,6 +149,13 @@ class Channel(Base):
     # Uplynk's use_chsched: 1 = schedule disabled, 2 = enabled.
     use_chsched: Mapped[int | None] = mapped_column(Integer, nullable=True)
     upstream_created_at: Mapped[str | None] = mapped_column(String(40), nullable=True)
+
+    # Events only: Uplynk's `state` and schedule (expected) vs what happened (actual).
+    event_state: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    expected_start: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    expected_stop: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    actual_start: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    actual_stop: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # What a signed HLS media playlist showed last time we looked:
     # 'drm' (Studio DRM: FairPlay keys), 'aes-128', 'sample-aes', 'none'.
@@ -174,6 +195,32 @@ class Channel(Base):
     @property
     def is_drm(self) -> bool:
         return self.encryption == "drm"
+
+    @property
+    def is_event(self) -> bool:
+        return self.kind == "event"
+
+    @property
+    def content_type(self) -> str:
+        """Token `ct`: c (channel) or e (event)."""
+        return "e" if self.is_event else "c"
+
+    @property
+    def event_phase(self) -> str | None:
+        """pre / live / ended from the actual start and stop; None for channels."""
+        if not self.is_event:
+            return None
+        if self.actual_stop:
+            return "ended"
+        return "live" if self.actual_start else "pre"
+
+    @classmethod
+    def checkable(cls):
+        """SQL filter: channels, and events on air (started, not stopped).
+
+        Health and encryption checks skip events before and after they air.
+        """
+        return (cls.kind == "channel") | (cls.actual_start.isnot(None) & cls.actual_stop.is_(None))
 
     @property
     def needs_attention(self) -> bool:

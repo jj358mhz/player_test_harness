@@ -5,6 +5,7 @@
 import './styles/player.css';
 import type {PlayerApp} from './app';
 import type {ChannelOption} from './config';
+import {channelGroups, channelLabel} from './config';
 import {bandFor} from './lib/bands';
 import {
     compareSearch,
@@ -144,11 +145,11 @@ class ComparePage {
         this.channel = h(
             'select',
             {id: 'cmp-channel', class: 'pl-control'},
-            ...config.channels.map((c) =>
+            ...channelGroups(config.channels).map(([account, channels]) =>
                 h(
-                    'option',
-                    {value: String(c.id)},
-                    `${c.encryption === 'drm' ? '🔒 ' : ''}${c.favorite ? '★ ' : ''}${c.name}`,
+                    'optgroup',
+                    {label: account},
+                    ...channels.map((c) => h('option', {value: String(c.id)}, channelLabel(c))),
                 ),
             ),
         );

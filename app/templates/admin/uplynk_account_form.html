@@ -35,6 +35,11 @@
         </div>
         {% endif %}
 
+        <div class="field">
+            <label class="checkbox-row">{{ form.sync_events() }} {{ form.sync_events.label.text }}</label>
+            <p class="field__help">{{ form.sync_events.description }}</p>
+        </div>
+
         <div class="form-actions">
             {{ form.submit(class="button button--primary") }}
             <a href="{{ url_for('admin.list_accounts') }}" class="button button--link">Cancel</a>

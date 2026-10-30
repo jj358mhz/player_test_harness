@@ -391,6 +391,31 @@ describe('channelLabel', async () => {
         expect(channelLabel({...base, encryption: 'none'})).toBe('Chan');
         expect(channelLabel({...base, encryption: 'drm', favorite: true})).toBe('🔒 ★ Chan');
     });
+    it("adds a live event's phase", () => {
+        expect(channelLabel({...base, kind: 'event', phase: 'pre'})).toBe('Chan (pre-event)');
+        expect(channelLabel({...base, kind: 'event', phase: 'live'})).toBe('Chan (live)');
+        expect(channelLabel({...base, phase: 'live'})).toBe('Chan');
+    });
+});
+
+describe('channelGroups', async () => {
+    const {channelGroups} = await import('../src/config');
+    const row = (id: number, account: string, kind?: 'channel' | 'event') => ({
+        id,
+        name: `n${id}`,
+        account,
+        channelId: `chan000${id}`,
+        favorite: false,
+        kind,
+    });
+    it("puts each account's events in their own group", () => {
+        const groups = channelGroups([row(1, 'A'), row(2, 'A', 'event'), row(3, 'B')]);
+        expect(groups.map(([label, items]) => [label, items.map((c) => c.id)])).toEqual([
+            ['A', [1]],
+            ['A · Events', [2]],
+            ['B', [3]],
+        ]);
+    });
 });
 
 describe('ID3 in a DASH emsg (com.uplynk.asset.metadata)', () => {
