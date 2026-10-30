@@ -45,8 +45,8 @@ class UplynkAccountForm(FlaskForm):
     )
     sync_events = BooleanField(
         "Sync live events",
-        description="Also list this workspace's Live Events (pre-event, live and recently "
-        "ended) on each sync, so they can be played from the Events tab and the player. "
+        description="Also list this workspace's Live Events (pre-event and live; ended "
+        "ones drop off) on each sync, so they can be played from the Events tab and the player. "
         "Uses the API key (classic auth).",
     )
     submit = SubmitField("Save")

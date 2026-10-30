@@ -324,7 +324,8 @@ after dependency changes.
   `require_studio_drm`, `deleted`. Documented `state` values: only
   `complete` seen in the docs, so the phase (pre / live / ended) comes
   from `actual_start`/`actual_stop` (`Channel.event_phase`); verify real
-  states on a workspace. Playback `/event/<id>.{m3u8,mpd}` (`ct=e`) or
+  states on a workspace. Sync skips ended events (an `actual_stop`), so
+  they go inactive like missing ones (v3.33.1). Playback `/event/<id>.{m3u8,mpd}` (`ct=e`) or
   `/event/ext/<owner>/<ext>.*`. **Preplay v2 doesn't serve events**, so
   event DRM is DASH + Widevine/PlayReady with the license host, no FairPlay.
   Health/encryption checks skip events off air (`Channel.checkable()`).

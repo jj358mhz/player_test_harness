@@ -179,8 +179,8 @@ def sync_events(account: UplynkAccount, now: datetime | None = None) -> EventSyn
     """List the account's Live Events in the sync window into `Channel` rows (kind 'event').
 
     The window is EVENT_SYNC_PAST_HOURS back to EVENT_SYNC_AHEAD_DAYS ahead
-    of now, on the expected start. Events outside it (or deleted) go
-    inactive; pins are kept. Caller commits.
+    of now, on the expected start. Events outside it, deleted or ended
+    (an actual stop) go inactive; pins are kept. Caller commits.
     """
     now = now or datetime.now(UTC)
     config = current_app.config
@@ -210,6 +210,8 @@ def _apply_events(
     }
     seen: set[str] = set()
     for de in discovered:
+        if de.actual_stop:
+            continue  # ended: nothing left to play live, so it goes like a missing one
         seen.add(de.event_id)
         event = existing.get(de.event_id)
         if event is None:
