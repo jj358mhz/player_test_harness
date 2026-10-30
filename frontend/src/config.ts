@@ -12,6 +12,30 @@ export interface ChannelOption {
     slicerId?: string | null;
     /** The channel's Uplynk account (keys `adServers`). */
     accountId?: number;
+    /** 'event': a Live Event (plays from `/event/<id>`; Preplay doesn't serve events). */
+    kind?: 'channel' | 'event';
+    /** Events: pre / live / ended, from Uplynk's actual start and stop. */
+    phase?: 'pre' | 'live' | 'ended' | null;
+    /** Events: scheduled start, ISO. */
+    expectedStart?: string | null;
+}
+
+const PHASES = {pre: 'pre-event', live: 'live', ended: 'ended'} as const;
+
+/** Picker text: 🔒 for Studio DRM, ★ for pinned, an event's phase after its name. */
+export function channelLabel(c: ChannelOption): string {
+    const phase = c.kind === 'event' && c.phase ? ` (${PHASES[c.phase]})` : '';
+    return `${c.encryption === 'drm' ? '🔒 ' : ''}${c.favorite ? '★ ' : ''}${c.name}${phase}`;
+}
+
+/** Picker groups: each account's channels, then its events as "<account> · Events". */
+export function channelGroups(channels: ChannelOption[]): [string, ChannelOption[]][] {
+    const groups = new Map<string, ChannelOption[]>();
+    for (const c of channels) {
+        const label = c.kind === 'event' ? `${c.account} · Events` : c.account;
+        groups.set(label, [...(groups.get(label) ?? []), c]);
+    }
+    return [...groups];
 }
 
 /** An SSAI ad configuration name entered on the account page (`ad=<name>`). */

@@ -65,6 +65,7 @@ def new_account():
                 label=form.label.data.strip(),
                 workspace_id=form.workspace_id.data.strip(),
                 api_key_encrypted=encrypt(form.api_key.data.strip()),
+                sync_events=form.sync_events.data,
             )
             err = _apply_scoped_env(acct, form.scoped_env_file.data)
             if err:
@@ -91,6 +92,7 @@ def edit_account(account_id: int):
     if form.validate_on_submit():
         acct.label = form.label.data.strip()
         acct.workspace_id = form.workspace_id.data.strip()
+        acct.sync_events = form.sync_events.data
         if form.api_key.data:
             acct.api_key_encrypted = encrypt(form.api_key.data.strip())
         err = _apply_scoped_env(acct, form.scoped_env_file.data)

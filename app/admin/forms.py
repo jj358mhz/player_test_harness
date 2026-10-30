@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileAllowed, FileField
-from wtforms import PasswordField, StringField, SubmitField
+from wtforms import BooleanField, PasswordField, StringField, SubmitField
 from wtforms.validators import DataRequired, Length, Optional
 
 
@@ -42,5 +42,11 @@ class UplynkAccountForm(FlaskForm):
         description="Download from Settings → Scoped API Keys. Needs the "
         "video.services.channels:read scope. When present it's used for channel "
         "sync instead of the API key. Leave blank on edit to keep the existing value.",
+    )
+    sync_events = BooleanField(
+        "Sync live events",
+        description="Also list this workspace's Live Events (pre-event, live and recently "
+        "ended) on each sync, so they can be played from the Events tab and the player. "
+        "Uses the API key (classic auth).",
     )
     submit = SubmitField("Save")

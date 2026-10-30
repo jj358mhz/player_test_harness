@@ -296,6 +296,24 @@ code {
     font-size: 13px;
 }
 
+/* Dashboard: Channels | Events (once an account syncs live events). */
+.dashboard-tabs {
+    display: flex;
+    gap: 1.5rem;
+}
+.dashboard-tabs__tab {
+    color: var(--text-dim);
+    text-decoration: none;
+    border-bottom: 3px solid transparent;
+}
+.dashboard-tabs__tab:hover {
+    color: var(--text-primary);
+}
+.dashboard-tabs__tab--on {
+    color: var(--text-primary);
+    border-bottom-color: var(--accent);
+}
+
 
 /* ==========================================================================
    05. Cards
@@ -622,6 +640,20 @@ form.inline {
     background: rgba(224, 82, 82, 0.16);
     color: #fca5a5;
     border-color: rgba(224, 82, 82, 0.45);
+}
+/* Live events: phase from the actual start/stop. */
+.badge--event--pre {
+    background: rgba(96, 165, 250, 0.12);
+    color: #93c5fd;
+    border-color: rgba(96, 165, 250, 0.35);
+}
+.badge--event--live {
+    background: var(--accent-bg);
+    color: var(--accent);
+    border-color: rgba(236, 30, 121, 0.4);
+}
+.badge--event--ended {
+    color: var(--text-dim);
 }
 .channel-card__health {
     display: flex;

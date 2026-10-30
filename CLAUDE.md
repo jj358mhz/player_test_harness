@@ -95,6 +95,12 @@ after dependency changes.
     Period `AssetIdentifier`) to `pdts=latency` HLS `#UPLYNK-SEGMENT`
     slices. `create_playback` returns it as `clock` for live DASH.
   - `sync.py` — channels → DB upsert; deactivates missing, keeps favorites.
+    With `UplynkAccount.sync_events` also `sync_events()`: Live Events
+    into the same `channels` table as `kind='event'` (v3.33.0, #86).
+  - `events.py` — `GET /api2/liveevents2/list` (classic v2 auth: the params
+    go inside the signed `msg`), window `start`/`stop` in UTC ms on
+    `expected_start` (`EVENT_SYNC_PAST_HOURS` / `EVENT_SYNC_AHEAD_DAYS`),
+    `limit` ≤ 100 + `skip`, no total (a short page ends it).
 - `app/api/service.py` — validates playback requests, signs/Preplays,
   writes `PlaybackEvent`, records `Channel.encryption` from the probe
   (`check_encryption()` backs `flask check-encryption`; `check_health()`
@@ -310,6 +316,18 @@ after dependency changes.
 - **CMCD**: a `CMCD=` query param is fine on signed playlists, MPDs and
   segments (after `sig`). Headers aren't: content.uplynk.com's preflight
   has no `Access-Control-Allow-Headers` and the CDN answers 403.
+- **Live Events** (docs "Live Events" API v2, #86): list
+  `/api2/liveevents2/list`, one `/api2/liveevents2/get` (`id`/`ids`/
+  `external_id(s)`). Answer `{"events": [...], "error": 0}`; fields we use:
+  `id`, `external_id`, `desc`, `state`, `expected_start/stop`,
+  `actual_start/stop` (ms), `slicers` (`[{owner, id}]`), `require_drm`,
+  `require_studio_drm`, `deleted`. Documented `state` values: only
+  `complete` seen in the docs, so the phase (pre / live / ended) comes
+  from `actual_start`/`actual_stop` (`Channel.event_phase`); verify real
+  states on a workspace. Playback `/event/<id>.{m3u8,mpd}` (`ct=e`) or
+  `/event/ext/<owner>/<ext>.*`. **Preplay v2 doesn't serve events**, so
+  event DRM is DASH + Widevine/PlayReady with the license host, no FairPlay.
+  Health/encryption checks skip events off air (`Channel.checkable()`).
 - Docs index: https://docs.uplynk.com/llms.txt
 
 ## Deployment
@@ -396,6 +414,10 @@ in the `player_harness_data` volume.
       `CSL_API_TOKEN`, the same shared secret both ways) feeds health
       badges on csl-slicer-console's slicer cards (console v1.18.0,
       `PLAYER_API_URL`).
+
+- [~] Live events (v3.33.0, #86): opt-in per account, dashboard
+      **Channels | Events** tabs, player groups. **Left:** check against a
+      real workspace (state values, pre-event playback, DRM events).
 
 ### Todo
 

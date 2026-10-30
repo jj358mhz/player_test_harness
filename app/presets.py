@@ -212,6 +212,8 @@ def describe(query: str) -> dict[str, Any]:
 
 def channel_label(channel: Channel) -> str:
     label = channel.description or channel.channel_id
+    if channel.is_event:
+        label += " (event)"
     return label if channel.is_active else f"{label} (inactive)"
 
 

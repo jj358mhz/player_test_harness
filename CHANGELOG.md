@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.33.0] - 2026-10-30
+
+### Added
+
+- **Live events** (#86). A **Sync live events** checkbox on the Uplynk
+  account form (off by default) makes each sync also list the
+  workspace's Live Events from `GET /api2/liveevents2/list` (classic
+  auth, params signed into `msg`, paged by `limit`/`skip`): those
+  expected to start from `EVENT_SYNC_PAST_HOURS` ago (default 24) to
+  `EVENT_SYNC_AHEAD_DAYS` ahead (default 7). Deleted events and ones
+  that leave the window go inactive; pins are kept. A failed event list
+  doesn't fail the channel sync, and turning the box off hides the
+  account's events.
+- Events are rows in `channels` with `kind = 'event'`, so they play,
+  pin, deep-link (`channel=<id>`), go in presets and `/compare` like
+  channels. Signed URLs use `ct=e` and `/event/<id>.{m3u8,mpd}`.
+- Dashboard **Channels | Events** tabs (Events shows once any account
+  syncs events), grouped per account; event cards show pre-event / live
+  / ended and the start and stop (actual, else scheduled) in local time.
+- Player and compare pickers list each account's events as
+  "<account> · Events", labelled with their phase. Preplay doesn't serve
+  events, so an event with Widevine/PlayReady signs its own MPD and uses
+  Uplynk's license host; FairPlay events say why they can't play.
+
+### Changed
+
+- Health and encryption checks (background, **Check health**, `flask
+  check-health` / `check-encryption`) cover channels and events that are
+  on air (started, not stopped), not events before or after they air.
+  `/api/health/slicers` stays channels only.
+
 ## [3.32.4] - 2026-10-26
 
 ### Fixed

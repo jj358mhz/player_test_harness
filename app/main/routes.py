@@ -41,31 +41,54 @@ from app.uplynk.playback import CONTENT_TYPES
 from app.vite import COMPARE_ENTRY, RECORDING_ENTRY, vite_assets
 
 
-@bp.route("/")
-@login_required
-def index() -> str:
-    channels = (
+def _active_rows() -> list[Channel]:
+    """Active channels then events, per account: pinned first, then by name / start."""
+    return (
         db.session.query(Channel)
         .filter_by(is_active=True)
         .join(UplynkAccount)
-        .order_by(UplynkAccount.label, Channel.is_favorite.desc(), Channel.description)
+        .order_by(
+            UplynkAccount.label,
+            Channel.kind,
+            Channel.is_favorite.desc(),
+            Channel.expected_start,
+            Channel.description,
+        )
         .all()
     )
+
+
+@bp.route("/")
+@login_required
+def index() -> str:
+    """The dashboard: a Channels tab and, once any account syncs events, an Events tab."""
+    rows = _active_rows()
+    events = [c for c in rows if c.is_event]
+    channels = [c for c in rows if not c.is_event]
+    show_events = bool(events) or bool(
+        db.session.query(UplynkAccount).filter_by(sync_events=True).count()
+    )
+    tab = "events" if show_events and request.args.get("tab") == "events" else "channels"
+    shown = events if tab == "events" else channels
     groups = [
         (label, list(items))
-        for label, items in groupby(channels, key=lambda c: c.uplynk_account.label)
+        for label, items in groupby(shown, key=lambda c: c.uplynk_account.label)
     ]
     account_count = db.session.query(UplynkAccount).count()
-    checked = [c.health_checked_at for c in channels if c.health_checked_at]
+    checked = [c.health_checked_at for c in rows if c.health_checked_at]
     sparks, since = health_history.dashboard(
-        [c.id for c in channels], max(checked) if checked else None
+        [c.id for c in shown], max(checked) if checked else None
     )
     return render_template(
         "main/index.html",
         groups=groups,
-        total=len(channels),
+        tab=tab,
+        show_events=show_events,
+        channel_count=len(channels),
+        event_count=len(events),
+        total=len(shown),
         account_count=account_count,
-        attention=sum(1 for c in channels if c.needs_attention),
+        attention=sum(1 for c in shown if c.needs_attention),
         health_checked_at=max(checked) if checked else None,
         health_interval=current_app.config["CHANNEL_HEALTH_INTERVAL"],
         sparks=sparks,
@@ -105,7 +128,9 @@ def check_channel_health():
     """Check every active channel's live edge now (the background check, on demand)."""
     from app.api.service import check_health
 
-    channels = db.session.query(Channel).filter_by(is_active=True).all()
+    channels = (
+        db.session.query(Channel).filter(Channel.is_active.is_(True), Channel.checkable()).all()
+    )
     if not channels:
         return redirect(url_for("main.index"))
     results = check_health(channels)
@@ -123,7 +148,8 @@ def toggle_favorite(channel_id: int):
     channel = db.session.get(Channel, channel_id) or abort(404)
     channel.is_favorite = not channel.is_favorite
     db.session.commit()
-    return redirect(url_for("main.index") + f"#channel-{channel.id}")
+    tab = "events" if channel.is_event else None
+    return redirect(url_for("main.index", tab=tab) + f"#channel-{channel.id}")
 
 
 @bp.route("/channels/<int:channel_id>/play")
@@ -177,13 +203,7 @@ def compare() -> str:
 
 
 def _channel_options() -> list[dict]:
-    channels = (
-        db.session.query(Channel)
-        .filter_by(is_active=True)
-        .join(UplynkAccount)
-        .order_by(UplynkAccount.label, Channel.is_favorite.desc(), Channel.description)
-        .all()
-    )
+    channels = _active_rows()
     return [
         {
             "id": c.id,
@@ -194,9 +214,26 @@ def _channel_options() -> list[dict]:
             "encryption": c.encryption,
             "slicerId": c.slicer_id,
             "accountId": c.uplynk_account_id,
+            **(
+                {
+                    "kind": "event",
+                    "phase": c.event_phase,
+                    "expectedStart": _iso(c.expected_start),
+                }
+                if c.is_event
+                else {}
+            ),
         }
         for c in channels
     ]
+
+
+def _iso(when: datetime | None) -> str | None:
+    if when is None:
+        return None
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=UTC)  # SQLite drops the zone
+    return when.isoformat()
 
 
 @bp.route("/channels/by-slicer/<slicer_id>")
@@ -204,12 +241,12 @@ def _channel_options() -> list[dict]:
 def channel_by_slicer(slicer_id: str):
     """Where the slicer console's "Player" link lands: the slicer's channel.
 
-    One channel → the player on it; several → the dashboard filtered to
-    them; none → the dashboard with a note.
+    One channel (or, without channels, one live event) → the player on it;
+    several → the dashboard filtered to them; none → the dashboard with a note.
     """
-    ids = [
-        c.id for c in db.session.query(Channel).filter_by(is_active=True, slicer_id=slicer_id).all()
-    ]
+    rows = db.session.query(Channel).filter_by(is_active=True, slicer_id=slicer_id).all()
+    # Its channels; if it feeds none, the live event it's slicing.
+    ids = [c.id for c in rows if not c.is_event] or [c.id for c in rows if c.event_phase == "live"]
     if len(ids) == 1:
         return redirect(url_for("main.player", channel=ids[0]))
     if not ids:
