@@ -270,11 +270,19 @@ def test_dashboard_has_no_tabs_without_events(auth_client, make_account, make_ch
     assert "?tab=events" not in page and "Channel chan0001" in page
 
 
-def test_player_config_marks_events(auth_client, make_account, make_channel):
+def test_player_config_marks_events(app, make_account, make_channel):
+    # The options directly: /player renders them only once the frontend is built.
+    from app.main.routes import _channel_options
+
     acct = make_account()
-    make_channel(acct, "evt0001", kind="event", actual_start=START)
-    page = auth_client.get("/player").get_data(as_text=True)
-    assert '"kind": "event"' in page and '"phase": "live"' in page
+    make_channel(acct, "chan0001")
+    make_channel(acct, "evt0001", kind="event", actual_start=START, expected_start=START)
+    with app.test_request_context():
+        options = {o["channelId"]: o for o in _channel_options()}
+    assert "kind" not in options["chan0001"]
+    assert options["evt0001"]["kind"] == "event"
+    assert options["evt0001"]["phase"] == "live"
+    assert options["evt0001"]["expectedStart"] == START.isoformat()
 
 
 def test_account_form_saves_sync_events(auth_client, make_account):
