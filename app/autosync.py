@@ -110,7 +110,7 @@ def run_due(
                 log.warning("auto-sync: %s", result.summary)
             else:
                 failed.pop(account.id, None)
-            if result.error or result.created or result.deactivated:
+            if result.changed:
                 db.session.add(
                     AdminEvent(
                         actor_id=None,

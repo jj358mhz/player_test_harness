@@ -172,7 +172,7 @@ def test_sync_skips_events_unless_enabled(app, make_account, stub_events):
 def test_sync_events_creates_updates_and_deactivates(app, make_account, make_channel, stub_events):
     acct = make_account(sync_events=True)
     channel = make_channel(acct, "chan0001")
-    kept = make_channel(acct, "evt0001", kind="event", is_favorite=True)
+    kept = make_channel(acct, "evt0001", kind="event", is_favorite=True)  # pre-event until now
     make_channel(acct, "evt0002", kind="event")
     make_channel(acct, "evt0004", kind="event")
     stub_events["events"] = [
@@ -187,7 +187,7 @@ def test_sync_events_creates_updates_and_deactivates(app, make_account, make_cha
 
     assert result.error is None and result.event_error is None
     assert (result.events.created, result.events.updated, result.events.deactivated) == (1, 1, 2)
-    assert "events: 1 new, 1 updated, 2 gone" in result.summary
+    assert "events: 1 new, 1 updated, 2 gone, 1 went live" in result.summary
     assert not db.session.query(Channel).filter_by(channel_id="evt0004").one().is_active
     assert db.session.query(Channel).filter_by(channel_id="evt0005").first() is None
     db.session.refresh(kept)

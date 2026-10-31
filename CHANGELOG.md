@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.34.0] - 2026-10-30
+
+### Added
+
+- **Live event changes in Activity**: automatic sync now writes an
+  Activity entry when events are added, drop off (ended, deleted or out
+  of the window), go live, or the event list fails, as it already did
+  for channels. Events that only had their details refreshed stay quiet.
+- Sync messages count events that went live since the last sync
+  (`events: 0 new, 4 updated, 1 gone, 1 went live`).
+
 ## [3.33.1] - 2026-10-30
 
 ### Fixed
