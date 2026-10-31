@@ -51,6 +51,27 @@ def test_logs_only_changes_and_failures(app, make_account, monkeypatch):
     assert all(e.summary.startswith("Auto-sync: ") and e.actor_id is None for e in events)
 
 
+def test_logs_event_changes(app, make_account, monkeypatch):
+    from app.uplynk.sync import EventSyncResult
+
+    for label in "abcde":
+        make_account(label=label)
+    results = [
+        SyncResult(0, "", events=EventSyncResult(created=1)),
+        SyncResult(0, "", events=EventSyncResult(updated=3)),  # nothing new: quiet
+        SyncResult(0, "", events=EventSyncResult(updated=1, started=1)),
+        SyncResult(0, "", events=EventSyncResult(deactivated=2)),
+        SyncResult(0, "", event_error="Uplynk API error: nope"),
+    ]
+    monkeypatch.setattr(autosync, "sync_account", fake_sync(results))
+
+    autosync.run_due(app, now=NOW)
+    events = db.session.query(AdminEvent).order_by(AdminEvent.id).all()
+    assert [e.target for e in events] == ["a", "c", "d", "e"]
+    assert "1 went live" in events[1].summary
+    assert "live events not synced" in events[3].summary
+
+
 def test_failed_account_waits_before_retrying(app, make_account, monkeypatch):
     make_account(label="broken")
     calls = []

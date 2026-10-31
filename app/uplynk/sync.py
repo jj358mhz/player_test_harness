@@ -37,6 +37,19 @@ class SyncResult:
     event_error: str | None = None
 
     @property
+    def changed(self) -> bool:
+        """Worth an Activity entry from auto-sync: channels or events came,
+        went or went live, or something failed."""
+        ev = self.events
+        return bool(
+            self.error
+            or self.created
+            or self.deactivated
+            or self.event_error
+            or (ev and (ev.created or ev.deactivated or ev.started))
+        )
+
+    @property
     def summary(self) -> str:
         if self.error:
             return f"Sync failed for '{self.account_label}': {self.error}"
@@ -47,6 +60,8 @@ class SyncResult:
         if self.events:
             ev = self.events
             text += f"; events: {ev.created} new, {ev.updated} updated, {ev.deactivated} gone"
+            if ev.started:
+                text += f", {ev.started} went live"
         if self.event_error:
             text += f"; live events not synced: {self.event_error}"
         if self.ad_error:
@@ -67,6 +82,8 @@ class EventSyncResult:
     created: int = 0
     updated: int = 0
     deactivated: int = 0
+    # Known events that started (gained an actual start) since the last sync.
+    started: int = 0
 
 
 def build_client(account: UplynkAccount) -> UplynkChannelsClient:
@@ -220,6 +237,8 @@ def _apply_events(
             result.created += 1
         else:
             result.updated += 1
+            if de.actual_start and not event.actual_start:
+                result.started += 1
         event.external_id = de.external_id
         event.description = de.description
         event.slicer_id = de.slicer_id
