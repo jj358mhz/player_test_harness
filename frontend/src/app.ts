@@ -1568,10 +1568,16 @@ export class PlayerApp {
     private applyChannelDrm(channel: ChannelOption | null): void {
         if (channel?.encryption === 'drm') {
             if (this.drm()) return;
-            const fps = fairplaySupported() && !this.noFairPlay.has(channel.account);
-            this.el<HTMLSelectElement>('drm').value = fps ? 'fps' : 'wv';
-            this.syncDrm();
             this.autoDrm = true;
+            if (fairplaySupported() && this.noFairPlay.has(channel.account)) {
+                // Safari without FairPlay for this workspace: DASH with no DRM. Shaka
+                // given Widevine treats every stream as Widevine, and Safari has none
+                // (4032 even on clear pre-event slate).
+                this.setFormat('mpd');
+                return;
+            }
+            this.el<HTMLSelectElement>('drm').value = fairplaySupported() ? 'fps' : 'wv';
+            this.syncDrm();
         } else if (this.autoDrm) {
             this.el<HTMLSelectElement>('drm').value = '';
             this.setFormat('m3u8');
@@ -1926,7 +1932,7 @@ export class PlayerApp {
                 await this.loadFromForm(params);
                 this.notice(
                     'info',
-                    `${channel.account} has no FairPlay certificate set up in Uplynk (Preplay sent no certificate URL), so ${channel.name} is playing as DASH. Without Widevine (iOS), only unencrypted parts such as pre-event slate will play.`,
+                    `${channel.account} has no FairPlay certificate set up in Uplynk (Preplay sent no certificate URL), so ${channel.name} is playing as DASH without DRM. That plays unencrypted parts such as pre-event slate; encrypted ones need FairPlay here.`,
                 );
                 return;
             }

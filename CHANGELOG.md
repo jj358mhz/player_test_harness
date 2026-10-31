@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.35.2] - 2026-10-30
+
+### Fixed
+- In Safari and on iOS, v3.35.1's DASH fallback now plays: it loads DASH
+  without DRM. With Widevine set, Shaka treats every stream as Widevine,
+  and Safari has none, so playback stopped at `MANIFEST 4032
+  CONTENT_UNSUPPORTED_BY_BROWSER`, even on clear pre-event slate.
+
 ## [3.35.1] - 2026-10-30
 
 ### Fixed
