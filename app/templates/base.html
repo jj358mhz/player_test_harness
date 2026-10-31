@@ -32,6 +32,7 @@
         <nav class="site-header__nav">
             {% if current_user.is_authenticated %}
             <a href="{{ url_for('main.index') }}" class="site-header__link">Channels</a>
+            {% if show_events_nav() %}<a href="{{ url_for('main.events') }}" class="site-header__link">Events</a>{% endif %}
             <a href="{{ url_for('main.player') }}" class="site-header__link">Player</a>
             <a href="{{ url_for('main.compare') }}" class="site-header__link">Compare</a>
             <a href="{{ url_for('main.presets') }}" class="site-header__link">Presets</a>

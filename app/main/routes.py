@@ -58,18 +58,35 @@ def _active_rows() -> list[Channel]:
     )
 
 
+def events_enabled() -> bool:
+    """Show the Events page (and its header link): an account syncs events, or some are listed."""
+    return bool(
+        db.session.query(UplynkAccount.id).filter_by(sync_events=True).first()
+        or db.session.query(Channel.id).filter_by(kind="event", is_active=True).first()
+    )
+
+
 @bp.route("/")
 @login_required
-def index() -> str:
-    """The dashboard: a Channels tab and, once any account syncs events, an Events tab."""
+def index():
+    """The channels dashboard."""
+    if request.args.get("tab") == "events":  # v3.33 links
+        return redirect(url_for("main.events"))
+    return _dashboard("channels")
+
+
+@bp.route("/events")
+@login_required
+def events():
+    """Live events, the same dashboard (accounts with Sync live events)."""
+    if not events_enabled():
+        return redirect(url_for("main.index"))
+    return _dashboard("events")
+
+
+def _dashboard(tab: str) -> str:
     rows = _active_rows()
-    events = [c for c in rows if c.is_event]
-    channels = [c for c in rows if not c.is_event]
-    show_events = bool(events) or bool(
-        db.session.query(UplynkAccount).filter_by(sync_events=True).count()
-    )
-    tab = "events" if show_events and request.args.get("tab") == "events" else "channels"
-    shown = events if tab == "events" else channels
+    shown = [c for c in rows if c.is_event == (tab == "events")]
     groups = [
         (label, list(items))
         for label, items in groupby(shown, key=lambda c: c.uplynk_account.label)
@@ -83,9 +100,6 @@ def index() -> str:
         "main/index.html",
         groups=groups,
         tab=tab,
-        show_events=show_events,
-        channel_count=len(channels),
-        event_count=len(events),
         total=len(shown),
         account_count=account_count,
         attention=sum(1 for c in shown if c.needs_attention),
@@ -148,8 +162,8 @@ def toggle_favorite(channel_id: int):
     channel = db.session.get(Channel, channel_id) or abort(404)
     channel.is_favorite = not channel.is_favorite
     db.session.commit()
-    tab = "events" if channel.is_event else None
-    return redirect(url_for("main.index", tab=tab) + f"#channel-{channel.id}")
+    page = "main.events" if channel.is_event else "main.index"
+    return redirect(url_for(page) + f"#channel-{channel.id}")
 
 
 @bp.route("/channels/<int:channel_id>/play")

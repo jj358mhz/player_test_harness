@@ -49,9 +49,8 @@ latency, drift, ABR, DRM keys, ID3/SCTE-35, captions and more.
   Live Events (`/api2/liveevents2/list`) on each sync: those expected to
   start from `EVENT_SYNC_PAST_HOURS` ago (default 24) to
   `EVENT_SYNC_AHEAD_DAYS` ahead (default 7). They get their own **Events**
-  tab on the dashboard (per account, pre-event / live, schedule; ended
-  events drop off at the next sync)
-  and their own group in the player, and play from `/event/<id>.{m3u8,mpd}`.
+  page in the header menu (per account: pre-event or live, schedule; ended
+  events drop off at the next sync) and their own group in the player, and play from `/event/<id>.{m3u8,mpd}`.
 - ▶️ **One-click play** — each channel card signs a fresh HLS URL and opens
   the monitoring player with it. Copy HLS/DASH buttons for use in other players.
 - 📊 **Monitoring player** — video first, with latency (ID3, PDT and
