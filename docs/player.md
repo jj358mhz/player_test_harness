@@ -14,10 +14,12 @@ Uplynk stream is doing while it plays.
 - **Live events:** accounts with **Sync live events** list their events
   in the source menu after their channels, as "<account> · Events", with
   the phase (pre-event or live; ended events drop off at the next sync). They play from `/event/<id>.{m3u8,mpd}`
-  (token `ct=e`). Preplay doesn't serve events, so with **Widevine** or
-  **PlayReady** an event signs its own MPD and uses Uplynk's license host
-  (`content.uplynk.com/wv`, `/pr`; the MPD names it too). FairPlay needs
-  Preplay's certificate URL, so it can't play an event.
+  (token `ct=e`). With DRM they go through Preplay like channels
+  (`/preplay/event/<id>.json`, not in Uplynk's docs but served): Widevine
+  and PlayReady get its license URLs, and FairPlay its certificate URL.
+  Preplay sends a FairPlay certificate URL only when the workspace has a
+  FairPlay certificate set up; without one, FairPlay can't play that
+  workspace's channels or events (play them as DASH with Widevine).
 - **Ads (SSAI):** Uplynk inserts ads only when the playback URL names an ad
   configuration (`ad=<name>`); without it there are no ads, and a name the
   workspace doesn't have stops playback. Channel sync lists each account's

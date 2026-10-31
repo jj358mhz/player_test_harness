@@ -245,14 +245,38 @@ def test_event_signs_event_url(auth_client, make_account, make_channel):
     assert params["ct"] == "e" and params["cid"] == "evt0001"
 
 
-def test_event_preplay_is_refused(auth_client, make_account, make_channel):
+def test_event_preplay_uses_the_event_endpoint(
+    auth_client, make_account, make_channel, monkeypatch
+):
+    from app.api import service
+    from app.uplynk.playback import PreplayResult
+
+    fetched = []
+
+    def fake_preplay(url):
+        fetched.append(url)
+        return PreplayResult(
+            play_url="https://content-x.example.com/preplay2/event/evt0001/abc/def.mpd",
+            prefix="https://content-x.example.com",
+            sid="sid1",
+            drm={"required": True, "widevineLicenseURL": "https://content-x.example.com/wv"},
+            raw={},
+        )
+
+    monkeypatch.setattr(service, "fetch_preplay", fake_preplay)
     event = make_channel(make_account(), "evt0001", kind="event")
     response = auth_client.post(
         "/api/playback",
         json={"channel_id": event.id, "manifest": "mpd", "mode": "preplay", "drm": "wv"},
     )
-    assert response.status_code == 400
-    assert "channels and assets only" in response.get_json()["error"]
+    assert response.status_code == 200, response.get_json()
+    parts = urlsplit(fetched[0])
+    assert parts.path == "/preplay/event/evt0001.json"
+    params = dict(parse_qsl(parts.query))
+    assert params["ct"] == "e" and params["rmt"] == "wv" and params["manifest"] == "mpd"
+    body = response.get_json()
+    assert body["url"].endswith("/def.mpd")
+    assert body["drm_config"]["widevineLicenseURL"] == "https://content-x.example.com/wv"
 
 
 EVENTS_LINK = 'href="/events" class="site-header__link"'

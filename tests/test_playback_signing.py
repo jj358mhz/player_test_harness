@@ -60,9 +60,16 @@ def test_preplay_base_url_channel_and_asset():
     )
 
 
-def test_preplay_rejects_events():
-    with pytest.raises(PlaybackError, match="channels and assets"):
+def test_preplay_base_url_event():
+    assert (
         preplay_base_url(BASE, PlaybackTarget("e", content_id="ev1"))
+        == f"{BASE}/preplay/event/ev1.json"
+    )
+
+
+def test_preplay_rejects_playlists():
+    with pytest.raises(PlaybackError, match="channels, events and assets"):
+        preplay_base_url(BASE, PlaybackTarget("p", content_id="pl1"))
 
 
 def test_target_requires_exactly_one_id():
