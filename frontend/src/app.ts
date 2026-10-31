@@ -1562,13 +1562,11 @@ export class PlayerApp {
      * Studio DRM channels play as FairPlay (HLS, Native) in Safari and as
      * DASH + Widevine elsewhere. Set that for DRM channels and undo it when
      * moving to a clear one, unless the user picked the DRM setting themselves.
-     * Events always get Widevine: FairPlay's certificate comes from Preplay,
-     * which doesn't serve events.
      */
     private applyChannelDrm(channel: ChannelOption | null): void {
         if (channel?.encryption === 'drm') {
             if (this.drm()) return;
-            const fps = fairplaySupported() && channel.kind !== 'event';
+            const fps = fairplaySupported();
             this.el<HTMLSelectElement>('drm').value = fps ? 'fps' : 'wv';
             this.syncDrm();
             this.autoDrm = true;
@@ -1852,17 +1850,6 @@ export class PlayerApp {
         const channel = this.config.channels.find((c) => String(c.id) === value) ?? null;
         if (!channel) return;
         const drm = this.drm();
-        // Preplay serves channels and assets, not events: an event signs its
-        // own /event/<id> URL, and Widevine/PlayReady use the license host
-        // (the MPD names it too).
-        const isEvent = channel.kind === 'event';
-        if (isEvent && drm === 'fps') {
-            this.notice(
-                'error',
-                'FairPlay needs Preplay for its certificate URL, and Preplay does not serve live events. Play the event as DASH with Widevine.',
-            );
-            return;
-        }
         const manifest = this.format();
         const delay = this.delay();
         const ad = this.adServer();
@@ -1896,7 +1883,7 @@ export class PlayerApp {
                 manifest,
                 params: signed,
                 // DRM needs Preplay: it returns the session URL and license servers.
-                ...(drm && !isEvent ? {mode: 'preplay' as const, drm} : {}),
+                ...(drm ? {mode: 'preplay' as const, drm} : {}),
             });
         } catch (err) {
             if (err instanceof PlaybackRequestError && err.preplayRequest)
@@ -1930,16 +1917,11 @@ export class PlayerApp {
             if (!certificateUrl) {
                 this.notice(
                     'error',
-                    `Preplay returned no FairPlay certificate URL for ${channel.name}. Is Studio DRM with FairPlay enabled on this channel?`,
+                    `Preplay returned no FairPlay certificate URL for ${channel.name}, so it can't play with FairPlay. Uplynk sends one only when the workspace has a FairPlay certificate set up, which some Studio DRM workspaces don't. In Chrome or Edge, play it as DASH with Widevine.`,
                 );
                 return;
             }
             drmConfig = {keySystem: KEY_SYSTEMS.fps, certificateUrl};
-        } else if (drm && isEvent) {
-            drmConfig = {
-                keySystem: KEY_SYSTEMS[drm],
-                licenseUrl: defaultLicenseUrl(response.url, drm),
-            };
         } else if (drm) {
             const licenseUrl =
                 drm === 'wv'

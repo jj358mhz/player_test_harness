@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.35.0] - 2026-10-30
+
+### Changed
+- Live events with DRM now load through Preplay, like channels, at
+  `/preplay/event/<id>.json`. Uplynk serves this endpoint although its docs
+  don't list it. Widevine and PlayReady take their license URLs from
+  Preplay's answer instead of guessing the license host.
+
+### Added
+- FairPlay for live events in Safari and on iOS. A Studio DRM event now
+  picks FairPlay (Native engine) on Apple devices, as channels do.
+
+### Fixed
+- When Preplay sends no FairPlay certificate URL, the error now says why:
+  Uplynk sends one only when the workspace has a FairPlay certificate set
+  up. Some Studio DRM workspaces don't, for channels and events alike;
+  play those as DASH with Widevine.
+
 ## [3.34.2] - 2026-10-30
 
 ### Fixed

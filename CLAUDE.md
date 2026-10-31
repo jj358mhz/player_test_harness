@@ -186,8 +186,8 @@ after dependency changes.
   is signed, including Preplay's `manifest` and `rmt`. `exp` ≥ now+10s.
 - Playback: `content.uplynk.com/channel/<id>.{m3u8,mpd}`,
   `/channel/ext/<owner>/<ext>.*`, assets at `/<id>.*`, events at `/event/<id>.*`.
-- Preplay v2: `/preplay/channel/<id>.json` (channels) and `/preplay/<id>.json`
-  (assets); not events. Response: absolute `playURL`, `prefix`, `sid`, `drm`
+- Preplay v2: `/preplay/channel/<id>.json` (channels), `/preplay/<id>.json`
+  (assets) and, undocumented, `/preplay/event/<id>.json` (events, v3.35.0). Response: absolute `playURL`, `prefix`, `sid`, `drm`
   (`widevineLicenseURL`, `playreadyLicenseURL`, `fairplayCertificateURL`, `required`).
 - Rays: Uplynk names renditions by letter, `a` = lowest. In an HLS master
   each variant URI's basename is the ray (`…/channel/<id>/e.m3u8`; `ifo` is
@@ -322,12 +322,20 @@ after dependency changes.
   `id`, `external_id`, `desc`, `state`, `expected_start/stop`,
   `actual_start/stop` (ms), `slicers` (`[{owner, id}]`), `require_drm`,
   `require_studio_drm`, `deleted`. Documented `state` values: only
-  `complete` seen in the docs, so the phase (pre / live / ended) comes
-  from `actual_start`/`actual_stop` (`Channel.event_phase`); verify real
-  states on a workspace. Sync skips ended events (an `actual_stop`), so
+  `complete` seen in the docs; a real workspace's upcoming events say
+  `pre` (2026-10-30). The phase (pre / live / ended) comes from
+  `actual_start`/`actual_stop` (`Channel.event_phase`). Sync skips ended events (an `actual_stop`), so
   they go inactive like missing ones (v3.33.1). Playback `/event/<id>.{m3u8,mpd}` (`ct=e`) or
-  `/event/ext/<owner>/<ext>.*`. **Preplay v2 doesn't serve events**, so
-  event DRM is DASH + Widevine/PlayReady with the license host, no FairPlay.
+  `/event/ext/<owner>/<ext>.*`. **Preplay serves events at
+  `/preplay/event/<id>.json`** (not in the docs; checked 2026-10-30: `playURL`
+  `/preplay2/event/…`, `prefix`, `sid`, `drm` with `wv`/`pr` license URLs),
+  so event DRM goes through Preplay like channels (v3.35.0).
+  `/event/<id>.json` is something else: a JSON ray list (`rays`, `pbs`,
+  a `__ray__.json` URL). Studio DRM event HLS is FairPlay, pre-event slate too.
+  **`fairplayCertificateURL` comes only from workspaces with a FairPlay
+  certificate set up** (`x-drm.uplynk.com/fairplay/public_key/<id>.cer`, the
+  id isn't the workspace ID); one events workspace returns none, for its DRM
+  channels too, so FairPlay can't play there until Uplynk/the customer adds one.
   Health/encryption checks skip events off air (`Channel.checkable()`).
 - Docs index: https://docs.uplynk.com/llms.txt
 
@@ -418,8 +426,9 @@ in the `player_harness_data` volume.
 
 - [~] Live events (v3.33.0, #86): opt-in per account, dashboard
       **Events** page (`/events`, header link once enabled; v3.34.1),
-      player groups. **Left:** check against a
-      real workspace (state values, pre-event playback, DRM events).
+      player groups. v3.35.0: event DRM via `/preplay/event/` (FairPlay
+      where the workspace has a certificate). **Left:** play a live (not
+      pre-event) DRM event end to end.
 
 ### Todo
 

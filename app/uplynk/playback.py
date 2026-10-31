@@ -109,9 +109,12 @@ def preplay_base_url(content_base: str, target: PlaybackTarget) -> str:
     base = content_base.rstrip("/")
     if target.content_type == "c":
         return f"{base}/preplay/channel/{target.path_id}.json"
+    if target.content_type == "e":
+        # Not in the Preplay docs, but Uplynk serves it (checked 2026-10-30).
+        return f"{base}/preplay/event/{target.path_id}.json"
     if target.content_type == "a":
         return f"{base}/preplay/{target.path_id}.json"
-    raise PlaybackError("Preplay v2 supports channels and assets only")
+    raise PlaybackError("Preplay v2 supports channels, events and assets only")
 
 
 def sign_url(
