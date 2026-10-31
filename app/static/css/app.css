@@ -296,24 +296,6 @@ code {
     font-size: 13px;
 }
 
-/* Dashboard: Channels | Events (once an account syncs live events). */
-.dashboard-tabs {
-    display: flex;
-    gap: 1.5rem;
-}
-.dashboard-tabs__tab {
-    color: var(--text-dim);
-    text-decoration: none;
-    border-bottom: 3px solid transparent;
-}
-.dashboard-tabs__tab:hover {
-    color: var(--text-primary);
-}
-.dashboard-tabs__tab--on {
-    color: var(--text-primary);
-    border-bottom-color: var(--accent);
-}
-
 
 /* ==========================================================================
    05. Cards

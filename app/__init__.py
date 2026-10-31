@@ -58,6 +58,15 @@ def create_app(config: Config | None = None) -> Flask:
     def inject_version() -> dict:
         return {"app_version": APP_VERSION, "csl_base_url": app.config["CSL_BASE_URL"]}
 
+    @app.context_processor
+    def inject_nav() -> dict:
+        from flask_login import current_user
+
+        from app.main.routes import events_enabled
+
+        # The header's Events link; a callable so pages without a header don't query.
+        return {"show_events_nav": lambda: current_user.is_authenticated and events_enabled()}
+
     _register_cli(app)
 
     # First-run bootstrap (idempotent — skips if users already exist)

@@ -417,7 +417,8 @@ in the `player_harness_data` volume.
       `PLAYER_API_URL`).
 
 - [~] Live events (v3.33.0, #86): opt-in per account, dashboard
-      **Channels | Events** tabs, player groups. **Left:** check against a
+      **Events** page (`/events`, header link once enabled; v3.34.1),
+      player groups. **Left:** check against a
       real workspace (state values, pre-event playback, DRM events).
 
 ### Todo

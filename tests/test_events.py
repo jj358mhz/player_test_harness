@@ -255,25 +255,33 @@ def test_event_preplay_is_refused(auth_client, make_account, make_channel):
     assert "channels and assets only" in response.get_json()["error"]
 
 
-def test_dashboard_events_tab(auth_client, make_account, make_channel):
+EVENTS_LINK = 'href="/events" class="site-header__link"'
+
+
+def test_events_page(auth_client, make_account, make_channel):
     acct = make_account(sync_events=True)
     make_channel(acct, "chan0001", description="A channel")
     make_channel(acct, "evt0001", kind="event", description="Big game", expected_start=START)
 
     page = auth_client.get("/").get_data(as_text=True)
     assert "A channel" in page and "Big game" not in page
-    assert "?tab=events" in page
+    assert EVENTS_LINK in page  # in the header, on every page
 
-    page = auth_client.get("/?tab=events").get_data(as_text=True)
+    page = auth_client.get("/events").get_data(as_text=True)
     assert "Big game" in page and "A channel" not in page
+    assert "<h1>Events" in page
     assert "Pre-event" in page and "2026-10-30 12:00 UTC" in page
     assert 'data-section="events:demo"' in page
 
+    # v3.33's tab links still land there.
+    assert auth_client.get("/?tab=events").headers["Location"].endswith("/events")
 
-def test_dashboard_has_no_tabs_without_events(auth_client, make_account, make_channel):
+
+def test_no_events_page_without_events(auth_client, make_account, make_channel):
     make_channel(make_account(), "chan0001")
-    page = auth_client.get("/?tab=events").get_data(as_text=True)
-    assert "?tab=events" not in page and "Channel chan0001" in page
+    page = auth_client.get("/").get_data(as_text=True)
+    assert EVENTS_LINK not in page
+    assert auth_client.get("/events").headers["Location"].endswith("/")
 
 
 def test_player_config_marks_events(app, make_account, make_channel):

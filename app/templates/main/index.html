@@ -3,16 +3,7 @@
 
 {% block content %}
 <div class="page-header">
-    {% if show_events %}
-    <h1 class="dashboard-tabs" role="tablist">
-        <a href="{{ url_for('main.index') }}" role="tab" aria-selected="{{ 'true' if tab == 'channels' else 'false' }}"
-           class="dashboard-tabs__tab{% if tab == 'channels' %} dashboard-tabs__tab--on{% endif %}">Channels <span class="page-header__meta">{{ channel_count }}</span></a>
-        <a href="{{ url_for('main.index', tab='events') }}" role="tab" aria-selected="{{ 'true' if tab == 'events' else 'false' }}"
-           class="dashboard-tabs__tab{% if tab == 'events' %} dashboard-tabs__tab--on{% endif %}">Events <span class="page-header__meta">{{ event_count }}</span></a>
-    </h1>
-    {% else %}
-    <h1>Channels <span class="page-header__meta">{{ total }} active</span></h1>
-    {% endif %}
+    <h1>{{ 'Events' if tab == 'events' else 'Channels' }} <span class="page-header__meta">{{ total }} active</span></h1>
     <div class="page-header__controls">
         {% if total %}
         <input type="search" id="channel-filter" class="input channel-filter"

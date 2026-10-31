@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.34.1] - 2026-10-30
+
+### Fixed
+
+- **Events moved to the header menu**: the dashboard's big
+  **Channels | Events** tab headings looked out of place next to the
+  filter. Events now has its own page, `/events`, linked as **Events**
+  after **Channels** in the site header (shown once an account syncs
+  events), with a plain title like every other page. Old `/?tab=events`
+  links redirect there.
+
 ## [3.34.0] - 2026-10-30
 
 ### Added
