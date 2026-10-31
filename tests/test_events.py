@@ -174,16 +174,22 @@ def test_sync_events_creates_updates_and_deactivates(app, make_account, make_cha
     channel = make_channel(acct, "chan0001")
     kept = make_channel(acct, "evt0001", kind="event", is_favorite=True)
     make_channel(acct, "evt0002", kind="event")
+    make_channel(acct, "evt0004", kind="event")
     stub_events["events"] = [
         _de("evt0001", description="Renamed", actual_start=START, require_drm=True),
         _de("evt0003"),
+        # Ended: listed by Uplynk (in the window) but not kept.
+        _de("evt0004", actual_start=START, actual_stop=START + timedelta(hours=4)),
+        _de("evt0005", actual_start=START, actual_stop=START + timedelta(hours=4)),
     ]
 
     result = sync_module.sync_account(acct)
 
     assert result.error is None and result.event_error is None
-    assert (result.events.created, result.events.updated, result.events.deactivated) == (1, 1, 1)
-    assert "events: 1 new, 1 updated, 1 gone" in result.summary
+    assert (result.events.created, result.events.updated, result.events.deactivated) == (1, 1, 2)
+    assert "events: 1 new, 1 updated, 2 gone" in result.summary
+    assert not db.session.query(Channel).filter_by(channel_id="evt0004").one().is_active
+    assert db.session.query(Channel).filter_by(channel_id="evt0005").first() is None
     db.session.refresh(kept)
     assert kept.description == "Renamed" and kept.is_favorite and kept.is_drm
     assert kept.event_phase == "live" and kept.content_type == "e"

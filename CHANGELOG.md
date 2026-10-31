@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.33.1] - 2026-10-30
+
+### Fixed
+
+- **Ended live events stayed on the Events tab**: the sync window
+  reaches 24 h back, so an event that finished earlier the same day was
+  still listed, marked Ended. Sync now skips events with an actual stop
+  time, so they go inactive like events that leave the window (pins are
+  kept if one comes back).
+
 ## [3.33.0] - 2026-10-30
 
 ### Added

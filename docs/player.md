@@ -13,7 +13,7 @@ Uplynk stream is doing while it plays.
   **Save as preset…** on the right, so the first row never changes height.
 - **Live events:** accounts with **Sync live events** list their events
   in the source menu after their channels, as "<account> · Events", with
-  the phase (pre-event, live, ended). They play from `/event/<id>.{m3u8,mpd}`
+  the phase (pre-event or live; ended events drop off at the next sync). They play from `/event/<id>.{m3u8,mpd}`
   (token `ct=e`). Preplay doesn't serve events, so with **Widevine** or
   **PlayReady** an event signs its own MPD and uses Uplynk's license host
   (`content.uplynk.com/wv`, `/pr`; the MPD names it too). FairPlay needs
