@@ -19,7 +19,10 @@ Uplynk stream is doing while it plays.
   and PlayReady get its license URLs, and FairPlay its certificate URL.
   Preplay sends a FairPlay certificate URL only when the workspace has a
   FairPlay certificate set up; without one, FairPlay can't play that
-  workspace's channels or events (play them as DASH with Widevine).
+  workspace's channels or events, so where the player picked FairPlay itself
+  it reloads as DASH and uses DASH for that account until the page reloads.
+  On iOS (no Widevine) that plays only unencrypted parts, such as pre-event
+  slate.
 - **Ads (SSAI):** Uplynk inserts ads only when the playback URL names an ad
   configuration (`ad=<name>`); without it there are no ads, and a name the
   workspace doesn't have stops playback. Channel sync lists each account's
