@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.34.2] - 2026-10-30
+
+### Fixed
+
+- **Crowded site header**: with **Events** added, the header's links no
+  longer fit its 1080 px width on the dashboard and other narrow pages,
+  so the brand and links like "Sign URL" broke onto two lines. The header
+  is now as wide as the player's (1480 px) on every page, so it no longer
+  shifts between pages; its links never break inside; and below 1280 px
+  the email hides and whole links wrap under the brand.
+
 ## [3.34.1] - 2026-10-30
 
 ### Fixed
