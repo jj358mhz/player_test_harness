@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.35.1] - 2026-10-30
+
+### Fixed
+- In Safari and on iOS, a Studio DRM channel or event whose workspace has
+  no FairPlay certificate no longer stops at an error. When the player
+  picked FairPlay itself, it reloads as DASH and uses DASH for that
+  account until the page reloads. Before, you had to select DASH by hand.
+  On iOS, which has no Widevine, only unencrypted parts play (such as
+  pre-event slate). If you choose FairPlay yourself, you still get the
+  error.
+
 ## [3.35.0] - 2026-10-30
 
 ### Changed

@@ -242,6 +242,8 @@ export class PlayerApp {
     private pendingAd: string | null = null;
     /** DRM → Widevine was chosen for a DRM channel, not by the user. */
     private autoDrm = false;
+    /** Accounts whose Preplay sent no FairPlay certificate URL: DASH from then on. */
+    private noFairPlay = new Set<string>();
     private versions: Record<NpmEngine, EngineVersion[]> = {
         'hls.js': [],
         'shaka-player': [],
@@ -1566,7 +1568,7 @@ export class PlayerApp {
     private applyChannelDrm(channel: ChannelOption | null): void {
         if (channel?.encryption === 'drm') {
             if (this.drm()) return;
-            const fps = fairplaySupported();
+            const fps = fairplaySupported() && !this.noFairPlay.has(channel.account);
             this.el<HTMLSelectElement>('drm').value = fps ? 'fps' : 'wv';
             this.syncDrm();
             this.autoDrm = true;
@@ -1914,6 +1916,20 @@ export class PlayerApp {
         let drmConfig: DrmConfig | null = null;
         if (drm === 'fps') {
             const certificateUrl = response.drm_config?.fairplayCertificateURL;
+            if (!certificateUrl && this.autoDrm) {
+                // The workspace has no FairPlay certificate: DASH is the way left
+                // (on iOS it plays clear periods such as pre-event slate, not CENC).
+                this.noFairPlay.add(channel.account);
+                this.el<HTMLSelectElement>('drm').value = '';
+                this.autoDrm = false;
+                this.applyChannelDrm(channel);
+                await this.loadFromForm(params);
+                this.notice(
+                    'info',
+                    `${channel.account} has no FairPlay certificate set up in Uplynk (Preplay sent no certificate URL), so ${channel.name} is playing as DASH. Without Widevine (iOS), only unencrypted parts such as pre-event slate will play.`,
+                );
+                return;
+            }
             if (!certificateUrl) {
                 this.notice(
                     'error',
